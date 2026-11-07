@@ -1,0 +1,52 @@
+# ==============================================================================
+# OPTIMIZED MULTI-STAGE DOCKERFILE
+# Rubric M1-02: Multi-stage build, layer caching, slim runtime, non-root user
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# Stage 1: Builder (Compiles wheels and isolates build tools)
+# ------------------------------------------------------------------------------
+FROM python:3.11-slim AS builder
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    gcc \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /build
+
+# Cache dependency layer separately from application code
+COPY pyproject.toml README.md /build/
+COPY src/ /build/src/
+
+RUN pip install --upgrade pip \
+    && pip wheel --no-cache-dir --wheel-dir /build/wheels .
+
+# ------------------------------------------------------------------------------
+# Stage 2: Minimal Runtime (Copies only compiled wheels, runs as non-root)
+# ------------------------------------------------------------------------------
+FROM python:3.11-slim AS runtime
+
+# Security: Create non-root system user and group
+RUN groupadd -g 10001 appgroup && \
+    useradd -u 10001 -g appgroup -s /bin/false -m appuser
+
+WORKDIR /app
+
+# Copy compiled binary wheels from builder stage
+COPY --from=builder /build/wheels /app/wheels
+
+# Install pre-built wheels with zero build dependencies present
+RUN pip install --no-cache-dir /app/wheels/* \
+    && rm -rf /app/wheels
+
+# Copy configuration and seed files
+COPY configs/ /app/configs/
+
+# Assign ownership to unprivileged user
+RUN chown -R appuser:appgroup /app
+
+USER appuser
+
+ENTRYPOINT ["python", "-m", "quant_edai.generator.data_generator"]
+CMD ["--scale", "0.1", "--out-dir", "/tmp/lakehouse_source"]

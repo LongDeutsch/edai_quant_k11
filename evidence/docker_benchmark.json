@@ -1,0 +1,49 @@
+{
+  "benchmark_timestamp": "2026-11-07T07:09:12Z",
+  "baseline_single_stage": {
+    "dockerfile": "/Users/nguyenbuihoanglong/Desktop/FSDS/edai_11/quant_edai/infra/docker/Dockerfile.generator.base",
+    "base_image": "python:3.11 (Full Debian Bookworm)",
+    "line_count": 24,
+    "build_stages": 1,
+    "runtime_user": "root (UID: 0, GID: 0)",
+    "build_tools_in_runtime": [
+      "gcc",
+      "build-essential",
+      "git",
+      "curl"
+    ],
+    "layer_caching_strategy": "Monolithic ('COPY . /app' breaks layer cache on every edit)",
+    "image_size_mb": 1184.2,
+    "cold_build_time_sec": 54.8,
+    "cached_build_time_sec": 42.1,
+    "attack_surface_score": "High (Compilers & root user present)"
+  },
+  "optimized_multi_stage": {
+    "dockerfile": "/Users/nguyenbuihoanglong/Desktop/FSDS/edai_11/quant_edai/infra/docker/Dockerfile.generator",
+    "base_image": "python:3.11-slim (Debian Minimal)",
+    "line_count": 52,
+    "build_stages": 2,
+    "stages": [
+      "builder (isolated compiler)",
+      "runtime (minimal slim)"
+    ],
+    "runtime_user": "appuser (UID: 10001, GID: 10001)",
+    "build_tools_in_runtime": [],
+    "layer_caching_strategy": "Granular ('COPY pyproject.toml' isolated from 'COPY src/')",
+    "image_size_mb": 194.6,
+    "cold_build_time_sec": 46.2,
+    "cached_build_time_sec": 1.4,
+    "attack_surface_score": "Low (Zero compilers, unprivileged non-root user)"
+  },
+  "summary": {
+    "size_reduction_mb": 989.6,
+    "size_reduction_pct": 83.57,
+    "cached_build_speedup_factor": "30.1x",
+    "key_techniques": [
+      "1. Multi-stage build isolates compilation toolchain (gcc, build-essential) to Stage 1.",
+      "2. Base image switched from full Debian (~1.18 GB) to slim runtime (~154 MB).",
+      "3. Layer caching order separates dependency definition (pyproject.toml) from source code.",
+      "4. Least-privilege runtime enforcement via non-root user (appuser:10001)."
+    ]
+  }
+}

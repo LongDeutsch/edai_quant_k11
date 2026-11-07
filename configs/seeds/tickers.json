@@ -1,0 +1,165 @@
+{
+  "mega_caps": ["AAPL", "NVDA", "MSFT", "AMZN", "GOOGL", "META", "TSLA"],
+  "tickers": [
+    {
+      "ticker": "AAPL",
+      "name": "Apple Inc.",
+      "sector": "Technology",
+      "industry": "Consumer Electronics",
+      "base_price": 182.50,
+      "base_volatility": 0.22,
+      "base_volume": 55000000,
+      "market_cap_category": "Mega-Cap"
+    },
+    {
+      "ticker": "NVDA",
+      "name": "NVIDIA Corporation",
+      "sector": "Technology",
+      "industry": "Semiconductors",
+      "base_price": 128.00,
+      "base_volatility": 0.38,
+      "base_volume": 65000000,
+      "market_cap_category": "Mega-Cap"
+    },
+    {
+      "ticker": "MSFT",
+      "name": "Microsoft Corporation",
+      "sector": "Technology",
+      "industry": "Software - Infrastructure",
+      "base_price": 420.00,
+      "base_volatility": 0.20,
+      "base_volume": 25000000,
+      "market_cap_category": "Mega-Cap"
+    },
+    {
+      "ticker": "AMZN",
+      "name": "Amazon.com Inc.",
+      "sector": "Consumer Cyclical",
+      "industry": "Internet Retail",
+      "base_price": 185.00,
+      "base_volatility": 0.26,
+      "base_volume": 35000000,
+      "market_cap_category": "Mega-Cap"
+    },
+    {
+      "ticker": "GOOGL",
+      "name": "Alphabet Inc.",
+      "sector": "Communication Services",
+      "industry": "Internet Content & Information",
+      "base_price": 165.00,
+      "base_volatility": 0.24,
+      "base_volume": 28000000,
+      "market_cap_category": "Mega-Cap"
+    },
+    {
+      "ticker": "META",
+      "name": "Meta Platforms Inc.",
+      "sector": "Communication Services",
+      "industry": "Internet Content & Information",
+      "base_price": 490.00,
+      "base_volatility": 0.32,
+      "base_volume": 20000000,
+      "market_cap_category": "Mega-Cap"
+    },
+    {
+      "ticker": "TSLA",
+      "name": "Tesla Inc.",
+      "sector": "Consumer Cyclical",
+      "industry": "Auto Manufacturers",
+      "base_price": 215.00,
+      "base_volatility": 0.45,
+      "base_volume": 75000000,
+      "market_cap_category": "Mega-Cap"
+    },
+    {
+      "ticker": "JPM",
+      "name": "JPMorgan Chase & Co.",
+      "sector": "Financial Services",
+      "industry": "Banks - Diversified",
+      "base_price": 198.00,
+      "base_volatility": 0.18,
+      "base_volume": 9000000,
+      "market_cap_category": "Large-Cap"
+    },
+    {
+      "ticker": "V",
+      "name": "Visa Inc.",
+      "sector": "Financial Services",
+      "industry": "Credit Services",
+      "base_price": 275.00,
+      "base_volatility": 0.16,
+      "base_volume": 6000000,
+      "market_cap_category": "Large-Cap"
+    },
+    {
+      "ticker": "JNJ",
+      "name": "Johnson & Johnson",
+      "sector": "Healthcare",
+      "industry": "Drug Manufacturers - General",
+      "base_price": 155.00,
+      "base_volatility": 0.14,
+      "base_volume": 7000000,
+      "market_cap_category": "Large-Cap"
+    },
+    {
+      "ticker": "XOM",
+      "name": "Exxon Mobil Corporation",
+      "sector": "Energy",
+      "industry": "Oil & Gas Integrated",
+      "base_price": 112.00,
+      "base_volatility": 0.21,
+      "base_volume": 14000000,
+      "market_cap_category": "Large-Cap"
+    },
+    {
+      "ticker": "WMT",
+      "name": "Walmart Inc.",
+      "sector": "Consumer Defensive",
+      "industry": "Discount Stores",
+      "base_price": 68.00,
+      "base_volatility": 0.15,
+      "base_volume": 18000000,
+      "market_cap_category": "Large-Cap"
+    },
+    {
+      "ticker": "PG",
+      "name": "Procter & Gamble Company",
+      "sector": "Consumer Defensive",
+      "industry": "Household & Personal Products",
+      "base_price": 166.00,
+      "base_volatility": 0.13,
+      "base_volume": 6500000,
+      "market_cap_category": "Large-Cap"
+    },
+    {
+      "ticker": "AMD",
+      "name": "Advanced Micro Devices Inc.",
+      "sector": "Technology",
+      "industry": "Semiconductors",
+      "base_price": 145.00,
+      "base_volatility": 0.42,
+      "base_volume": 42000000,
+      "market_cap_category": "Large-Cap"
+    },
+    {
+      "ticker": "ORCL",
+      "name": "Oracle Corporation",
+      "sector": "Technology",
+      "industry": "Software - Infrastructure",
+      "base_price": 138.00,
+      "base_volatility": 0.23,
+      "base_volume": 12000000,
+      "market_cap_category": "Large-Cap"
+    },
+    {
+      "ticker": "SPY",
+      "name": "SPDR S&P 500 ETF Trust",
+      "sector": "Benchmark",
+      "industry": "ETF",
+      "base_price": 540.00,
+      "base_volatility": 0.15,
+      "base_volume": 60000000,
+      "market_cap_category": "Benchmark"
+    }
+  ]
+}

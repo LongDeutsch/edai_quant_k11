@@ -1,0 +1,241 @@
+{
+  "scale": 0.1,
+  "seed": 42,
+  "total_market_rows": 3557,
+  "unique_market_rows": 3488,
+  "offline_duplicate_rate": 0.0198,
+  "total_volume": 20387570930,
+  "mega_cap_volume": 16328040167,
+  "volume_skew_ratio": 0.8009,
+  "schema_evolved_rows": 1772,
+  "total_news_articles": 1183,
+  "total_label_rows": 3472,
+  "total_dimension_rows": 32,
+  "cardinality_profile": {
+    "market_ohlcv": {
+      "trade_id": {
+        "unique_values": 3488,
+        "total_rows": 3557,
+        "cardinality_ratio": 0.980602,
+        "category": "HIGH"
+      },
+      "ticker_symbol": {
+        "unique_values": 16,
+        "total_rows": 3557,
+        "cardinality_ratio": 0.004498,
+        "category": "LOW"
+      },
+      "trade_date": {
+        "unique_values": 218,
+        "total_rows": 3557,
+        "cardinality_ratio": 0.061288,
+        "category": "MEDIUM"
+      },
+      "open_price": {
+        "unique_values": 3218,
+        "total_rows": 3557,
+        "cardinality_ratio": 0.904695,
+        "category": "HIGH"
+      },
+      "high_price": {
+        "unique_values": 3238,
+        "total_rows": 3557,
+        "cardinality_ratio": 0.910318,
+        "category": "HIGH"
+      },
+      "low_price": {
+        "unique_values": 3229,
+        "total_rows": 3557,
+        "cardinality_ratio": 0.907787,
+        "category": "HIGH"
+      },
+      "close_price": {
+        "unique_values": 3234,
+        "total_rows": 3557,
+        "cardinality_ratio": 0.909193,
+        "category": "HIGH"
+      },
+      "volume": {
+        "unique_values": 3487,
+        "total_rows": 3557,
+        "cardinality_ratio": 0.98032,
+        "category": "HIGH"
+      },
+      "exchange": {
+        "unique_values": 2,
+        "total_rows": 3557,
+        "cardinality_ratio": 0.000562,
+        "category": "ULTRA_LOW"
+      },
+      "ingestion_timestamp": {
+        "unique_values": 45,
+        "total_rows": 3557,
+        "cardinality_ratio": 0.012651,
+        "category": "LOW"
+      },
+      "market_regime": {
+        "unique_values": 2,
+        "total_rows": 3557,
+        "cardinality_ratio": 0.000562,
+        "category": "ULTRA_LOW"
+      },
+      "vwap": {
+        "unique_values": 1676,
+        "total_rows": 3557,
+        "cardinality_ratio": 0.471184,
+        "category": "MEDIUM"
+      },
+      "trade_count": {
+        "unique_values": 1687,
+        "total_rows": 3557,
+        "cardinality_ratio": 0.474276,
+        "category": "MEDIUM"
+      }
+    },
+    "financial_news": {
+      "article_id": {
+        "unique_values": 1183,
+        "total_rows": 1183,
+        "cardinality_ratio": 1.0,
+        "category": "HIGH"
+      },
+      "ticker_symbol": {
+        "unique_values": 16,
+        "total_rows": 1183,
+        "cardinality_ratio": 0.013525,
+        "category": "LOW"
+      },
+      "publish_date": {
+        "unique_values": 218,
+        "total_rows": 1183,
+        "cardinality_ratio": 0.184277,
+        "category": "MEDIUM"
+      },
+      "published_ts": {
+        "unique_values": 1183,
+        "total_rows": 1183,
+        "cardinality_ratio": 1.0,
+        "category": "HIGH"
+      },
+      "headline": {
+        "unique_values": 179,
+        "total_rows": 1183,
+        "cardinality_ratio": 0.15131,
+        "category": "MEDIUM"
+      },
+      "summary": {
+        "unique_values": 16,
+        "total_rows": 1183,
+        "cardinality_ratio": 0.013525,
+        "category": "LOW"
+      },
+      "sentiment_score": {
+        "unique_values": 1127,
+        "total_rows": 1183,
+        "cardinality_ratio": 0.952663,
+        "category": "HIGH"
+      },
+      "source_outlet": {
+        "unique_values": 4,
+        "total_rows": 1183,
+        "cardinality_ratio": 0.003381,
+        "category": "LOW"
+      }
+    },
+    "dim_companies": {
+      "company_key": {
+        "unique_values": 32,
+        "total_rows": 32,
+        "cardinality_ratio": 1.0,
+        "category": "HIGH"
+      },
+      "ticker_symbol": {
+        "unique_values": 16,
+        "total_rows": 32,
+        "cardinality_ratio": 0.5,
+        "category": "MEDIUM"
+      },
+      "company_name": {
+        "unique_values": 16,
+        "total_rows": 32,
+        "cardinality_ratio": 0.5,
+        "category": "MEDIUM"
+      },
+      "sector": {
+        "unique_values": 8,
+        "total_rows": 32,
+        "cardinality_ratio": 0.25,
+        "category": "MEDIUM"
+      },
+      "industry": {
+        "unique_values": 13,
+        "total_rows": 32,
+        "cardinality_ratio": 0.40625,
+        "category": "MEDIUM"
+      },
+      "market_cap_category": {
+        "unique_values": 4,
+        "total_rows": 32,
+        "cardinality_ratio": 0.125,
+        "category": "MEDIUM"
+      },
+      "valid_from_ts": {
+        "unique_values": 2,
+        "total_rows": 32,
+        "cardinality_ratio": 0.0625,
+        "category": "MEDIUM"
+      },
+      "valid_to_ts": {
+        "unique_values": 2,
+        "total_rows": 32,
+        "cardinality_ratio": 0.0625,
+        "category": "MEDIUM"
+      },
+      "is_current": {
+        "unique_values": 2,
+        "total_rows": 32,
+        "cardinality_ratio": 0.0625,
+        "category": "MEDIUM"
+      }
+    },
+    "labels": {
+      "ticker_symbol": {
+        "unique_values": 16,
+        "total_rows": 3472,
+        "cardinality_ratio": 0.004608,
+        "category": "LOW"
+      },
+      "label_date": {
+        "unique_values": 217,
+        "total_rows": 3472,
+        "cardinality_ratio": 0.0625,
+        "category": "MEDIUM"
+      },
+      "close_price": {
+        "unique_values": 3218,
+        "total_rows": 3472,
+        "cardinality_ratio": 0.926843,
+        "category": "HIGH"
+      },
+      "next_day_close": {
+        "unique_values": 3222,
+        "total_rows": 3472,
+        "cardinality_ratio": 0.927995,
+        "category": "HIGH"
+      },
+      "daily_return_fwd": {
+        "unique_values": 3341,
+        "total_rows": 3472,
+        "cardinality_ratio": 0.96227,
+        "category": "HIGH"
+      },
+      "direction_label": {
+        "unique_values": 2,
+        "total_rows": 3472,
+        "cardinality_ratio": 0.000576,
+        "category": "ULTRA_LOW"
+      }
+    }
+  },
+  "out_dir": "/tmp/lakehouse_source"
+}

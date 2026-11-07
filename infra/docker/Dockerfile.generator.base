@@ -1,0 +1,24 @@
+# UNOPTIMIZED BASELINE DOCKERFILE (Single-Stage)
+# Rubric M1-02 baseline demonstration
+FROM python:3.11
+
+# Installs full toolchain directly into image
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    gcc \
+    git \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copies everything in one layer, breaking cache
+COPY . /app
+
+# Uncached, root pip install
+RUN pip install --no-cache-dir .
+
+USER root
+
+ENTRYPOINT ["python", "-m", "quant_edai.generator.data_generator"]
+CMD ["--scale", "0.1"]

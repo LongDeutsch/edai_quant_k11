@@ -1,0 +1,58 @@
+# Generator Configuration for Quant EDAI Platform
+generator:
+  seed: 42
+  scale: 0.1 # 0.1 for local/test (~10 GB), 1.0 for full cluster benchmark (>=100 GB)
+  start_date: "2024-01-02"
+  end_date: "2024-10-31"
+  trading_days: 210
+  out_dir: "/tmp/lakehouse_source"
+  seed_file: "configs/seeds/tickers.json"
+
+faults:
+  # 1. Volume & row-count skew: 80% concentrated in Mega-Cap tickers
+  volume_skew:
+    enabled: true
+    ratio: 0.80
+    mega_caps:
+      - "AAPL"
+      - "NVDA"
+      - "MSFT"
+      - "AMZN"
+      - "GOOGL"
+      - "META"
+      - "TSLA"
+
+  # 2. Schema evolution: at boundary, add vwap & trade_count to market data
+  schema_evolution:
+    enabled: true
+    boundary_date: "2024-06-01"
+    new_columns:
+      market:
+        vwap: "float64"
+        trade_count: "int32"
+      news:
+        sentiment_score: "float64"
+
+  # 3. Offline duplicates: 2.0% duplicates with drifted timestamps
+  offline_duplicates:
+    enabled: true
+    ratio: 0.02
+
+  # 4. Streaming late arrivals: 5% of ticks delayed 5 to 10 minutes
+  streaming_late_arrivals:
+    enabled: true
+    ratio: 0.05
+    min_delay_seconds: 300
+    max_delay_seconds: 600
+
+  # 5. Streaming duplicates: 1.5% duplicate messages in Kafka stream
+  streaming_duplicates:
+    enabled: true
+    ratio: 0.015
+
+  # 6. Market regime drift: transition from Bull to high-volatility Bear regime
+  regime_drift:
+    enabled: true
+    boundary_date: "2024-08-01"
+    bear_volatility_multiplier: 2.2
+    bear_drift_penalty: -0.0015

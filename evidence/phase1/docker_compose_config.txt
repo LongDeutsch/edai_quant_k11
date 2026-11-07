@@ -1,0 +1,4 @@
+=== Docker Compose Service Definition Verification ===
+Path: infra/docker-compose.yml
+Services: minio, minio-init, kafka, postgres, redis
+Healthchecks, volumes, and ports verified.

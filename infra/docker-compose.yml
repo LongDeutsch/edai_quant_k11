@@ -1,0 +1,125 @@
+services:
+  # ============================================================================
+  # 1. Storage & Lakehouse Foundation (MinIO-compatible S3)
+  # Official minio/minio + minio/mc were removed from Docker Hub; quay.io now
+  # requires auth. Use Silo (MinIO community fork) + AWS CLI for bucket init.
+  # ============================================================================
+  minio:
+    image: pgsty/silo:RELEASE.2026-09-16T00-00-00Z
+    container_name: quant_minio
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    # Entrypoint maps legacy `minio`/`server` argv to `silo`.
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - minio_data:/data
+
+  minio-init:
+    image: amazon/aws-cli:2.22.0
+    container_name: quant_minio_init
+    depends_on:
+      minio:
+        condition: service_healthy
+    environment:
+      AWS_ACCESS_KEY_ID: minioadmin
+      AWS_SECRET_ACCESS_KEY: minioadmin
+      AWS_DEFAULT_REGION: us-east-1
+    entrypoint: >
+      /bin/sh -c "
+      set -e;
+      ENDPOINT=http://minio:9000;
+      aws --endpoint-url $$ENDPOINT s3 mb s3://external-source 2>/dev/null || true;
+      aws --endpoint-url $$ENDPOINT s3 mb s3://lakehouse 2>/dev/null || true;
+      aws --endpoint-url $$ENDPOINT s3api put-bucket-policy --bucket external-source --policy '{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"AWS\":[\"*\"]},\"Action\":[\"s3:GetObject\"],\"Resource\":[\"arn:aws:s3:::external-source/*\"]}]}';
+      echo 'MinIO buckets external-source and lakehouse successfully provisioned.';
+      "
+
+  # ============================================================================
+  # 2. Streaming Foundation (Apache Kafka KRaft Mode)
+  # ============================================================================
+  kafka:
+    image: confluentinc/cp-kafka:7.6.1
+    container_name: quant_kafka
+    restart: unless-stopped
+    ports:
+      - "9092:9092"
+      - "29092:29092"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT'
+      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092'
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_PROCESS_ROLES: 'broker,controller'
+      KAFKA_CONTROLLER_QUORUM_VOTERS: '1@kafka:29093'
+      KAFKA_LISTENERS: 'PLAINTEXT://0.0.0.0:29092,CONTROLLER://0.0.0.0:29093,PLAINTEXT_HOST://0.0.0.0:9092'
+      KAFKA_INTER_BROKER_LISTENER_NAME: 'PLAINTEXT'
+      KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
+      # cp-kafka runs as uid 1000; use the image's writable data dir.
+      KAFKA_LOG_DIRS: '/var/lib/kafka/data'
+      CLUSTER_ID: 'MkU3OEVBNTcwNTJENDM2Qk'
+    healthcheck:
+      test: ["CMD-SHELL", "kafka-topics --bootstrap-server localhost:9092 --list"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+
+  # ============================================================================
+  # 3. Relational & State Store (PostgreSQL)
+  # ============================================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: quant_postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: quant
+      POSTGRES_PASSWORD: quant_password
+      POSTGRES_DB: quant_db
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U quant -d quant_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  # ============================================================================
+  # 4. In-Memory & Online Feature Store (Redis)
+  # ============================================================================
+  redis:
+    image: redis:7.2-alpine
+    container_name: quant_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: redis-server --save "" --appendonly no
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - redis_data:/data
+
+volumes:
+  minio_data:
+  kafka_data:
+  postgres_data:
+  redis_data:

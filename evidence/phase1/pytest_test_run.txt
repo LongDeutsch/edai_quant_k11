@@ -1,0 +1,23 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.13.12, pytest-9.1.1, pluggy-1.5.0 -- /opt/homebrew/Caskroom/miniconda/base/bin/python3.13
+cachedir: .pytest_cache
+rootdir: /Users/nguyenbuihoanglong/Desktop/FSDS/edai_11/quant_edai
+configfile: pyproject.toml
+testpaths: tests
+plugins: anyio-4.10.0
+collecting ... collected 12 items
+
+tests/unit/test_faults_injector.py::test_volume_skew_injection PASSED    [  8%]
+tests/unit/test_faults_injector.py::test_schema_evolution_injection PASSED [ 16%]
+tests/unit/test_faults_injector.py::test_offline_duplicates_injection PASSED [ 25%]
+tests/unit/test_faults_injector.py::test_streaming_late_arrivals PASSED  [ 33%]
+tests/unit/test_faults_injector.py::test_streaming_duplicates PASSED     [ 41%]
+tests/unit/test_faults_injector.py::test_market_regime_drift PASSED      [ 50%]
+tests/unit/test_generator.py::test_generator_deterministic_run PASSED    [ 58%]
+tests/unit/test_generator.py::test_generator_datasets_and_schemas PASSED [ 66%]
+tests/unit/test_s3_uploader.py::test_uploader_local_fallback PASSED      [ 75%]
+tests/unit/test_s3_uploader.py::test_uploader_nonexistent_directory PASSED [ 83%]
+tests/unit/test_streaming_producer.py::test_streaming_tick_batch PASSED  [ 91%]
+tests/unit/test_streaming_producer.py::test_streaming_to_disk PASSED     [100%]
+
+============================== 12 passed in 2.02s ==============================
