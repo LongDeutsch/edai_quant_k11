@@ -1,0 +1,23 @@
+{
+  "engine": "auto",
+  "input_rows": 42684,
+  "output_rows": 42684,
+  "tickers_count": 16,
+  "features_computed": [
+    "sma_20",
+    "sma_50",
+    "sma_ratio_20_50",
+    "rsi_14d",
+    "macd_12_26",
+    "macd_signal_9",
+    "macd_histogram",
+    "rolling_volatility_30d",
+    "intraday_return_1d"
+  ],
+  "required_columns_verified": {
+    "event_timestamp": true,
+    "created": true
+  },
+  "target_table": "lakehouse.gold.feat_ticker_technical_indicators",
+  "status": "SUCCESS"
+}

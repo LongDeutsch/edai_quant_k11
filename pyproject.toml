@@ -19,6 +19,7 @@ dependencies = [
     "ruamel.yaml>=0.17.0",
     "openpyxl>=3.1.0",
     "minio>=7.2.20",
+    "fastavro>=1.9.0",
 ]
 
 [project.optional-dependencies]
@@ -28,6 +29,12 @@ dev = [
     "hypothesis>=6.80.0",
     "mutmut>=2.4.0",
     "locust>=2.15.0",
+]
+spark = [
+    "pyspark>=3.5.0,<4.0.0",
+]
+kafka = [
+    "kafka-python-ng>=2.2.0",
 ]
 
 [tool.pytest.ini_options]

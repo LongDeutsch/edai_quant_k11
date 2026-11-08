@@ -1,0 +1,91 @@
+{
+  "suite_name": "suite_gold_market_data",
+  "table_meta": {
+    "zone": "gold",
+    "table": "lakehouse.gold.fact_daily_ohlcv",
+    "description": "Validation suite for curated Gold Fact and Dimension tables"
+  },
+  "evaluated_rows": 24416,
+  "total_expectations": 6,
+  "successful_expectations": 6,
+  "success_percent": 100.0,
+  "status": "PASSED",
+  "evaluated_at": "2026-11-08T16:28:26.244686+00:00",
+  "results": [
+    {
+      "expectation_type": "expect_column_to_exist",
+      "kwargs": {
+        "column": "ticker_symbol"
+      },
+      "success": true,
+      "result": {
+        "observed_value": true
+      }
+    },
+    {
+      "expectation_type": "expect_column_values_to_not_be_null",
+      "kwargs": {
+        "column": "ticker_symbol"
+      },
+      "success": true,
+      "result": {
+        "unexpected_count": 0,
+        "unexpected_percent": 0.0
+      }
+    },
+    {
+      "expectation_type": "expect_column_values_to_not_be_null",
+      "kwargs": {
+        "column": "trade_date"
+      },
+      "success": true,
+      "result": {
+        "unexpected_count": 0,
+        "unexpected_percent": 0.0
+      }
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_between",
+      "kwargs": {
+        "column": "close_price",
+        "min_value": 0.01,
+        "max_value": 100000.0
+      },
+      "success": true,
+      "result": {
+        "unexpected_count": 0,
+        "min_observed": 44.41,
+        "max_observed": 625.35
+      }
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_between",
+      "kwargs": {
+        "column": "volume",
+        "min_value": 0
+      },
+      "success": true,
+      "result": {
+        "unexpected_count": 0,
+        "min_observed": 307077.0,
+        "max_observed": 43155693.0
+      }
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_in_set",
+      "kwargs": {
+        "column": "exchange",
+        "value_set": [
+          "NASDAQ",
+          "NYSE",
+          "BATS",
+          "ARCA"
+        ]
+      },
+      "success": true,
+      "result": {
+        "unexpected_values": []
+      }
+    }
+  ]
+}

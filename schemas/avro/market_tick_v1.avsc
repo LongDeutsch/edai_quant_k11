@@ -1,0 +1,16 @@
+{
+  "type": "record",
+  "name": "MarketTick",
+  "namespace": "com.quant.edai.market",
+  "doc": "Tick-level market execution event (v1)",
+  "fields": [
+    {"name": "trade_id", "type": "string", "doc": "Unique execution identifier"},
+    {"name": "ticker_symbol", "type": "string", "doc": "Equities ticker symbol"},
+    {"name": "event_timestamp", "type": "string", "doc": "ISO-8601 UTC event timestamp"},
+    {"name": "price", "type": "double", "doc": "Execution price"},
+    {"name": "size", "type": "long", "doc": "Execution share quantity"},
+    {"name": "exchange", "type": "string", "default": "NASDAQ", "doc": "Exchange venue"},
+    {"name": "is_late", "type": "boolean", "default": false, "doc": "Simulated late arrival indicator"},
+    {"name": "is_duplicate", "type": "boolean", "default": false, "doc": "Simulated duplicate delivery indicator"}
+  ]
+}

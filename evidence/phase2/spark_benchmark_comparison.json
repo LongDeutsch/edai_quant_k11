@@ -1,0 +1,8 @@
+{
+  "baseline_max_task_duration": 681.958,
+  "optimized_max_task_duration": 1.994,
+  "baseline_latency": 12616.22,
+  "optimized_latency": 8.37,
+  "speedup": 1507.31,
+  "variance_reduction": "100.0%"
+}

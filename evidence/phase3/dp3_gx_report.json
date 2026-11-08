@@ -1,0 +1,104 @@
+{
+  "suite_name": "suite_features",
+  "table_meta": {
+    "zone": "gold",
+    "table": "lakehouse.gold.feat_ticker_technical_indicators",
+    "description": "Validation suite for offline technical features serving Feast"
+  },
+  "evaluated_rows": 42684,
+  "total_expectations": 7,
+  "successful_expectations": 7,
+  "success_percent": 100.0,
+  "status": "PASSED",
+  "evaluated_at": "2026-11-08T16:28:41.718577+00:00",
+  "results": [
+    {
+      "expectation_type": "expect_column_to_exist",
+      "kwargs": {
+        "column": "ticker_symbol"
+      },
+      "success": true,
+      "result": {
+        "observed_value": true
+      }
+    },
+    {
+      "expectation_type": "expect_column_values_to_not_be_null",
+      "kwargs": {
+        "column": "event_timestamp"
+      },
+      "success": true,
+      "result": {
+        "unexpected_count": 0,
+        "unexpected_percent": 0.0
+      }
+    },
+    {
+      "expectation_type": "expect_column_values_to_not_be_null",
+      "kwargs": {
+        "column": "created"
+      },
+      "success": true,
+      "result": {
+        "unexpected_count": 0,
+        "unexpected_percent": 0.0
+      }
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_between",
+      "kwargs": {
+        "column": "close_price",
+        "min_value": 0.01,
+        "max_value": 100000.0
+      },
+      "success": true,
+      "result": {
+        "unexpected_count": 0,
+        "min_observed": 44.41,
+        "max_observed": 625.35
+      }
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_between",
+      "kwargs": {
+        "column": "rsi_14d",
+        "min_value": 0.0,
+        "max_value": 100.0
+      },
+      "success": true,
+      "result": {
+        "unexpected_count": 0,
+        "min_observed": 0.0,
+        "max_observed": 99.70149253731286
+      }
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_between",
+      "kwargs": {
+        "column": "rolling_volatility_30d",
+        "min_value": 0.0,
+        "max_value": 10.0
+      },
+      "success": true,
+      "result": {
+        "unexpected_count": 0,
+        "min_observed": 0.0,
+        "max_observed": 0.42097807375525864
+      }
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_between",
+      "kwargs": {
+        "column": "sma_ratio_20_50",
+        "min_value": 0.1,
+        "max_value": 10.0
+      },
+      "success": true,
+      "result": {
+        "unexpected_count": 0,
+        "min_observed": 0.9088737527470278,
+        "max_observed": 1.0767332589662983
+      }
+    }
+  ]
+}

@@ -1,0 +1,50 @@
+{
+  "engine": "sim",
+  "baseline_processing_time": {
+    "mode": "BASELINE_PROCESSING_TIME",
+    "watermark_enabled": false,
+    "total_ticks_received": 1025,
+    "ticks_successfully_windowed": 974,
+    "late_ticks_dropped": 51,
+    "data_loss_percentage": "4.9799999999999995%",
+    "root_cause": "Processing-time windows evaluated immediately; out-of-order ticks discarded by window operator."
+  },
+  "optimized_event_time_windowing": {
+    "mode": "EVENT_TIME_WATERMARK",
+    "watermark_enabled": true,
+    "watermark_delay_seconds": 600,
+    "allowed_lateness_seconds": 600,
+    "total_input_ticks": 1025,
+    "valid_ticks_admitted": 1000,
+    "dlq_records_routed": 10,
+    "late_ticks_recovered_ratio": "100.0%",
+    "one_minute_bars_generated": 8,
+    "deduplication_applied": true,
+    "dedup_stats": {
+      "state_backend": "RocksDB_Embedded",
+      "state_ttl_seconds": 3600,
+      "total_input_ticks": 1015,
+      "unique_ticks_retained": 1000,
+      "duplicate_ticks_eliminated": 15,
+      "duplicate_elimination_rate": 0.0148,
+      "active_state_keys_count": 1000,
+      "status": "PASSED"
+    },
+    "dlq_breakdown": {
+      "malformed_schema_count": 10,
+      "expired_past_lateness_count": 0
+    },
+    "checkpoint_config": {
+      "interval_ms": 10000,
+      "mode": "EXACTLY_ONCE",
+      "storage": "s3a://lakehouse/flink-checkpoints/"
+    }
+  },
+  "sliding_window_bars_count": 8,
+  "kafka_publishing": {
+    "bars_published": 0,
+    "dlq_published": 0
+  },
+  "output_directory": "/tmp/lakehouse_source/flink_output",
+  "timestamp": "2026-11-08T16:15:15.425354+00:00"
+}

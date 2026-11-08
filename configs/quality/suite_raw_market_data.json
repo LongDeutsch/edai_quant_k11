@@ -1,0 +1,46 @@
+{
+  "expectation_suite_name": "suite_raw_market_data",
+  "meta": {
+    "zone": "bronze",
+    "table": "lakehouse.bronze.raw_market_ohlcv",
+    "description": "Validation suite for raw market ingestion from external MinIO source"
+  },
+  "expectations": [
+    {
+      "expectation_type": "expect_column_to_exist",
+      "kwargs": { "column": "ticker_symbol" }
+    },
+    {
+      "expectation_type": "expect_column_values_to_not_be_null",
+      "kwargs": { "column": "ticker_symbol" }
+    },
+    {
+      "expectation_type": "expect_column_values_to_not_be_null",
+      "kwargs": { "column": "trade_date" }
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_between",
+      "kwargs": { "column": "open_price", "min_value": 0.01, "max_value": 100000.0 }
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_between",
+      "kwargs": { "column": "high_price", "min_value": 0.01, "max_value": 100000.0 }
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_between",
+      "kwargs": { "column": "low_price", "min_value": 0.01, "max_value": 100000.0 }
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_between",
+      "kwargs": { "column": "close_price", "min_value": 0.01, "max_value": 100000.0 }
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_between",
+      "kwargs": { "column": "volume", "min_value": 0 }
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_in_set",
+      "kwargs": { "column": "exchange", "value_set": ["NASDAQ", "NYSE", "BATS", "ARCA"] }
+    }
+  ]
+}

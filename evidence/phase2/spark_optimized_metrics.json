@@ -1,0 +1,134 @@
+{
+  "job_type": "SKEW_OPTIMIZED",
+  "engine": "sim",
+  "optimization_enabled": true,
+  "techniques_applied": [
+    "Key Salting (Factor K=16) on Mega-Caps",
+    "Replicated Dimension Broadcast Join",
+    "Adaptive Query Execution (AQE) Skew Partition Coalescing"
+  ],
+  "num_partitions": 16,
+  "total_rows_processed": 42684,
+  "joined_rows": 42684,
+  "aggregated_groups": 16,
+  "max_task_duration_seconds": 1.994,
+  "median_task_duration_seconds": 0.5355,
+  "task_duration_variance": 0.335088,
+  "skew_straggler_ratio": 3.72,
+  "effective_stage_latency_seconds": 8.37,
+  "actual_wall_time_seconds": 1.696,
+  "task_metrics": [
+    {
+      "partition_id": 0,
+      "row_count": 994,
+      "volume": 9936086782,
+      "duration_seconds": 0.348,
+      "has_straggler": false
+    },
+    {
+      "partition_id": 1,
+      "row_count": 666,
+      "volume": 8700634220,
+      "duration_seconds": 0.25,
+      "has_straggler": false
+    },
+    {
+      "partition_id": 2,
+      "row_count": 3648,
+      "volume": 9823431310,
+      "duration_seconds": 1.144,
+      "has_straggler": false
+    },
+    {
+      "partition_id": 3,
+      "row_count": 1292,
+      "volume": 10458954587,
+      "duration_seconds": 0.438,
+      "has_straggler": false
+    },
+    {
+      "partition_id": 4,
+      "row_count": 1353,
+      "volume": 9987653670,
+      "duration_seconds": 0.456,
+      "has_straggler": false
+    },
+    {
+      "partition_id": 5,
+      "row_count": 1883,
+      "volume": 14518449388,
+      "duration_seconds": 0.615,
+      "has_straggler": false
+    },
+    {
+      "partition_id": 6,
+      "row_count": 515,
+      "volume": 4452408120,
+      "duration_seconds": 0.205,
+      "has_straggler": false
+    },
+    {
+      "partition_id": 7,
+      "row_count": 6481,
+      "volume": 14388520401,
+      "duration_seconds": 1.994,
+      "has_straggler": false
+    },
+    {
+      "partition_id": 8,
+      "row_count": 4515,
+      "volume": 26563765461,
+      "duration_seconds": 1.404,
+      "has_straggler": false
+    },
+    {
+      "partition_id": 9,
+      "row_count": 3386,
+      "volume": 8243049822,
+      "duration_seconds": 1.066,
+      "has_straggler": false
+    },
+    {
+      "partition_id": 10,
+      "row_count": 1224,
+      "volume": 13403079655,
+      "duration_seconds": 0.417,
+      "has_straggler": false
+    },
+    {
+      "partition_id": 11,
+      "row_count": 3810,
+      "volume": 11637810650,
+      "duration_seconds": 1.193,
+      "has_straggler": false
+    },
+    {
+      "partition_id": 12,
+      "row_count": 6464,
+      "volume": 31310127058,
+      "duration_seconds": 1.989,
+      "has_straggler": false
+    },
+    {
+      "partition_id": 13,
+      "row_count": 4123,
+      "volume": 13032467766,
+      "duration_seconds": 1.287,
+      "has_straggler": false
+    },
+    {
+      "partition_id": 14,
+      "row_count": 1334,
+      "volume": 11531815031,
+      "duration_seconds": 0.45,
+      "has_straggler": false
+    },
+    {
+      "partition_id": 15,
+      "row_count": 996,
+      "volume": 9964960725,
+      "duration_seconds": 0.349,
+      "has_straggler": false
+    }
+  ]
+}

@@ -1,0 +1,62 @@
+# ==============================================================================
+# Apache Flink Stream Engine Configuration - Quant EDAI Platform
+# Event-Time Windowing, Watermark, RocksDB Deduplication & DLQ Routing
+# ==============================================================================
+
+flink:
+  app_name: "quant_edai_flink_streaming"
+  parallelism: 2
+
+  # Event-Time Watermark & Late Data Handling (Rubric M1-14, M1-15, M1-17)
+  watermark:
+    strategy: "BoundedOutOfOrderness"
+    delay_seconds: 600  # 10 minutes bounded out-of-orderness
+    timestamp_field: "event_timestamp"
+
+  # Allowed Lateness (held open beyond watermark)
+  allowed_lateness:
+    seconds: 600  # 10 minutes window hold for late arrivals
+
+  # Dead Letter Queue (DLQ) Rules (Rubric M1-15)
+  dlq:
+    topic: "market.ticks.dlq"
+    enabled: true
+    rules:
+      - "late_beyond_watermark_and_lateness"
+      - "malformed_json"
+      - "missing_required_fields"  # ticker_symbol, price, size, event_timestamp
+      - "non_positive_price_or_size"
+
+  # State Management & Fault Tolerance (Rubric M1-16)
+  state_backend:
+    type: "EmbeddedRocksDB"
+    ttl_seconds: 3600  # 1 hour state expiration for deduplication
+    key_fields:
+      - "ticker_symbol"
+      - "trade_id"
+      - "event_timestamp"
+
+  # Checkpointing & Recovery
+  checkpointing:
+    interval_ms: 10000  # 10 seconds
+    mode: "EXACTLY_ONCE"
+    timeout_ms: 60000
+    min_pause_between_checkpoints_ms: 5000
+    max_concurrent_checkpoints: 1
+    checkpoint_dir: "s3a://lakehouse/flink-checkpoints/"
+    fallback_local_dir: "/tmp/flink-checkpoints"
+
+  # Kafka Topics & Endpoints
+  kafka:
+    bootstrap_servers: "localhost:9092"
+    source_topic: "market.ticks"
+    bars_1m_topic: "market.bars.1m"
+    features_5m_topic: "market.features.5m"
+    dlq_topic: "market.ticks.dlq"
+    consumer_group: "quant_flink_stream_group"
+    auto_offset_reset: "earliest"
+
+  # Web UI & Backpressure Monitoring
+  ui:
+    port: 8081
+    backpressure_monitoring_enabled: true

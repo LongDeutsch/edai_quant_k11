@@ -1,0 +1,56 @@
+# ==============================================================================
+# PySpark Engine Configuration - Quant EDAI Platform
+# Medallion Lakehouse Batch Processing, Skew Handling & Compaction
+# ==============================================================================
+
+spark:
+  app_name: "quant_edai_spark"
+  master: "local[*]"
+  driver_memory: "2g"
+  executor_memory: "2g"
+
+  # Adaptive Query Execution (AQE) & Skew Handling (Rubric M1-10)
+  aqe:
+    enabled: true
+    skew_join_enabled: true
+    skew_join_skewed_partition_factor: 5
+    skew_join_skewed_partition_threshold_in_bytes: 67108864  # 64 MB
+    coalesce_partitions_enabled: true
+    min_num_post_shuffle_partitions: 4
+
+  # Key Salting Parameters
+  salting:
+    salt_factor: 16
+    mega_caps:
+      - "AAPL"
+      - "NVDA"
+      - "MSFT"
+      - "AMZN"
+      - "GOOGL"
+      - "META"
+      - "TSLA"
+
+  # Apache Iceberg & MinIO S3A Configuration (Rubric M1-18, M1-33)
+  iceberg:
+    catalog_name: "lakehouse"
+    catalog_type: "hadoop"
+    warehouse: "s3a://lakehouse/"
+    fallback_local_dir: "/tmp/lakehouse_source"
+    write_format: "parquet"
+    compression_codec: "zstd"
+
+  s3a:
+    endpoint: "http://localhost:9000"
+    access_key: "minioadmin"
+    secret_key: "minioadmin"
+    path_style_access: true
+    impl: "org.apache.hadoop.fs.s3a.S3AFileSystem"
+
+  # Spark Web UI & Event Logging (Rubric M1-09, M1-10)
+  # Event logs must live at repo .data/spark-events (mounted into History Server)
+  ui:
+    enabled: true
+    port: 4040
+    event_log_enabled: true
+    event_log_dir: ".data/spark-events"
+    history_server_port: 18080

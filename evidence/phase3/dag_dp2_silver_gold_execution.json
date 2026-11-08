@@ -1,0 +1,149 @@
+{
+  "pipeline": "dag_dp2_silver_gold",
+  "engine": "sim",
+  "airflow_trigger": {
+    "status": "OFFLINE_FALLBACK",
+    "error": "HTTPConnectionPool(host='localhost', port=8080): Max retries exceeded with url: /api/v1/dags/dag_dp2_silver_gold/dagRuns (Caused by NewConnectionError(\"HTTPConnection(host='localhost', port=8080): Failed to establish a new connection: [Errno 1] Operation not permitted\"))"
+  },
+  "task_results": {
+    "dedup": {
+      "job_type": "DEDUPLICATION_AND_SCHEMA_EVOLUTION",
+      "engine": "sim",
+      "source_path": "/tmp/lakehouse_source/raw_market_ohlcv",
+      "target_path": "/tmp/lakehouse_source/stg_market_ohlcv",
+      "total_raw_rows": 42684,
+      "deduplicated_rows": 3488,
+      "duplicates_removed": 39196,
+      "duplicate_elimination_rate": 0.9183,
+      "schema_evolution_verified": true,
+      "evolved_column_names": [
+        "vwap",
+        "trade_count"
+      ],
+      "evolved_rows_with_data": 21264,
+      "pre_boundary_null_rows": 1744
+    },
+    "scd2": {
+      "job_type": "SCD2_DIMENSION_BUILDER",
+      "engine": "sim",
+      "table": "lakehouse.gold.dim_companies",
+      "total_records": 32,
+      "active_records": 16,
+      "historical_records": 16,
+      "scd2_columns_verified": [
+        "valid_from_ts",
+        "valid_to_ts",
+        "is_current"
+      ],
+      "point_in_time_query_support": true,
+      "status": "PASSED"
+    },
+    "compaction": {
+      "procedure": "rewrite_data_files",
+      "strategy": "binpack",
+      "engine": "sim",
+      "table": "lakehouse.gold.fact_daily_ohlcv",
+      "initial_file_count": 2616,
+      "compacted_file_count": 43,
+      "file_reduction_percentage": "98.36%",
+      "initial_total_bytes": 23461340,
+      "compacted_total_bytes": 564947,
+      "total_rows_preserved": 42684,
+      "compaction_status": "SUCCESS"
+    },
+    "quality_gate": {
+      "suite_name": "suite_gold_market_data",
+      "table_meta": {
+        "zone": "gold",
+        "table": "lakehouse.gold.fact_daily_ohlcv",
+        "description": "Validation suite for curated Gold Fact and Dimension tables"
+      },
+      "evaluated_rows": 17440,
+      "total_expectations": 6,
+      "successful_expectations": 6,
+      "success_percent": 100.0,
+      "status": "PASSED",
+      "evaluated_at": "2026-11-08T16:14:48.381526+00:00",
+      "results": [
+        {
+          "expectation_type": "expect_column_to_exist",
+          "kwargs": {
+            "column": "ticker_symbol"
+          },
+          "success": true,
+          "result": {
+            "observed_value": true
+          }
+        },
+        {
+          "expectation_type": "expect_column_values_to_not_be_null",
+          "kwargs": {
+            "column": "ticker_symbol"
+          },
+          "success": true,
+          "result": {
+            "unexpected_count": 0,
+            "unexpected_percent": 0.0
+          }
+        },
+        {
+          "expectation_type": "expect_column_values_to_not_be_null",
+          "kwargs": {
+            "column": "trade_date"
+          },
+          "success": true,
+          "result": {
+            "unexpected_count": 0,
+            "unexpected_percent": 0.0
+          }
+        },
+        {
+          "expectation_type": "expect_column_values_to_be_between",
+          "kwargs": {
+            "column": "close_price",
+            "min_value": 0.01,
+            "max_value": 100000.0
+          },
+          "success": true,
+          "result": {
+            "unexpected_count": 0,
+            "min_observed": 44.41,
+            "max_observed": 625.35
+          }
+        },
+        {
+          "expectation_type": "expect_column_values_to_be_between",
+          "kwargs": {
+            "column": "volume",
+            "min_value": 0
+          },
+          "success": true,
+          "result": {
+            "unexpected_count": 0,
+            "min_observed": 307077.0,
+            "max_observed": 43155693.0
+          }
+        },
+        {
+          "expectation_type": "expect_column_values_to_be_in_set",
+          "kwargs": {
+            "column": "exchange",
+            "value_set": [
+              "NASDAQ",
+              "NYSE",
+              "BATS",
+              "ARCA"
+            ]
+          },
+          "success": true,
+          "result": {
+            "unexpected_values": []
+          }
+        }
+      ],
+      "success": true,
+      "evaluated_expectations": 6,
+      "unsuccessful_expectations": 0
+    }
+  }
+}

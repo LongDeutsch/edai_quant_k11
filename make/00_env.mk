@@ -3,7 +3,7 @@
 # ==============================================================================
 
 SHELL := /bin/bash
-UV := $(shell which uv 2>/dev/null)
+UV := $(shell command -v uv 2>/dev/null || ([ -x $(HOME)/.local/bin/uv ] && echo $(HOME)/.local/bin/uv))
 # Prefer project .venv created by `uv sync` / `make setup`. Override with: make PYTHON=...
 VENV_PYTHON := $(CURDIR)/.venv/bin/python
 ifeq ($(origin PYTHON),command line)
@@ -18,6 +18,10 @@ SEED ?= 42
 MODE ?= smoke
 SPEED ?= 10
 OUT_DIR ?= /tmp/lakehouse_source
+ENGINE ?= sim
+KAFKA_BOOTSTRAP ?= localhost:9092
+SCHEMA_REGISTRY_URL ?= http://localhost:8085
+ICEBERG_REST_URL ?= http://localhost:8181
 
 # Export standard variables for downstream sub-shells and scripts
 export PYTHONPATH := src
@@ -27,6 +31,10 @@ export SEED
 export MODE
 export SPEED
 export OUT_DIR
+export ENGINE
+export KAFKA_BOOTSTRAP
+export SCHEMA_REGISTRY_URL
+export ICEBERG_REST_URL
 
 # --- [ Environment & Setup ] ---
 
@@ -48,8 +56,11 @@ help: ## Show this help menu with all available targets
 
 setup: ## Install dependencies into .venv via uv (includes [dev] extras for pytest)
 	@echo "==> Setting up environment..."
-	@if [ -n "$(UV)" ]; then \
+	@if [ -n "$(UV)" ] && [ -x "$(UV)" ]; then \
 		echo "Found uv: $(UV)"; \
+		$(UV) sync --extra dev; \
+	elif command -v uv >/dev/null 2>&1; then \
+		echo "Found uv: $$(command -v uv)"; \
 		uv sync --extra dev; \
 	else \
 		echo "Notice: uv not found, falling back to $(PYTHON) -m pip"; \
@@ -74,5 +85,7 @@ doctor: ## Diagnostic tool to inspect environment, python, and container tools
 	@echo "  MODE:           $(MODE)"
 	@echo "  SPEED:          $(SPEED)"
 	@echo "  OUT_DIR:        $(OUT_DIR)"
+	@echo "  ENGINE:         $(ENGINE) (sim | spark | flink)"
+	@echo "  KAFKA_BOOTSTRAP:$(KAFKA_BOOTSTRAP)"
 
 .PHONY: help setup doctor

@@ -1,0 +1,21 @@
+{
+  "engine": "simulation_fallback",
+  "controller_url": "http://localhost:9002",
+  "broker_url": "http://localhost:8099",
+  "table_name": "market_bars_1m",
+  "stream_topic": "market.bars.1m",
+  "schema_validation": {
+    "valid": true,
+    "fields_count": 10,
+    "table_type": "REALTIME",
+    "stream_configs": {
+      "streamType": "kafka",
+      "stream.kafka.topic.name": "market.bars.1m",
+      "stream.kafka.broker.list": "kafka:29092",
+      "stream.kafka.consumer.type": "lowlevel",
+      "stream.kafka.consumer.prop.auto.offset.reset": "smallest",
+      "stream.kafka.consumer.factory.class.name": "org.apache.pinot.plugin.stream.kafka20.KafkaConsumerFactory",
+      "stream.kafka.decoder.class.name": "org.apache.pinot.plugin.inputformat.json.JSONMessageDecoder"
+    }
+  }
+}

@@ -1,11 +1,11 @@
 {
-  "scale": 0.1,
+  "scale": 0.05,
   "seed": 42,
   "total_market_rows": 3557,
   "unique_market_rows": 3488,
   "offline_duplicate_rate": 0.0198,
-  "total_volume": 20387570930,
-  "mega_cap_volume": 16328040167,
+  "total_volume": 10193782933,
+  "mega_cap_volume": 8164018053,
   "volume_skew_ratio": 0.8009,
   "schema_evolved_rows": 1772,
   "total_news_articles": 1183,
@@ -56,9 +56,9 @@
         "category": "HIGH"
       },
       "volume": {
-        "unique_values": 3487,
+        "unique_values": 3486,
         "total_rows": 3557,
-        "cardinality_ratio": 0.98032,
+        "cardinality_ratio": 0.980039,
         "category": "HIGH"
       },
       "exchange": {
@@ -86,9 +86,9 @@
         "category": "MEDIUM"
       },
       "trade_count": {
-        "unique_values": 1687,
+        "unique_values": 1654,
         "total_rows": 3557,
-        "cardinality_ratio": 0.474276,
+        "cardinality_ratio": 0.464999,
         "category": "MEDIUM"
       }
     },
@@ -237,5 +237,5 @@
       }
     }
   },
-  "out_dir": "/tmp/lakehouse_source"
+  "out_dir": "/private/var/folders/df/p7lmy0917s36_bmbrvhq4tn00000gp/T/pytest-of-nguyenbuihoanglong/pytest-46/spark_test_source0"
 }

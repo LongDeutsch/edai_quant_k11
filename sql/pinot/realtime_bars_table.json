@@ -1,0 +1,31 @@
+{
+  "tableName": "market_bars_1m",
+  "tableType": "REALTIME",
+  "segmentsConfig": {
+    "timeColumnName": "window_start",
+    "timeType": "MILLISECONDS",
+    "schemaName": "market_bars_1m",
+    "replication": "1",
+    "retentionTimeUnit": "DAYS",
+    "retentionTimeValue": "7"
+  },
+  "tableIndexConfig": {
+    "loadMode": "MMAP",
+    "streamConfigs": {
+      "streamType": "kafka",
+      "stream.kafka.topic.name": "market.bars.1m",
+      "stream.kafka.broker.list": "kafka:29092",
+      "stream.kafka.consumer.type": "lowlevel",
+      "stream.kafka.consumer.prop.auto.offset.reset": "smallest",
+      "stream.kafka.consumer.factory.class.name": "org.apache.pinot.plugin.stream.kafka20.KafkaConsumerFactory",
+      "stream.kafka.decoder.class.name": "org.apache.pinot.plugin.inputformat.json.JSONMessageDecoder"
+    }
+  },
+  "tenants": {
+    "broker": "DefaultTenant",
+    "server": "DefaultTenant"
+  },
+  "metadata": {
+    "customConfigs": {}
+  }
+}

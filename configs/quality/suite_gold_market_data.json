@@ -1,0 +1,34 @@
+{
+  "expectation_suite_name": "suite_gold_market_data",
+  "meta": {
+    "zone": "gold",
+    "table": "lakehouse.gold.fact_daily_ohlcv",
+    "description": "Validation suite for curated Gold Fact and Dimension tables"
+  },
+  "expectations": [
+    {
+      "expectation_type": "expect_column_to_exist",
+      "kwargs": { "column": "ticker_symbol" }
+    },
+    {
+      "expectation_type": "expect_column_values_to_not_be_null",
+      "kwargs": { "column": "ticker_symbol" }
+    },
+    {
+      "expectation_type": "expect_column_values_to_not_be_null",
+      "kwargs": { "column": "trade_date" }
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_between",
+      "kwargs": { "column": "close_price", "min_value": 0.01, "max_value": 100000.0 }
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_between",
+      "kwargs": { "column": "volume", "min_value": 0 }
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_in_set",
+      "kwargs": { "column": "exchange", "value_set": ["NASDAQ", "NYSE", "BATS", "ARCA"] }
+    }
+  ]
+}

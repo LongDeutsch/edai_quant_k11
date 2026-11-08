@@ -1,0 +1,25 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.13.12, pytest-9.2.0, pluggy-1.7.0 -- /Users/nguyenbuihoanglong/Desktop/FSDS/edai_11/quant_edai/.venv/bin/python
+cachedir: .pytest_cache
+hypothesis profile 'default'
+rootdir: /Users/nguyenbuihoanglong/Desktop/FSDS/edai_11/quant_edai
+configfile: pyproject.toml
+plugins: platformdirs-4.14.5, hypothesis-6.170.15, cov-7.1.0, locust-2.47.0
+collecting ... collected 14 items
+
+tests/unit/test_spark_salting.py::test_spark_baseline_stragglers PASSED  [  7%]
+tests/unit/test_spark_salting.py::test_spark_skew_optimized_balancing PASSED [ 14%]
+tests/unit/test_flink_streaming.py::test_rocksdb_deduplication PASSED    [ 21%]
+tests/unit/test_flink_streaming.py::test_flink_baseline_drops_late_data PASSED [ 28%]
+tests/unit/test_flink_streaming.py::test_flink_event_time_tumbling_window PASSED [ 35%]
+tests/unit/test_flink_streaming.py::test_flink_sliding_window_5m PASSED  [ 42%]
+tests/unit/test_iceberg_scd2.py::test_spark_dedup_and_schema_evolution PASSED [ 50%]
+tests/unit/test_iceberg_scd2.py::test_scd2_dimension_builder PASSED      [ 57%]
+tests/unit/test_iceberg_scd2.py::test_iceberg_compaction_procedure PASSED [ 64%]
+tests/unit/test_schema_registry_and_avro.py::test_avro_schemas_validity PASSED [ 71%]
+tests/unit/test_schema_registry_and_avro.py::test_confluent_wire_format_framing PASSED [ 78%]
+tests/unit/test_schema_registry_and_avro.py::test_verify_schema_evolution_offline PASSED [ 85%]
+tests/unit/test_dlq_and_kafka.py::test_dlq_schema_validation PASSED      [ 92%]
+tests/unit/test_dlq_and_kafka.py::test_dlq_expired_late_data_routing PASSED [100%]
+
+============================== 14 passed in 2.77s ==============================

@@ -4,22 +4,37 @@
 
 DOCKER_COMPOSE_FILE := infra/docker-compose.yml
 COMPOSE := docker compose -f $(DOCKER_COMPOSE_FILE)
-# Core long-running services. minio-init is a one-shot bucket provisioner.
-CORE_SERVICES := minio kafka postgres redis
-INIT_SERVICES := minio-init
+# Infrastructure Services
+STORAGE_SERVICES := minio postgres redis
+STREAMING_SERVICES := kafka
+INIT_SERVICES := minio-init kafka-init
+PROCESSING_SERVICES := schema-registry iceberg-rest flink-jobmanager flink-taskmanager spark-history
+ALL_SERVICES := $(STORAGE_SERVICES) $(STREAMING_SERVICES) $(INIT_SERVICES) $(PROCESSING_SERVICES)
 
 # --- [ Infrastructure & Containers ] ---
 
-up: ## Start core infrastructure containers (MinIO, Kafka, Postgres, Redis)
+up: ## Start all infrastructure containers (MinIO, Kafka, Postgres, Redis, Flink, Spark History, Schema Registry, Iceberg REST)
 	@echo "==> Starting infrastructure via Docker Compose..."
 	@if ! docker info >/dev/null 2>&1; then \
 		echo "Notice: Docker daemon is not active. Using local fallback adapters."; \
 		exit 0; \
 	fi
-	@$(COMPOSE) up -d $(CORE_SERVICES)
-	@echo "==> Provisioning MinIO buckets (minio-init)..."
-	@$(COMPOSE) up -d --force-recreate $(INIT_SERVICES)
-	@echo "==> Infrastructure is up. Run 'make status' to inspect."
+	@mkdir -p ./.data/spark-events
+	@echo "==> 1/3 Starting storage & broker foundation..."
+	@$(COMPOSE) up -d $(STORAGE_SERVICES) $(STREAMING_SERVICES)
+	@echo "==> 2/3 Provisioning MinIO buckets and Kafka streaming topics..."
+	@$(COMPOSE) up $(INIT_SERVICES)
+	@echo "==> 3/3 Starting processing engines, governance & UIs..."
+	@$(COMPOSE) up -d $(PROCESSING_SERVICES)
+	@echo "==> Infrastructure is up. Available endpoints:"
+	@echo "    - MinIO Console:        http://localhost:9001 (minioadmin / minioadmin)"
+	@echo "    - MinIO S3 API:         http://localhost:9000"
+	@echo "    - Kafka Broker:         localhost:9092"
+	@echo "    - Schema Registry:      http://localhost:8085"
+	@echo "    - Flink Web Dashboard:  http://localhost:8081"
+	@echo "    - Iceberg REST Catalog: http://localhost:8181"
+	@echo "    - Spark History Server: http://localhost:18080"
+	@echo "Run 'make status' to inspect container health."
 
 down: ## Stop running infrastructure containers without deleting volumes
 	@echo "==> Stopping infrastructure containers..."

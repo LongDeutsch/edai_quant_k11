@@ -1,0 +1,17 @@
+{
+  "job_type": "DEDUPLICATION_AND_SCHEMA_EVOLUTION",
+  "engine": "sim",
+  "source_path": "/tmp/lakehouse_source/raw_market_ohlcv",
+  "target_path": "/tmp/lakehouse_source/stg_market_ohlcv",
+  "total_raw_rows": 42684,
+  "deduplicated_rows": 3488,
+  "duplicates_removed": 39196,
+  "duplicate_elimination_rate": 0.9183,
+  "schema_evolution_verified": true,
+  "evolved_column_names": [
+    "vwap",
+    "trade_count"
+  ],
+  "evolved_rows_with_data": 21264,
+  "pre_boundary_null_rows": 1744
+}

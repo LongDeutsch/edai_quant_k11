@@ -1,0 +1,15 @@
+{
+  "job_type": "SCD2_DIMENSION_BUILDER",
+  "engine": "sim",
+  "table": "lakehouse.gold.dim_companies",
+  "total_records": 32,
+  "active_records": 16,
+  "historical_records": 16,
+  "scd2_columns_verified": [
+    "valid_from_ts",
+    "valid_to_ts",
+    "is_current"
+  ],
+  "point_in_time_query_support": true,
+  "status": "PASSED"
+}

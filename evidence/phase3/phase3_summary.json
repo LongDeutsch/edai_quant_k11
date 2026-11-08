@@ -1,0 +1,24 @@
+{
+  "phase": 3,
+  "status": "COMPLETED",
+  "artifacts": [
+    "evidence/phase3/dp1_gx_report.md",
+    "evidence/phase3/dp2_gx_report.json",
+    "evidence/phase3/pinot_realtime_metrics.json",
+    "evidence/phase3/dp3_gx_report.json",
+    "evidence/phase3/feature_computation_metrics.json",
+    "evidence/phase3/dag_dp1_raw_ingestion_execution.json",
+    "evidence/phase3/dp1_gx_report.json",
+    "evidence/phase3/dp3_features_metrics.json",
+    "evidence/phase3/dag_dp2_silver_gold_execution.json",
+    "evidence/phase3/pytest_test_run.txt",
+    "evidence/phase3/dp1_ingestion_metrics.json",
+    "evidence/phase3/clickhouse_sync_metrics.json",
+    "evidence/phase3/dp2_silver_gold_metrics.json",
+    "evidence/phase3/lineage_proof.json",
+    "evidence/phase3/dp2_gx_report.md",
+    "evidence/phase3/dp3_gx_report.md",
+    "evidence/phase3/dag_dp3_features_execution.json",
+    "evidence/phase3/lineage_proof.md"
+  ]
+}

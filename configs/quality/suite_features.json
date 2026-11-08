@@ -1,0 +1,38 @@
+{
+  "expectation_suite_name": "suite_features",
+  "meta": {
+    "zone": "gold",
+    "table": "lakehouse.gold.feat_ticker_technical_indicators",
+    "description": "Validation suite for offline technical features serving Feast"
+  },
+  "expectations": [
+    {
+      "expectation_type": "expect_column_to_exist",
+      "kwargs": { "column": "ticker_symbol" }
+    },
+    {
+      "expectation_type": "expect_column_values_to_not_be_null",
+      "kwargs": { "column": "event_timestamp" }
+    },
+    {
+      "expectation_type": "expect_column_values_to_not_be_null",
+      "kwargs": { "column": "created" }
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_between",
+      "kwargs": { "column": "close_price", "min_value": 0.01, "max_value": 100000.0 }
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_between",
+      "kwargs": { "column": "rsi_14d", "min_value": 0.0, "max_value": 100.0 }
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_between",
+      "kwargs": { "column": "rolling_volatility_30d", "min_value": 0.0, "max_value": 10.0 }
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_between",
+      "kwargs": { "column": "sma_ratio_20_50", "min_value": 0.1, "max_value": 10.0 }
+    }
+  ]
+}

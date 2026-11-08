@@ -1,0 +1,18 @@
+{
+  "type": "record",
+  "name": "MarketTick",
+  "namespace": "com.quant.edai.market",
+  "doc": "Tick-level market execution event (v2 with optional vwap and trade_count)",
+  "fields": [
+    {"name": "trade_id", "type": "string", "doc": "Unique execution identifier"},
+    {"name": "ticker_symbol", "type": "string", "doc": "Equities ticker symbol"},
+    {"name": "event_timestamp", "type": "string", "doc": "ISO-8601 UTC event timestamp"},
+    {"name": "price", "type": "double", "doc": "Execution price"},
+    {"name": "size", "type": "long", "doc": "Execution share quantity"},
+    {"name": "exchange", "type": "string", "default": "NASDAQ", "doc": "Exchange venue"},
+    {"name": "is_late", "type": "boolean", "default": false, "doc": "Simulated late arrival indicator"},
+    {"name": "is_duplicate", "type": "boolean", "default": false, "doc": "Simulated duplicate delivery indicator"},
+    {"name": "vwap", "type": ["null", "double"], "default": null, "doc": "Volume-weighted average price"},
+    {"name": "trade_count", "type": ["null", "long"], "default": null, "doc": "Accumulated trade count in window"}
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "sync_direction": "One-Way (Avro Schema Registry -> Iceberg Lakehouse)",
+  "source_schema": "schemas/avro/market_tick_v2.avsc",
+  "target_table": "lakehouse.bronze.raw_market_ohlcv",
+  "engine": "sim",
+  "promoted_columns": [
+    {
+      "column_name": "vwap",
+      "avro_type": "['null', 'double']",
+      "iceberg_sql_type": "DOUBLE",
+      "default_value": "NULL"
+    },
+    {
+      "column_name": "trade_count",
+      "avro_type": "['null', 'long']",
+      "iceberg_sql_type": "BIGINT",
+      "default_value": "NULL"
+    }
+  ],
+  "generated_ddl": [
+    "ALTER TABLE lakehouse.bronze.raw_market_ohlcv ADD COLUMN IF NOT EXISTS vwap DOUBLE;",
+    "ALTER TABLE lakehouse.bronze.raw_market_ohlcv ADD COLUMN IF NOT EXISTS trade_count BIGINT;"
+  ],
+  "backward_compatibility_verified": true,
+  "null_counts_on_historical_records": {
+    "vwap": 21420,
+    "trade_count": 21420
+  },
+  "historical_query_crash_observed": false,
+  "status": "SUCCESS"
+}

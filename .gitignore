@@ -7,6 +7,7 @@ __pycache__/
 .env
 .env.*
 /tmp/
+.data/
 *.egg-info/
 dist/
 build/

@@ -1,0 +1,13 @@
+{
+  "registry_url": "http://localhost:8085",
+  "is_online": true,
+  "subject": "market.ticks-value",
+  "compatibility_mode": "BACKWARD_TRANSITIVE",
+  "v1_schema_registered": true,
+  "v2_evolution_accepted": true,
+  "breaking_change_blocked": true,
+  "wire_format_serialization_tested": true,
+  "status": "PASSED",
+  "v1_id": 1,
+  "v2_id": 2
+}

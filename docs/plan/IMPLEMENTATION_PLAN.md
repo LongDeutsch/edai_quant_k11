@@ -374,29 +374,48 @@ Build the big data processing layer: PySpark batch jobs handling data skew, sche
 8. **Flink-02**: Implement `src/quant_edai/processing/flink/streaming_dedup.py` with embedded RocksDB state backend and 1-hour TTL deduplication.
 
 #### Files & Modules to Implement
+- `configs/processing/spark.yaml`: Spark engine, AQE, S3A MinIO, and UI configs
+- `configs/processing/flink.yaml`: Flink engine, Watermark, RocksDB, Checkpointing, DLQ configs
 - `sql/iceberg/01_create_bronze_tables.sql`
 - `sql/iceberg/02_create_silver_tables.sql`
 - `sql/iceberg/03_create_gold_tables.sql`
-- `src/quant_edai/processing/spark/baseline_job.py`
-- `src/quant_edai/processing/spark/skew_optimized.py`
-- `src/quant_edai/processing/spark/scd2_builder.py`
-- `src/quant_edai/processing/spark/iceberg_compaction.py`
-- `src/quant_edai/processing/flink/streaming_job.py`
-- `src/quant_edai/processing/flink/streaming_dedup.py`
+- `src/quant_edai/processing/spark/spark_session.py`: Shared SparkSession factory with AQE & MinIO S3A
+- `src/quant_edai/processing/spark/baseline_job.py`: Dual-mode (`ENGINE=sim|spark`) hash partition skew job
+- `src/quant_edai/processing/spark/skew_optimized.py`: Dual-mode (`ENGINE=sim|spark`) Key Salting K=16 + Broadcast Join + AQE
+- `src/quant_edai/processing/spark/dedup_job.py`: Dual-mode (`ENGINE=sim|spark`) Window dedup & schema evolution
+- `src/quant_edai/processing/spark/iceberg_compaction.py`: Dual-mode (`ENGINE=sim|spark`) binpack file compaction
+- `src/quant_edai/processing/spark/scd2_builder.py`: Dual-mode (`ENGINE=sim|spark`) SCD Type 2 dimension builder
+- `src/quant_edai/processing/flink/streaming_job.py`: Dual-mode (`ENGINE=sim|flink`) Watermark + DLQ routing + 1m/5m windows
+- `src/quant_edai/processing/flink/streaming_dedup.py`: Stateful RocksDB TTL deduplication filter
+- `src/quant_edai/generator/streaming_producer.py`: Tick generator with real Kafka publisher and JSONL fallback
+
+#### Dual Runtime Architecture (Coursework-Ready)
+- **ENGINE=sim (Default)**: Ultra-fast algorithmic simulation using Pandas/NumPy. Runs sandboxed in CI/smoke environments without JVM clusters or open sockets.
+- **ENGINE=spark**: Real PySpark DataFrame & Spark SQL API (`pyspark.sql.functions`, `broadcast()`, AQE Adaptive Skew Join, Hadoop S3A MinIO connector).
+- **ENGINE=flink**: Real streaming pipeline consuming from Kafka broker (`market.ticks`), validating schema -> Side Output DLQ (`market.ticks.dlq`), RocksDB state deduplication, event-time tumbling 1m & sliding 5m windows -> publishing to `market.bars.1m`.
 
 #### Acceptance Criteria
 - PySpark baseline vs optimized run achieves measurable speedup (target: $>5$x locally; documented target $12.2$x). Max task duration variance drops significantly.
 - Iceberg queries over historical and modern partitions return correct values without schema crashes.
 - Iceberg compaction reduces small-file count by $\ge 75\%$.
 - Flink streaming deduplicates $100\%$ of injected $1.5\%$ duplicates while properly incorporating $5-10$m delayed ticks.
+- Flink routes malformed records and expired late ticks (> 10m beyond watermark) to Dead Letter Queue (`market.ticks.dlq`).
 - `dim_companies` correctly maintains historic and active versions with SCD2 flags.
 
 #### Commands to Run
 ```bash
-make phase2
-make spark-baseline
-make spark-optimized
-make iceberg-compaction
+# Smoke / Simulation Mode
+make generate SCALE=0.1
+make stream-test
+ENGINE=sim make spark-baseline spark-optimized spark-dedup iceberg-compaction verify-scd2
+ENGINE=sim make flink-baseline flink-optimized flink-dedup
+
+# Production Runtime Path (Docker Compose Infra Up)
+make up
+make generate SCALE=0.1
+make stream-kafka
+ENGINE=spark make spark-baseline spark-optimized
+ENGINE=flink make flink-optimized flink-dedup
 ```
 
 #### Automated Tests

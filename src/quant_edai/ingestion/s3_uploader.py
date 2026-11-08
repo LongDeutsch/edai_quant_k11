@@ -108,6 +108,20 @@ class S3SourceUploader:
         }
 
 
+def sync_lakehouse_data(
+    source_dir: str = "/tmp/lakehouse_source",
+    endpoint: str = "http://localhost:9000",
+    bucket: str = "external-source",
+) -> Dict[str, Any]:
+    """Helper to stage/sync lakehouse external data to MinIO or local fallback."""
+    uploader = S3SourceUploader(
+        source_dir=source_dir,
+        endpoint_url=endpoint,
+        bucket_name=bucket,
+    )
+    return uploader.upload_dataset()
+
+
 def main():
     parser = argparse.ArgumentParser(description="Upload staged data to MinIO S3")
     parser.add_argument("--source-dir", type=str, default="/tmp/lakehouse_source")

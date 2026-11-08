@@ -79,8 +79,80 @@ services:
     volumes:
       - kafka_data:/var/lib/kafka/data
 
+  kafka-init:
+    image: confluentinc/cp-kafka:7.6.1
+    container_name: quant_kafka_init
+    depends_on:
+      kafka:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      set -e;
+      echo 'Waiting for Kafka to be ready...';
+      kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic market.ticks --partitions 4 --replication-factor 1;
+      kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic market.ticks.dlq --partitions 1 --replication-factor 1;
+      kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic market.bars.1m --partitions 4 --replication-factor 1;
+      kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic market.features.5m --partitions 4 --replication-factor 1;
+      echo 'Kafka streaming topics provisioned:';
+      kafka-topics --bootstrap-server kafka:29092 --list;
+      "
+
   # ============================================================================
-  # 3. Relational & State Store (PostgreSQL)
+  # 3. Schema Governance (Confluent Schema Registry Port 8085)
+  # ============================================================================
+  schema-registry:
+    image: confluentinc/cp-schema-registry:7.6.1
+    container_name: quant_schema_registry
+    restart: unless-stopped
+    ports:
+      - "8085:8081"
+    depends_on:
+      kafka:
+        condition: service_healthy
+    environment:
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: 'kafka:29092'
+      SCHEMA_REGISTRY_LISTENERS: 'http://0.0.0.0:8081'
+      SCHEMA_REGISTRY_SCHEMA_COMPATIBILITY_LEVEL: 'BACKWARD_TRANSITIVE'
+
+  # ============================================================================
+  # 4. Stream Processing Engine (Apache Flink Web UI :8081)
+  # ============================================================================
+  flink-jobmanager:
+    image: flink:1.18.1-scala_2.12-java11
+    container_name: quant_flink_jobmanager
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    command: jobmanager
+    environment:
+      - |
+        FLINK_PROPERTIES=
+        jobmanager.rpc.address: flink-jobmanager
+        parallelism.default: 2
+        state.backend: filesystem
+        state.checkpoints.dir: file:///tmp/flink-checkpoints
+    volumes:
+      - flink_data:/tmp/flink-checkpoints
+
+  flink-taskmanager:
+    image: flink:1.18.1-scala_2.12-java11
+    container_name: quant_flink_taskmanager
+    restart: unless-stopped
+    depends_on:
+      - flink-jobmanager
+    command: taskmanager
+    environment:
+      - |
+        FLINK_PROPERTIES=
+        jobmanager.rpc.address: flink-jobmanager
+        taskmanager.numberOfTaskSlots: 4
+        parallelism.default: 2
+    volumes:
+      - flink_data:/tmp/flink-checkpoints
+
+  # ============================================================================
+  # 5. Relational & State Store (PostgreSQL)
   # ============================================================================
   postgres:
     image: postgres:16-alpine
@@ -101,7 +173,52 @@ services:
       - postgres_data:/var/lib/postgresql/data
 
   # ============================================================================
-  # 4. In-Memory & Online Feature Store (Redis)
+  # 6. Centralized Lakehouse Catalog (Apache Iceberg REST Catalog :8181)
+  # ============================================================================
+  iceberg-rest:
+    image: tabulario/iceberg-rest:1.6.0
+    container_name: quant_iceberg_rest
+    restart: unless-stopped
+    ports:
+      - "8181:8181"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    environment:
+      AWS_REGION: us-east-1
+      CATALOG_WAREHOUSE: 's3a://lakehouse/'
+      CATALOG_IO__IMPL: 'org.apache.iceberg.aws.s3.S3FileIO'
+      CATALOG_S3_ENDPOINT: 'http://minio:9000'
+      CATALOG_S3_ACCESS_KEY_ID: 'minioadmin'
+      CATALOG_S3_SECRET_ACCESS_KEY: 'minioadmin'
+      CATALOG_S3_PATH_STYLE_ACCESS: 'true'
+      CATALOG_BACKEND: 'jdbc'
+      CATALOG_URI: 'jdbc:postgresql://postgres:5432/quant_db'
+      CATALOG_JDBC_USER: 'quant'
+      CATALOG_JDBC_PASSWORD: 'quant_password'
+
+  # ============================================================================
+  # 7. PySpark Observability (Spark History Server :18080)
+  # ============================================================================
+  spark-history:
+    image: apache/spark:3.5.5
+    container_name: quant_spark_history
+    restart: unless-stopped
+    ports:
+      - "18080:18080"
+    entrypoint: >
+      /bin/sh -c "
+      mkdir -p /tmp/spark-events &&
+      /opt/spark/bin/spark-class org.apache.spark.deploy.history.HistoryServer
+      "
+    volumes:
+      - ./.data/spark-events:/tmp/spark-events:ro
+
+  # ============================================================================
+  # ============================================================================
+  # 8. In-Memory & Online Feature Store (Redis)
   # ============================================================================
   redis:
     image: redis:7.2-alpine
@@ -118,8 +235,126 @@ services:
     volumes:
       - redis_data:/data
 
+  # ============================================================================
+  # 9. OLAP Serving Layer: ClickHouse (HTTP :8123, Native :9009)
+  # ============================================================================
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.3-alpine
+    container_name: quant_clickhouse
+    restart: unless-stopped
+    ports:
+      - "8123:8123"
+      - "9009:9000"
+    environment:
+      CLICKHOUSE_USER: quant
+      CLICKHOUSE_PASSWORD: quant_password
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8123/ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ============================================================================
+  # 10. Low-Latency Realtime Serving Layer: Apache Pinot (Controller :9002, Broker :8099)
+  # ============================================================================
+  pinot:
+    image: apachepinot/pinot:1.1.0
+    container_name: quant_pinot
+    restart: unless-stopped
+    ports:
+      - "9002:9000"
+      - "8099:8099"
+      - "8098:8098"
+    command: QuickStart -type EMPTY
+    depends_on:
+      kafka:
+        condition: service_healthy
+    volumes:
+      - pinot_data:/tmp/quickstart
+
+  # ============================================================================
+  # 11. Pipeline Orchestrator: Apache Airflow (LocalExecutor on quant_postgres)
+  # ============================================================================
+  airflow-init:
+    image: apache/airflow:2.9.0
+    container_name: quant_airflow_init
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://quant:quant_password@postgres:5432/airflow_db
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+    entrypoint: >
+      /bin/sh -c "
+      airflow db migrate &&
+      airflow users create --username admin --firstname Admin --lastname User --role Admin --email admin@example.com --password admin || true
+      "
+
+  airflow-webserver:
+    image: apache/airflow:2.9.0
+    container_name: quant_airflow_webserver
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+    environment:
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://quant:quant_password@postgres:5432/airflow_db
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'false'
+      AIRFLOW__WEBSERVER__SECRET_KEY: quant_edai_airflow_secret_key_2026
+      AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth'
+      PYTHONPATH: /opt/quant_edai/src:/opt/airflow/dags
+      QUANT_EDAI_ROOT: /opt/quant_edai
+      OUT_DIR: /tmp/lakehouse_source
+    volumes:
+      - ../orchestration/dags:/opt/airflow/dags
+      - ../src:/opt/quant_edai/src
+      - ../configs:/opt/quant_edai/configs
+      - ../evidence:/opt/quant_edai/evidence
+      - ../sql:/opt/quant_edai/sql
+      - /tmp:/tmp
+    command: webserver
+
+  airflow-scheduler:
+    image: apache/airflow:2.9.0
+    container_name: quant_airflow_scheduler
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      airflow-init:
+        condition: service_completed_successfully
+    environment:
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://quant:quant_password@postgres:5432/airflow_db
+      AIRFLOW__CORE__EXECUTOR: LocalExecutor
+      AIRFLOW__CORE__LOAD_EXAMPLES: 'false'
+      AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: 'false'
+      AIRFLOW__API__AUTH_BACKENDS: 'airflow.api.auth.backend.basic_auth'
+      PYTHONPATH: /opt/quant_edai/src:/opt/airflow/dags
+      QUANT_EDAI_ROOT: /opt/quant_edai
+      OUT_DIR: /tmp/lakehouse_source
+    volumes:
+      - ../orchestration/dags:/opt/airflow/dags
+      - ../src:/opt/quant_edai/src
+      - ../configs:/opt/quant_edai/configs
+      - ../evidence:/opt/quant_edai/evidence
+      - ../sql:/opt/quant_edai/sql
+      - /tmp:/tmp
+    command: scheduler
+
 volumes:
   minio_data:
   kafka_data:
   postgres_data:
   redis_data:
+  flink_data:
+  clickhouse_data:
+  pinot_data:

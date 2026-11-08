@@ -1,0 +1,28 @@
+FROM flink:1.18.1-scala_2.12-java11
+
+USER root
+
+# Install Python 3.10 and OpenJDK headers for pemja native compilation on Ubuntu 22.04 LTS
+RUN apt-get update -y && \
+    apt-get install -y --no-install-recommends \
+        python3 \
+        python3-pip \
+        python3-dev \
+        build-essential \
+        openjdk-11-jdk-headless \
+        curl && \
+    ln -sf /usr/bin/python3 /usr/bin/python && \
+    cp -r /usr/lib/jvm/java-11-openjdk-*/include /opt/java/openjdk/include && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install PyFlink 1.18.1
+RUN pip3 install --no-cache-dir apache-flink==1.18.1
+
+# Download official Flink Kafka SQL Connector 3.1.0 for Flink 1.18 into classpath
+RUN curl -fSL https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-connector-kafka/3.1.0-1.18/flink-sql-connector-kafka-3.1.0-1.18.jar \
+    -o /opt/flink/lib/flink-sql-connector-kafka-3.1.0-1.18.jar
+
+# Project directory mount point
+RUN mkdir -p /opt/quant_edai && chown -R flink:flink /opt/quant_edai
+
+USER flink
