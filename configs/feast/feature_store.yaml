@@ -1,0 +1,9 @@
+project: quant_feature_store
+registry: data/registry.db
+provider: local
+online_store:
+  type: redis
+  connection_string: localhost:6379
+  key_ttl: 604800  # 7 days in seconds
+offline_store:
+  type: file

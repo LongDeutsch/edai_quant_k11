@@ -1,0 +1,40 @@
+{
+  "pipeline": "ML_TRAINING_AND_EVALUATION",
+  "dataset_rows": 42480,
+  "train_rows": 33924,
+  "val_rows": 4272,
+  "test_rows": 4284,
+  "results": {
+    "baseline": {
+      "model_name": "LogisticRegression_Baseline",
+      "auc_roc": 0.4448,
+      "log_loss": 0.706,
+      "accuracy": 0.4524,
+      "f1_score": 0.4227
+    },
+    "champion": {
+      "model_name": "LightGBM_Classifier_Champion",
+      "auc_roc": 0.4454,
+      "log_loss": 0.7442,
+      "accuracy": 0.4435,
+      "f1_score": 0.3693
+    },
+    "mlflow": {
+      "status": "LOGGED",
+      "tracking_uri": "sqlite:///mlflow.db",
+      "run_id": "8c40dfd063ad4484a955286e5f500e7c",
+      "tags": {
+        "stage": "production",
+        "candidate_role": "champion"
+      }
+    },
+    "artifacts": {
+      "baseline_path": "models/baseline_model.joblib",
+      "champion_path": "models/champion_model.joblib",
+      "scaler_path": "models/scaler.joblib"
+    },
+    "test_sample_size": 4284
+  },
+  "status": "COMPLETED",
+  "timestamp": "2026-11-09T01:36:34.195650+00:00"
+}

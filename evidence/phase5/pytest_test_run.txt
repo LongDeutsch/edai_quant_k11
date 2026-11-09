@@ -1,0 +1,31 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.13.12, pytest-9.2.0, pluggy-1.7.0 -- /Users/nguyenbuihoanglong/Desktop/FSDS/edai_11/quant_edai/.venv/bin/python
+cachedir: .pytest_cache
+hypothesis profile 'default'
+rootdir: /Users/nguyenbuihoanglong/Desktop/FSDS/edai_11/quant_edai
+configfile: pyproject.toml
+plugins: platformdirs-4.14.5, hypothesis-6.170.15, cov-7.1.0, locust-2.47.0, typeguard-4.6.0, anyio-4.16.0
+collecting ... collected 14 items
+
+tests/unit/test_quant_metrics.py::test_calculate_ic_perfect_and_zero PASSED [  7%]
+tests/unit/test_quant_metrics.py::test_calculate_rank_ic_monotonic PASSED [ 14%]
+tests/unit/test_quant_metrics.py::test_calculate_sharpe_daily_vs_intraday PASSED [ 21%]
+tests/unit/test_quant_metrics.py::test_calculate_sortino_and_calmar PASSED [ 28%]
+tests/unit/test_quant_metrics.py::test_calculate_max_drawdown PASSED     [ 35%]
+tests/unit/test_quant_metrics.py::test_calculate_hit_rate_and_cumulative PASSED [ 42%]
+tests/unit/test_quant_metrics.py::test_calculate_rolling_sharpe_and_ic_series PASSED [ 50%]
+tests/unit/test_alpha_synthesis.py::test_detect_market_regime PASSED     [ 57%]
+tests/unit/test_alpha_synthesis.py::test_compute_composite_alpha PASSED  [ 64%]
+tests/unit/test_alpha_synthesis.py::test_compute_risk_parity_weights PASSED [ 71%]
+tests/unit/test_alpha_synthesis.py::test_generate_attribution_report PASSED [ 78%]
+tests/unit/test_backtester.py::test_backtester_synthetic_run_and_contract PASSED [ 85%]
+tests/unit/test_backtester.py::test_zero_look_ahead_bias_proof PASSED    [ 92%]
+tests/unit/test_backtester.py::test_transaction_cost_impact PASSED       [100%]
+
+=============================== warnings summary ===============================
+tests/unit/test_backtester.py::test_backtester_synthetic_run_and_contract
+  /Users/nguyenbuihoanglong/Desktop/FSDS/edai_11/quant_edai/.venv/lib/python3.13/site-packages/mlflow/store/tracking/sqlalchemy_store.py:356: SADeprecationWarning: The ``noload`` loader strategy is deprecated and will be removed in a future release.  This option produces incorrect results by returning ``None`` for related items. (deprecated since: 2.1)
+    sqlalchemy.orm.configure_mappers()
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================== 14 passed, 1 warning in 7.23s =========================

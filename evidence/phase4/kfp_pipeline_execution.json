@@ -1,0 +1,76 @@
+{
+  "pipeline_name": "quant_equity_direction_kfp_pipeline",
+  "mode": "local",
+  "steps": [
+    {
+      "step_name": "step1_load_features_and_join",
+      "total_joined_records": 42480,
+      "features_count": 10,
+      "duration_seconds": 0.152,
+      "status": "PASSED"
+    },
+    {
+      "step_name": "step2_walk_forward_split",
+      "train_set_size": 33924,
+      "val_set_size": 4272,
+      "test_set_size": 4284,
+      "split_ratios": {
+        "train": 0.8,
+        "val": 0.1,
+        "test": 0.1
+      },
+      "look_ahead_bias_eliminated": true,
+      "duration_seconds": 0.064,
+      "status": "PASSED"
+    },
+    {
+      "step_name": "step3_model_training",
+      "models_trained": [
+        "LogisticRegression_Baseline",
+        "LightGBM_Classifier_Champion"
+      ],
+      "artifacts_saved": {
+        "baseline_path": "models/baseline_model.joblib",
+        "champion_path": "models/champion_model.joblib",
+        "scaler_path": "models/scaler.joblib"
+      },
+      "duration_seconds": 1.994,
+      "status": "PASSED"
+    },
+    {
+      "step_name": "step4_evaluate_and_register",
+      "baseline_metrics": {
+        "model_name": "LogisticRegression_Baseline",
+        "auc_roc": 0.4448,
+        "log_loss": 0.706,
+        "accuracy": 0.4524,
+        "f1_score": 0.4227
+      },
+      "champion_metrics": {
+        "model_name": "LightGBM_Classifier_Champion",
+        "auc_roc": 0.4454,
+        "log_loss": 0.7442,
+        "accuracy": 0.4435,
+        "f1_score": 0.3693
+      },
+      "auc_lift": 0.0006,
+      "mlflow_registration": {
+        "status": "LOGGED",
+        "tracking_uri": "sqlite:///mlflow.db",
+        "run_id": "922e5ec05d224ceb8b912c90cfe036b2",
+        "tags": {
+          "stage": "production",
+          "candidate_role": "champion"
+        }
+      },
+      "production_candidate": "LightGBM_Classifier_Champion",
+      "duration_seconds": 0.856,
+      "status": "PASSED"
+    }
+  ],
+  "total_steps": 4,
+  "completed_steps": 4,
+  "total_duration_seconds": 3.068,
+  "status": "SUCCESS",
+  "timestamp": "2026-11-09T01:45:10.675912+00:00"
+}

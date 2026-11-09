@@ -53,9 +53,51 @@ phase3: ## Execute Phase 3: Orchestration (DP1/2/3), Great Expectations, Lineage
 	@$(PYTHON) -c "import json, glob; summary = {'phase': 3, 'status': 'COMPLETED', 'artifacts': glob.glob('evidence/phase3/*')}; json.dump(summary, open('evidence/phase3/phase3_summary.json', 'w'), indent=2); print('Phase 3 Complete:', json.dumps(summary, indent=2))"
 	@echo "==> Phase 3 completed successfully. Evidence saved to evidence/phase3/"
 
-phase4 phase5 phase6 phase7 phase8 demo:
+phase4: ## Execute Phase 4: Feast Feature Store, MLflow, KFP Training, KServe v2 Canary & Drift
+	@echo "==> Executing Phase 4: Feature Store, Model Training, Serving & Continuous Drift Monitoring..."
+	@mkdir -p evidence/phase4 models
+	@echo "1/7. Applying Feast definitions and materializing online store..."
+	@$(MAKE) feast-apply
+	@$(MAKE) feast-materialize
+	@echo "2/7. Verifying FastAPI Feature Fetch API (<10ms SLA)..."
+	@$(MAKE) test-api
+	@echo "3/7. Executing Kubeflow 4-Step Training Pipeline (MODE=$(MODE))..."
+	@$(MAKE) kfp-run
+	@echo "4/7. Checking MLflow experiment tracking and champion model..."
+	@$(MAKE) mlflow-status
+	@echo "5/7. Running KServe v2 mock canary routing verification (80/20 split)..."
+	@$(MAKE) kserve-infer-test
+	@echo "6/7. Running Kolmogorov-Smirnov & PSI Feature Drift Monitoring..."
+	@$(MAKE) test-drift
+	@echo "7/7. Running Phase 4 automated test suite..."
+	PYTHONPATH=src $(PYTHON) -m pytest tests/unit/test_phase4_mlops.py -v > evidence/phase4/pytest_test_run.txt
+	@$(PYTHON) -c "import json, glob; summary = {'phase': 4, 'status': 'COMPLETED', 'mode': '$(MODE)', 'artifacts': sorted(glob.glob('evidence/phase4/*'))}; json.dump(summary, open('evidence/phase4/phase4_summary.json', 'w'), indent=2); print('Phase 4 Complete:', json.dumps(summary, indent=2))"
+	@echo "==> Phase 4 completed successfully. Evidence saved to evidence/phase4/"
+
+phase5: ## Execute Phase 5: Quant Alpha Evaluation & Walk-Forward Backtesting (M1-37, M2-55)
+	@echo "==> Executing Phase 5: Quant Alpha Backtester & Novel Ideas..."
+	@mkdir -p evidence/phase5
+	$(MAKE) quant-backtest
+	@echo "==> Running mathematical and Zero Look-Ahead tests..."
+	PYTHONPATH=src $(PYTHON) -m pytest tests/unit/test_quant_metrics.py tests/unit/test_alpha_synthesis.py tests/unit/test_backtester.py -v > evidence/phase5/pytest_test_run.txt
+	@$(PYTHON) -c 'import json, glob, os; files = sorted([os.path.basename(p) for p in glob.glob("evidence/phase5/*")]); bt = json.load(open("evidence/phase5/backtest_summary.json")); json.dump({"phase": "phase5", "status": "PASSED", "rubrics_verified": ["M1-37", "M2-55"], "metrics_snapshot": bt["metrics"], "evidence_files": files}, open("evidence/phase5/phase5_summary.json", "w"), indent=2); print("==> Phase 5 Summary written to evidence/phase5/phase5_summary.json")'
+	@echo "==> Phase 5 completed successfully. Evidence saved to evidence/phase5/"
+
+phase6: ## Execute Phase 6: Real-time Paper Trading Simulation & Alpha Dashboard (M1-38)
+	@echo "Notice: Target '$@' executes Phase 6: Paper Trading & Streamlit Dashboard (paper_trading.py)."
+	@echo "Evidence will be stored in evidence/phase6/."
+	@echo "Refer to docs/plan/INTRADAY_TRADING_DASHBOARD.md."
+	@exit 1
+
+phase7: ## Execute Phase 7: Agentic AI, RAG Pipeline, MCP Tools & Multi-Agent Fleet (M2-01..M2-25)
+	@echo "Notice: Target '$@' executes Phase 7: LLM, RAG & Multi-Agent Fleet."
+	@echo "Evidence will be stored in evidence/phase7/."
+	@echo "Refer to docs/plan/IMPLEMENTATION_PLAN.md#phase-7-rag--llm--mcp--multi-agent."
+	@exit 1
+
+phase8 demo:
 	@echo "Notice: Target '$@' is scheduled for subsequent implementation phases."
-	@echo "Currently completed and verified milestones: Phase 1, Phase 2 & Phase 3."
+	@echo "Currently completed and verified milestones: Phase 1, Phase 2, Phase 3 & Phase 4."
 	@echo "Refer to docs/plan/IMPLEMENTATION_STATUS.md for detailed status and evidence."
 	@exit 1
 

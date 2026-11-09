@@ -148,8 +148,8 @@ quant_edai/
 │   ├── 03_processing.mk                # PySpark Batch & Apache Flink Streaming (Phase 2)
 │   ├── 04_orchestration.mk             # Apache Airflow & DataHub Governance (Phase 3)
 │   ├── 05_mlops.mk                     # Feast Feature Store, Kubeflow & KServe (Phase 4)
-│   ├── 06_agents.mk                    # LLM Inference, AgentGateway & Agent Fleet (Phase 5)
-│   ├── 07_quant.mk                     # Quant Alpha Backtesting & Paper Trading (Phases 6-7)
+│   ├── 06_agents.mk                    # LLM Inference, AgentGateway & Agent Fleet (Phase 7)
+│   ├── 07_quant.mk                     # Quant Alpha Backtesting & Paper Trading (Phases 5-6)
 │   ├── 08_test.mk                      # Pytest unit tests, Hypothesis & benchmarks
 │   └── 09_phases.mk                    # Milestone phase runners (phase1 -> phase8)
 ├── coursework_proposal.md              # Official coursework project proposal

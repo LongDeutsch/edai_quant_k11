@@ -19,9 +19,9 @@
    - [Phase 2: Kafka/Debezium + Medallion + Spark/Flink](#phase-2-kafkadebezium--medallion--sparkflink)
    - [Phase 3: Airflow + Quality + Governance + Serving](#phase-3-airflow--quality--governance--serving)
    - [Phase 4: Feast + MLflow + Kubeflow + KServe](#phase-4-feast--mlflow--kubeflow--kserve)
-   - [Phase 5: RAG + LLM + MCP + Multi-Agent](#phase-5-rag--llm--mcp--multi-agent)
-   - [Phase 6: Quant Alpha Evaluation + Novel Ideas](#phase-6-quant-alpha-evaluation--novel-ideas)
-   - [Phase 7: Real-time Paper Trading Simulation](#phase-7-real-time-paper-trading-simulation)
+   - [Phase 5: Quant Alpha Evaluation + Novel Ideas](#phase-5-quant-alpha-evaluation--novel-ideas)
+   - [Phase 6: Real-time Paper Trading Simulation & Alpha Dashboard](#phase-6-real-time-paper-trading-simulation--alpha-dashboard)
+   - [Phase 7: RAG + LLM + MCP + Multi-Agent](#phase-7-rag--llm--mcp--multi-agent)
    - [Phase 8: Full Rubric Verification + Optimization](#phase-8-full-rubric-verification--optimization)
 6. [Reviewer Walkthrough & Demonstration Guide](#6-reviewer-walkthrough--demonstration-guide)
 7. [Evidence Directory Conventions & Traceability](#7-evidence-directory-conventions--traceability)
@@ -176,9 +176,9 @@ quant_edai/
 │   ├── phase2/                            # Spark skew benchmark & Flink dedup logs
 │   ├── phase3/                            # Airflow DAGs, GX reports & DataHub lineage
 │   ├── phase4/                            # Kubeflow, MLflow & KServe logs
-│   ├── phase5/                            # Agent execution traces & MCP outputs
-│   ├── phase6/                            # Quant Alpha backtest tear sheets
-│   ├── phase7/                            # Real-time paper trading execution logs
+│   ├── phase5/                            # Quant Alpha backtest tear sheets & factor metrics
+│   ├── phase6/                            # Real-time paper trading execution logs & dashboard metrics
+│   ├── phase7/                            # Agent execution traces & MCP outputs
 │   └── phase8/                            # Test coverage, Locust HTML & audit proofs
 └── docs/                                  # Technical reports & architecture documentation
     ├── ARCHITECTURE_BLUEPRINT.md
@@ -222,9 +222,9 @@ The `Makefile` serves as the **single source of truth and entry point** for all 
 | `make phase2` | Run Phase 2: Spark Skew Optimization & Flink Stream | `SCALE=0.1` | Iceberg tables populated; Spark UI logs in `evidence/phase2/` |
 | `make phase3` | Run Phase 3: Airflow DP1-DP3, GX & DataHub Lineage | `MODE=smoke` | Airflow DAGs executed; DataHub metadata emitted |
 | `make phase4` | Run Phase 4: Feast, MLflow, KFP & Drift API | `MODE=smoke` | Model registered on MLflow; Feast online store populated |
-| `make phase5` | Run Phase 5: RAG Pipeline, MCP Tools & Agent Fleet | `MODE=smoke` | Investment memo synthesized via Multi-Agent fleet |
-| `make phase6` | Run Phase 6: Quant Alpha Backtesting & Novel Ideas | `MODE=smoke` | Backtest tear sheets & factor metrics in `evidence/phase6/` |
-| `make phase7` | Run Phase 7: Real-time Paper Trading Simulation | `MODE=smoke` | Live replayed trades & PnL accounting in PostgreSQL |
+| `make phase5` | Run Phase 5: Quant Alpha Backtesting & Novel Ideas | `MODE=smoke` | Backtest tear sheets & factor metrics in `evidence/phase5/` |
+| `make phase6` | Run Phase 6: Real-time Paper Trading Simulation & Dashboard | `MODE=smoke` | Live replayed trades & PnL accounting in PostgreSQL |
+| `make phase7` | Run Phase 7: RAG Pipeline, MCP Tools & Agent Fleet | `MODE=smoke` | Investment memo synthesized via Multi-Agent fleet |
 | `make phase8` | Run Phase 8: Full Rubric Verification Suite | `MODE=smoke` | Coverage $>90\%$, mutation score $>80\%$, Locust SLA |
 | `make demo` | End-to-end smoke demonstration in 5 minutes | `SCALE=0.1` | Complete automated walkthrough from data to agent memo |
 | `make test` | Run complete unit and property test suites | `MODE=smoke` | Pytest output with coverage report |
@@ -246,20 +246,20 @@ flowchart TD
     P2["Phase 2: Big Data Processing<br>(Spark Skew/AQE, Iceberg Compaction, Flink Dedup/Watermarks)"]
     P3["Phase 3: Orchestration & Governance<br>(Airflow DP1-DP3, Great Expectations, DataHub, ClickHouse/Pinot)"]
     P4["Phase 4: ML Platform & MLOps<br>(Feast Feature Store, Kubeflow KFP, MLflow, KServe v2, Drift API)"]
-    P5["Phase 5: Agentic AI & RAG<br>(LiteLLM/vLLM, AgentGateway, MCP Tools, Multi-Agent Fleet, Qdrant)"]
-    P6["Phase 6: Quant Alpha Evaluation<br>(Walk-Forward Backtesting: IC, Sharpe, MDD vs SPY + Novel Idea 1)"]
-    P7["Phase 7: Real-Time Paper Trading<br>(Out-of-sample Stream Replay, Atomic Accounting, Pinot Serving)"]
+    P5["Phase 5: Quant Alpha Evaluation<br>(Walk-Forward Backtesting: IC, Sharpe, MDD vs SPY + Novel Idea 1)"]
+    P6["Phase 6: Real-Time Paper Trading<br>(Out-of-sample Stream Replay, Atomic Accounting, Pinot Serving)"]
+    P7["Phase 7: Agentic AI & RAG<br>(LiteLLM/vLLM, AgentGateway, MCP Tools, Multi-Agent Fleet, Qdrant)"]
     P8["Phase 8: Full Rubric Verification<br>(Pytest >90%, Mutmut >80%, Locust SLA, CI/CD, NGINX Ingress, Vault)"]
 
     P1 --> P2
     P2 --> P3
     P3 --> P4
     P4 --> P5
-    P4 --> P6
     P5 --> P6
+    P4 --> P7
     P6 --> P7
     P7 --> P8
-    P3 -.-> P7
+    P3 -.-> P6
 ```
 
 ---
@@ -515,64 +515,108 @@ make datahub-view
 
 ---
 
-### Phase 4: Feast + MLflow + Kubeflow + KServe
+### Phase 4: Feast + MLflow + Kubeflow + KServe (ML Platform & MLOps)
 
 #### Objective & Scope
-Construct the enterprise MLOps lifecycle: Feast feature store managing offline Iceberg and online Redis; Kubeflow 4-step training pipeline with walk-forward temporal split; MLflow experiment tracking; KServe v2 canary model serving; and FastAPI real-time drift detection.
+Construct the enterprise MLOps lifecycle tailored to the existing `quant_edai` foundation (Phase 1–3 verified):
+- **Feast Feature Store**: Dual-tier architecture managing offline features (Parquet `feat_ticker_technical_indicators.parquet` generated by DP3 as Lakehouse SoT) and online low-latency serving via existing Redis (`quant_redis:6379`).
+- **Kubeflow 4-Step Pipeline**: End-to-end training lifecycle with temporal walk-forward split (80/10/10) to prevent look-ahead bias, training baseline Logistic Regression vs. tuned LightGBM.
+- **MLflow Experiment Tracking & Registry**: On-demand tracking service logging hyperparameters, metrics, and auto-tagging the champion model with `production`.
+- **KServe v2 Model Serving**: Serving endpoint adhering strictly to KServe v2 data plane protocol with 80/20 canary routing (`v1-champion`: 80%, `v2-challenger`: 20%).
+- **FastAPI Feature Fetch API (M2-14/M2-15)**: High-throughput async feature retrieval endpoint with Pydantic validation.
+- **Real-Time Drift Detection (M2-54)**: Statistical drift evaluation (Kolmogorov-Smirnov test and Population Stability Index) triggering an Airflow retrain DAG on regime shift.
+
+#### Execution Architecture: Dual-Mode Pattern
+Following the standard established in Phase 2 (`ENGINE=sim|spark|flink`) and Phase 3:
+1. **`MODE=local` (Default & CI)**:
+   - Full 4-step training pipeline runs via pure Python runner (`src/quant_edai/ml/trainer.py` + local KFP orchestrator).
+   - Feast operates against local Parquet FileSource (`feat_ticker_technical_indicators.parquet`) and live Redis container.
+   - MLflow operates with an on-demand container (`make mlflow-up`, `:5000`) or local file store (`file:./mlruns`).
+   - KServe v2 runs as a lightweight FastAPI mock container/process with 80/20 canary split logging.
+   - Generates 100% of rubric evidence without requiring a heavy Kubernetes cluster.
+2. **`MODE=k8s` (Optional / Demo)**:
+   - Runs against Kind/Minikube with KFP manifests and KServe `InferenceService` CRDs (`infra/k8s/kserve/inference_service.yaml`).
+
+#### Feature & Label Boundary Alignment
+- **Entity**: `ticker_symbol` (Primary Key).
+- **Offline Feature Source**: `feat_ticker_technical_indicators.parquet` from DP3 (`/tmp/lakehouse_source/gold_features/` or `evidence/phase3/`).
+- **Verified MVP Features**: Strictly binds the 11 columns produced by `feature_calculator.py` and defined in `sql/iceberg/03_create_gold_tables.sql`:
+  - Trend: `close_price`, `sma_20`, `sma_50`, `sma_ratio_20_50`, `macd_12_26`, `macd_signal_9`, `macd_histogram`
+  - Momentum: `rsi_14d`
+  - Volatility & Returns: `rolling_volatility_30d`, `intraday_return_1d`
+  - Audit Timestamps: `event_timestamp` (point-in-time correctness, M1-34), `created`
+- **Stretch / v2 Enhancements (Planned, Non-MVP Blockers)**: News sentiment features (`news_sentiment_avg_3d`, `news_article_count_3d`), `bollinger_pct_b`, and streaming OFI/VWAP are designated as v2 features (not blocking Phase 4 MVP).
+- **Label Source**: `label_ticker_daily_return` generated by the Phase 1 generator.
 
 #### Task Breakdown
-1. **Feast-01**: Configure Feast feature store (`configs/feast/feature_store.yaml`) with offline Iceberg source and online Redis sink.
-2. **Feast-02**: Define Feast entities (`ticker_symbol`) and FeatureViews for offline technical indicators and streaming features.
-3. **Feast-03**: Implement Airflow incremental materialization DAG (`dag_feast_materialize.py`) loading daily feature snapshots into Redis.
-4. **Feast-04**: Implement Flink streaming sink pushing real-time technical features into Redis.
-5. **KFP-01**: Implement Kubeflow 4-step pipeline (`src/quant_edai/ml/kfp/pipeline.py`):
-   - Step 1: Ingest features via Feast `get_historical_features` & join labels from `label_ticker_daily_return`.
-   - Step 2: Temporal Walk-Forward Split (80% Train, 10% Val, 10% Test) eliminating look-ahead bias.
-   - Step 3: Train baseline Logistic Regression vs tuned LightGBM Classifier.
-   - Step 4: Model evaluation (AUC-ROC, Log-Loss, Directional Accuracy) and auto-tagging champion as `production` on MLflow.
-6. **MLflow-01**: Configure MLflow tracking server; log hyperparameters, metrics, and serialized model artifacts.
-7. **KServe-01**: Deploy KServe v2 InferenceService with 80/20 canary traffic split (`v1-champion`: 80%, `v2-challenger`: 20%). Provide local mock KServe server for zero-cluster environments.
-8. **Drift-01**: Implement FastAPI Real-time Drift Detection API (`src/quant_edai/ml/drift_api.py`) computing Kolmogorov-Smirnov (KS) test and Population Stability Index (PSI) on incoming features; push metrics to Prometheus and trigger retrain DAG on threshold breach.
+1. **Feast-01**: Configure Feast feature store (`configs/feast/feature_store.yaml`) pointing to `FileSource` (Lakehouse Parquet SoT) and online Redis sink (`localhost:6379` / `quant_redis:6379`).
+2. **Feast-02**: Define Feast entity `ticker_symbol` (`src/quant_edai/ml/feast/entities.py`) and FeatureView `fv_ticker_technical_indicators` (`src/quant_edai/ml/feast/feature_views.py`) matching verified schema.
+3. **Feast-03**: Implement Airflow incremental materialization DAG (`orchestration/dags/dag_feast_materialize.py`) loading daily feature slices into Redis.
+4. **Feast-04**: Implement streaming feature push to Feast (`src/quant_edai/processing/flink/feast_sink.py`): primary `ENGINE=sim` Redis writer; `ENGINE=flink` PyFlink streaming push as enhancement.
+5. **KFP-01**: Implement 4-step pipeline (`src/quant_edai/ml/kfp/pipeline.py` & `src/quant_edai/ml/trainer.py`):
+   - **Step 1 (Ingest & Join)**: Pull historical features via Feast `get_historical_features` and join `label_ticker_daily_return`.
+   - **Step 2 (Walk-Forward Split)**: Temporal split (80% Train, 10% Val, 10% Test) eliminating look-ahead bias.
+   - **Step 3 (Model Training)**: Train baseline Logistic Regression vs tuned LightGBM Classifier.
+   - **Step 4 (Evaluation & Registration)**: Compute AUC-ROC, Log-Loss, Directional Accuracy; auto-tag champion model as `production` on MLflow.
+6. **MLflow-01**: Deploy on-demand MLflow tracking server (`infra/docker-compose.mlflow.yml` on port `:5000` via `make mlflow-up`) with file/sqlite backend; log hyperparams, metrics, and model artifacts.
+7. **KServe-01**: Implement KServe v2 protocol service (`src/quant_edai/serving/mock_kserve_v2.py`) with 80/20 canary traffic routing (`v1-champion`: 80%, `v2-challenger`: 20%). Manifest provided in `infra/k8s/kserve/inference_service.yaml` for optional K8s deployment.
+8. **API-01 (M2-14/M2-15)**: Implement FastAPI Feature Fetch service (`src/quant_edai/serving/api_feature_fetch.py`) with Pydantic schemas, `/health` endpoint, and asynchronous concurrent retrieval from Feast Redis.
+9. **Drift-01 (M2-54)**: Implement FastAPI Real-time Drift Detection API (`src/quant_edai/ml/drift_api.py`) computing Kolmogorov-Smirnov (KS) test and Population Stability Index (PSI); output metrics payload and retrain trigger DAG (`orchestration/dags/dag_drift_retrain.py`).
 
 #### Files & Modules to Implement
 - `configs/feast/feature_store.yaml`
 - `src/quant_edai/ml/feast/entities.py`
 - `src/quant_edai/ml/feast/feature_views.py`
 - `orchestration/dags/dag_feast_materialize.py`
-- `src/quant_edai/ml/kfp/pipeline.py`
+- `src/quant_edai/processing/flink/feast_sink.py`
 - `src/quant_edai/ml/trainer.py`
+- `src/quant_edai/ml/kfp/pipeline.py`
+- `src/quant_edai/serving/mock_kserve_v2.py`
+- `src/quant_edai/serving/api_feature_fetch.py`
 - `src/quant_edai/ml/drift_api.py`
-- `infra/k8s/kserve/inference_service.yaml`
 - `orchestration/dags/dag_drift_retrain.py`
+- `infra/k8s/kserve/inference_service.yaml`
+- `infra/docker-compose.mlflow.yml`
 
 #### Acceptance Criteria
-- Feast online store in Redis returns sub-10ms feature queries for any ticker.
-- Kubeflow pipeline completes all 4 steps successfully and outputs evaluated model artifacts.
-- MLflow registry records training runs, parameters, metrics, and tags the top model as `production`.
-- KServe v2 endpoint successfully serves prediction requests with canary traffic splitting.
-- Drift detection service accurately detects injected regime shift (KS-statistic $p < 0.05$) and triggers retrain hook.
+- Feast online store in Redis serves sub-10ms feature queries for any ticker symbol.
+- 4-step pipeline completes successfully and logs walk-forward evaluation metrics (AUC-ROC, LogLoss, Accuracy) to evidence.
+- MLflow tracking server records runs, parameters, metrics, and tags the champion model as `production`.
+- KServe v2 endpoint successfully serves prediction requests adhering to the v2 data plane and logs 80/20 canary split.
+- FastAPI Feature Fetch endpoint responds asynchronously with valid Pydantic validated JSON.
+- Drift detection service accurately detects injected regime shift (KS-statistic $p < 0.05$, PSI $> 0.25$) and triggers retrain hook.
 
 #### Commands to Run
 ```bash
-make phase4
-make feast-materialize
-make kfp-run
-make mlflow-status
-make kserve-infer-test
-make test-drift
+make feast-apply          # Apply Feast entity & feature views
+make feast-materialize    # Incrementally materialize features to Redis
+make mlflow-up            # Start on-demand MLflow tracking server (:5000)
+make mlflow-status        # Inspect MLflow tracking and registered models
+make kfp-run              # Run 4-step training pipeline (MODE=local by default)
+make kserve-deploy        # Launch KServe v2 canary service
+make kserve-infer-test    # Test KServe v2 prediction endpoint (80/20 canary check)
+make test-api             # Test FastAPI async feature fetch API
+make test-drift           # Test Kolmogorov-Smirnov & PSI drift detection API
+make phase4               # Execute complete Phase 4 lifecycle and collect evidence
+make mlflow-down          # Stop on-demand MLflow container
 ```
 
 #### Automated Tests
-- `tests/unit/test_feast_features.py`: Validates point-in-time correctness of Feast offline joins.
-- `tests/unit/test_ml_trainer.py`: Validates model training, walk-forward split boundaries, and metric computation.
-- `tests/unit/test_drift_api.py`: Tests KS-test and PSI calculations on synthetic normal vs shifted distributions.
+- `tests/unit/test_feast_features.py`: Validates Feast schema, entities, and point-in-time correctness of offline joins.
+- `tests/unit/test_ml_trainer.py`: Validates walk-forward split boundaries, LR vs LightGBM training, and metric evaluation.
+- `tests/unit/test_kserve_and_api.py`: Tests KServe v2 protocol contracts, canary 80/20 split, and FastAPI async feature retrieval.
+- `tests/unit/test_drift_api.py`: Tests KS-test and PSI calculations on normal vs drifted distributions.
 
-#### Evidence to Collect
+#### Evidence to Collect (`evidence/phase4/`)
 - `evidence/phase4/feast_redis_keys.txt`: Dump of active Redis feature keys.
-- `evidence/phase4/kfp_pipeline_run.png`: Kubeflow Pipelines UI execution graph.
-- `evidence/phase4/mlflow_model_registry.png`: MLflow model registry UI with `production` tag.
-- `evidence/phase4/kserve_canary_routing.log`: Log proving 80/20 traffic split between model versions.
-- `evidence/phase4/drift_detection_alert.json`: KS-test results and Prometheus alert payload.
+- `evidence/phase4/feast_materialize_metrics.json`: Materialization latency and row count.
+- `evidence/phase4/kfp_pipeline_execution.json`: Execution log and metrics of all 4 pipeline steps.
+- `evidence/phase4/mlflow_model_summary.json`: Hyperparameters, metrics (AUC-ROC, LogLoss), and `production` tag.
+- `evidence/phase4/kserve_canary_routing.log`: Log proving 80/20 canary traffic split between model versions.
+- `evidence/phase4/api_feature_fetch_response.json`: Async FastAPI response payload.
+- `evidence/phase4/drift_detection_metrics.json`: KS-test ($p < 0.05$) and PSI alert payload.
+- `evidence/phase4/pytest_test_run.txt`: Output of Phase 4 unit tests.
+- `evidence/phase4/phase4_summary.json`: Consolidated Phase 4 completion scorecard.
 
 #### Rubric Mapping
 - `M2-09` (Feast Materialize Pipeline): 2.0 pts
@@ -585,7 +629,187 @@ make test-drift
 
 ---
 
-### Phase 5: RAG + LLM + MCP + Multi-Agent
+### Phase 5: Quant Alpha Evaluation + Novel Ideas
+
+#### Objective & Scope
+Implement the quantitative factor research engine and backtesting harness, bridging big data engineering and quantitative finance. Compute out-of-sample alpha metrics (IC, Rank IC, Sharpe Ratio, Maximum Drawdown vs SPY) with zero look-ahead bias and log comprehensive tear sheets to MLflow and `evidence/phase5/`.
+
+> [!IMPORTANT]
+> **Phase 5 & Phase 6 Boundary**: Phase 5 is strictly daily EOD walk-forward backtesting (`backtester.py`). It does **not** implement Kafka streaming, PostgreSQL paper trading schemas, or Streamlit dashboards. Instead, Phase 5 provides a stable contract via `evidence/phase5/backtest_summary.json` and PNG tear sheets, cleanly handing off to Phase 6 where Streamlit Page 3 ("Daily Alpha Metrics" tab) ingests this artifact (displaying `Awaiting Phase 5 (make phase5)` if not found).
+
+#### Input Data Matrix (Phase 3/4 Reality)
+- **Primary Inputs**: Gold Lakehouse `feat_ticker_technical_indicators` (SMA ratios, RSI-14, MACD, rolling volatility from DP3) and `label_ticker_daily_return`.
+- **Optional ML Signal**: Directional probability $P_{\text{ML}} \in [0, 1]$ from Phase 4 LightGBM model artifact (`models/quant_model.joblib`).
+- **Stretch / v2 Input**: News sentiment scores (`news_sentiment_avg_3d`) depend on Phase 7 RAG and are **not** MVP Phase 5 blockers. If absent, the engine computes composite signals from available technical indicators and $P_{\text{ML}}$.
+
+#### Task Breakdown
+1. **Quant-01**: Implement `src/quant_edai/quant/metrics.py` defining unified, reusable financial formulas:
+   - Information Coefficient (Pearson correlation) & Rank IC (Spearman rank correlation).
+   - Annualized Sharpe Ratio with configurable `periods_per_year` ($\text{Rf} = 4.0\%$). Daily EOD uses $\text{periods\_per\_year} = 252$ ($\sqrt{252} \approx 15.87$). *(Note: Phase 6 intraday must NOT reuse daily $\sqrt{252}$ blindly on 1-minute bars).*
+   - Sortino Ratio and Calmar Ratio.
+   - Maximum Drawdown (MDD scalar and drawdown underwater curve).
+   - Excess Alpha over S&P 500 ETF (SPY) Buy & Hold.
+2. **Quant-02**: Implement `src/quant_edai/quant/backtester.py`:
+   - Walk-Forward expanding window evaluation.
+   - Strict time enforcement: signals generated using data through market close on day $t$; trades executed at open of day $t+1$.
+   - Realistic transaction costs (5 bps spread + 2 bps market impact).
+   - Top decile long vs SPY benchmark comparison.
+3. **Quant-03**: Integrate MLflow experiment logging: auto-save `cumulative_returns_vs_benchmark.png`, `rolling_sharpe_ratio.png`, `factor_ic_distribution.png`, and `backtest_summary.json`.
+4. **Novel-01 (Idea 1)**: Implement Market Regime Adaptive Factor Weighting (`src/quant_edai/quant/alpha_synthesis.py`) dynamically adjusting signal weights based on real-time volatility regime.
+5. **Novel-02 (Idea 2)**: Implement Quantitative Factor Attribution & Risk Parity Position Sizing, validating improved risk-adjusted returns over fixed-weight baseline.
+
+#### Files & Modules to Implement
+- `src/quant_edai/quant/metrics.py`
+- `src/quant_edai/quant/backtester.py`
+- `src/quant_edai/quant/alpha_synthesis.py`
+- `tests/unit/test_quant_metrics.py`
+- `tests/unit/test_backtester.py`
+
+#### Handoff Contract: `evidence/phase5/backtest_summary.json`
+Phase 5 produces the following stable JSON schema consumed by Phase 6 Streamlit Page 3:
+```json
+{
+  "strategy_name": "Quant Alpha Walk-Forward Strategy (M1-37)",
+  "benchmark_name": "S&P 500 ETF (SPY)",
+  "generated_at": "2026-11-10T00:00:00Z",
+  "date_range": {
+    "start_date": "2023-01-03",
+    "end_date": "2024-12-31",
+    "trading_days": 504
+  },
+  "metrics": {
+    "ic_mean": 0.048,
+    "rank_ic_mean": 0.054,
+    "ic_std": 0.106,
+    "ic_ir": 0.453,
+    "hit_rate": 0.548,
+    "cum_return": 0.286,
+    "annualized_return": 0.214,
+    "annualized_volatility": 0.141,
+    "sharpe": 1.23,
+    "sortino": 1.84,
+    "calmar": 1.81,
+    "max_drawdown": -0.118,
+    "spy_cum_return": 0.162,
+    "spy_annualized_return": 0.128,
+    "spy_annualized_volatility": 0.165,
+    "spy_sharpe": 0.53,
+    "spy_max_drawdown": -0.194,
+    "excess_alpha_vs_spy": 0.124
+  },
+  "series": {
+    "ic_series": [
+      {"date": "2023-01-03", "ic": 0.042, "rank_ic": 0.049}
+    ],
+    "equity_curve": [
+      {"date": "2023-01-03", "strategy_equity": 1.000, "spy_equity": 1.000, "strategy_drawdown": 0.0, "spy_drawdown": 0.0}
+    ],
+    "rolling_sharpe": [
+      {"date": "2023-06-30", "rolling_sharpe": 1.21, "spy_rolling_sharpe": 0.52}
+    ]
+  },
+  "artifacts": {
+    "cumulative_returns_vs_benchmark": "evidence/phase5/cumulative_returns_vs_benchmark.png",
+    "factor_ic_distribution": "evidence/phase5/factor_ic_distribution.png",
+    "rolling_sharpe_ratio": "evidence/phase5/rolling_sharpe_ratio.png",
+    "novel_idea_attribution_report": "evidence/phase5/novel_idea_attribution_report.md"
+  }
+}
+```
+
+#### Acceptance Criteria
+- `make phase5` succeeds when:
+  1. Backtest engine completes full walk-forward execution on Gold Lakehouse data without look-ahead bias or data leakage.
+  2. All evidence artifacts (`backtest_summary.json`, 3 PNG tear sheets, novel idea markdown) are generated in `evidence/phase5/`.
+  3. Zero look-ahead bias unit tests pass (`tests/unit/test_backtester.py`).
+- Target performance figures ($\text{IC} \approx +0.048, \text{Sharpe} \approx 1.23, \text{MDD} \approx -11.8\%$) are **illustrative benchmark targets** from reference quantitative research, not hard gating failures for synthetic test datasets.
+
+#### Commands to Run
+```bash
+make phase5
+```
+
+#### Automated Tests
+- `tests/unit/test_quant_metrics.py`: Mathematical verification of Sharpe (including `periods_per_year` parameter), Sortino, Drawdown, and IC against known synthetic benchmarks.
+- `tests/unit/test_backtester.py`: Asserts that shuffling dates in the future does not alter trading decisions on day $t$ (Zero Look-Ahead Bias proof).
+
+#### Evidence to Collect
+- `evidence/phase5/cumulative_returns_vs_benchmark.png`: Cumulative returns graph vs SPY.
+- `evidence/phase5/factor_ic_distribution.png`: Information coefficient histogram.
+- `evidence/phase5/rolling_sharpe_ratio.png`: 6-month rolling Sharpe ratio plot.
+- `evidence/phase5/backtest_summary.json`: Detailed quantitative performance metrics (scalars + time series for Phase 6 Streamlit).
+- `evidence/phase5/novel_idea_attribution_report.md`: Proof and comparison of Novel Ideas.
+
+#### Rubric Mapping
+- `M1-37` (Novel Idea 1 - Quant Alpha Backtester): 10.0 pts
+- `M2-55` (Novel Idea 2 - Alpha Synthesis & Risk Parity): 2.0 pts
+
+---
+
+### Phase 6: Real-time Paper Trading Simulation & Alpha Dashboard
+
+#### Objective & Scope
+Deploy an operational real-time intraday trading system and multi-page Streamlit analytics dashboard. The engine ingests 1-minute market bars (live via Kafka `market.bars.1m` or via fast market replay at 10x–50x speed), computes intraday momentum and VWAP deviation signals with an optional soft daily ML trend bias, applies institutional scalping risk controls (TP/SL in basis points, EOD flatting, daily drawdown circuit breaker), persists atomic ACID executions to PostgreSQL, and serves interactive visualizations across 3 dedicated Streamlit pages and Apache Pinot.
+
+#### Task Breakdown
+1. **Sim-01 (M1-38 Engine)**: Implement `src/quant_edai/quant/paper_trading.py`:
+   - Single unified engine entrypoint: `on_bar(bar: MarketBar)`.
+   - Intraday Signal Formulation: $Z = 0.50 \cdot \text{zscore}(\text{Mom}_{1\text{m}}) + 0.30 \cdot \text{zscore}(\text{VWAP Dev}) + 0.20 \cdot \text{zscore}(P_{\text{ML}} - 0.5)$ over an explicit rolling window of $N=45$ bars (min periods 15).
+   - Scalping Risk Profile (bps): Default TP $+20$ bps, SL $-12$ bps, slippage $5$ bps, commission $1$ bps. (Optional `PROFILE=swing` for multi-hour % swings).
+   - Portfolio Risk Guards: Fixed notional $\$10,000$/trade, max 5 concurrent positions, max 1 position/ticker, $-2.0\%$ max daily portfolio loss circuit breaker, and 15:55 EST EOD flattening.
+2. **Sim-02 (Replay & Dual-Mode)**: Implement `src/quant_edai/quant/market_replay.py`:
+   - Feeds the exact same `paper_trading.on_bar()` logic with zero code divergence.
+   - Configurable replay speed multiplier (`--speed 10` to `50`) for instant end-to-end demo and testing without waiting for NYSE hours.
+   - Supports `--reset-db` to cleanly initialize simulation tables.
+3. **Sim-03 (Persistence & Idempotency)**: Implement `sql/postgres/02_paper_trading_schema.sql`:
+   - ACID PostgreSQL persistence for `paper_orders`, `paper_trades`, `paper_positions`, and `paper_portfolio_snapshots`.
+   - Enforces execution idempotency via `UNIQUE (ticker_symbol, bar_timestamp, direction, order_type)` so stream retries never duplicate trades or corrupt cash ledgers.
+   - Measures and records sub-50ms execution latency SLA.
+4. **Sim-04 (Streamlit 3-Page Dashboard)**: Implement `src/quant_edai/serving/dashboard/`:
+   - `pages/1_Live_Trading_and_Risk.py`: Live PnL, positions matrix, real-time Sharpe, max drawdown, and recent execution feed.
+   - `pages/2_Candlestick_Charts.py`: 1m/5m candlesticks from Apache Pinot broker + trade entry/exit markers joined from PostgreSQL.
+   - `pages/3_Alpha_Quality_Analytics.py`: Clear separation between Live Intraday metrics (from `paper_*`) and Daily Backtest metrics (from `evidence/phase5/` / `backtester.py` M1-37).
+5. **Sim-05 (Verification & Evidence)**: Gather end-to-end performance and latency metrics under `evidence/phase6/`.
+
+#### Files & Modules to Implement
+- `docs/plan/INTRADAY_TRADING_DASHBOARD.md` (Detailed design reference)
+- `src/quant_edai/quant/paper_trading.py`
+- `src/quant_edai/quant/market_replay.py`
+- `sql/postgres/02_paper_trading_schema.sql`
+- `src/quant_edai/serving/dashboard/app.py`
+- `src/quant_edai/serving/dashboard/pages/1_Live_Trading_and_Risk.py`
+- `src/quant_edai/serving/dashboard/pages/2_Candlestick_Charts.py`
+- `src/quant_edai/serving/dashboard/pages/3_Alpha_Quality_Analytics.py`
+- `tests/unit/test_paper_trading.py`
+
+#### Acceptance Criteria
+- End-to-end replay $\to$ Signal $\to$ Risk Guard $\to$ Paper Execution loop runs cleanly without errors.
+- Dual-mode verified: Same signal, risk, and accounting behavior in both Live Kafka and Replay modes.
+- Idempotency verified: Replaying identical datasets produces zero duplicate orders and exact cash conservation.
+- Sub-50ms execution latency SLA verified per bar.
+- Streamlit multi-page dashboard runs on port `:8501`, visualizes live PnL, Pinot candles, and trade markers.
+
+#### Commands to Run
+```bash
+make trader-run                    # Live streaming consumer
+make trader-replay SPEED=20        # Fast replay test (20x speed)
+make dashboard                     # Launch Streamlit multi-page app (:8501)
+make test-quant                    # Run engine & math unit tests
+make phase6                        # Full Phase 6 execution & evidence collection
+```
+
+#### Evidence to Collect
+- `evidence/phase6/paper_trading_execution.json`: Execution summary, filled trades count, and final equity.
+- `evidence/phase6/paper_trading_latency.json`: Sub-50ms per-bar execution latency measurements.
+- `evidence/phase6/pytest_test_run.txt`: Unit and integration test pass log.
+- `evidence/phase6/phase6_summary.json`: Phase 6 milestone sign-off manifest.
+
+#### Rubric Mapping
+- `M1-38` (Novel Idea 2 - Real-time Paper Trading Simulator): 10.0 pts
+
+---
+
+### Phase 7: RAG + LLM + MCP + Multi-Agent
 
 #### Objective & Scope
 Deploy the GenAI and Agentic tier: LiteLLM/vLLM inference server; financial news RAG pipeline (chunking, embedding, Qdrant vector index); 3 containerized FastAPI MCP tools; and a hierarchical Multi-Agent Fleet (Coordinator, Technical Quant, Sentiment News) routed via AgentGateway.
@@ -636,7 +860,7 @@ Deploy the GenAI and Agentic tier: LiteLLM/vLLM inference server; financial news
 
 #### Commands to Run
 ```bash
-make phase5
+make phase7
 make airflow-trigger-rag
 make test-gateway-mcp
 make test-gateway-a2a
@@ -650,11 +874,11 @@ make warmup-check
 - `tests/unit/test_multi_agent.py`: Mocks LLM responses and verifies A2A message routing and output synthesis.
 
 #### Evidence to Collect
-- `evidence/phase5/airflow_rag_dag.png`: Airflow UI showing green RAG DAG.
-- `evidence/phase5/mcp_tools_curl_output.json`: API responses from all 3 MCP microservices.
-- `evidence/phase5/agent_gateway_routing.log`: Log showing A2A inter-agent routing.
-- `evidence/phase5/investment_memorandum_sample.md`: Synthesized investment report.
-- `evidence/phase5/langfuse_trace.png`: Distributed trace of multi-agent execution.
+- `evidence/phase7/airflow_rag_dag.png`: Airflow UI showing green RAG DAG.
+- `evidence/phase7/mcp_tools_curl_output.json`: API responses from all 3 MCP microservices.
+- `evidence/phase7/agent_gateway_routing.log`: Log showing A2A inter-agent routing.
+- `evidence/phase7/investment_memorandum_sample.md`: Synthesized investment report.
+- `evidence/phase7/langfuse_trace.png`: Distributed trace of multi-agent execution.
 
 #### Rubric Mapping
 - `M2-01` to `M2-04` (LLM Inference Platform & Benchmark): 7.0 pts
@@ -668,116 +892,6 @@ make warmup-check
 - `M2-23` (Coordinator Agent Multi-Reply): 2.0 pts
 - `M2-25` (System Warmup Mode): 2.0 pts
 - `M2-50`, `M2-51` (A/B Testing for Agents & LLM): 2.0 pts
-
----
-
-### Phase 6: Quant Alpha Evaluation + Novel Ideas
-
-#### Objective & Scope
-Implement the quantitative factor research engine and backtesting harness, bridging big data engineering and quantitative finance. Compute out-of-sample alpha metrics (IC, Rank IC, Sharpe Ratio, Maximum Drawdown vs SPY) with zero look-ahead bias and log comprehensive tear sheets to MLflow.
-
-#### Task Breakdown
-1. **Quant-01**: Implement `src/quant_edai/quant/metrics.py` defining unified, reusable financial formulas:
-   - Information Coefficient (Pearson correlation) & Rank IC (Spearman rank correlation).
-   - Annualized Sharpe Ratio ($\text{Rf} = 4.0\%$) and Sortino Ratio.
-   - Maximum Drawdown (MDD) and Calmar Ratio.
-   - Excess Alpha over S&P 500 ETF (SPY) Buy & Hold.
-2. **Quant-02**: Implement `src/quant_edai/quant/backtester.py`:
-   - Walk-Forward expanding window evaluation.
-   - Strict time enforcement: signals generated using data through market close on day $t$; trades executed at open of day $t+1$.
-   - Realistic transaction costs (5 bps spread + 2 bps market impact).
-   - Top decile long vs SPY benchmark comparison.
-3. **Quant-03**: Integrate MLflow experiment logging: auto-save `cumulative_returns_vs_benchmark.png`, `rolling_sharpe_ratio.png`, `factor_ic_distribution.png`, and `backtest_summary.json`.
-4. **Novel-01 (Idea 1)**: Implement Market Regime Adaptive Factor Weighting (`src/quant_edai/quant/alpha_synthesis.py`) dynamically adjusting signal weights ($w_1, w_2, w_3$) based on real-time volatility regime.
-5. **Novel-02 (Idea 2)**: Implement Quantitative Factor Attribution & Risk Parity Position Sizing, validating improved risk-adjusted returns over fixed-weight baseline.
-
-#### Files & Modules to Implement
-- `src/quant_edai/quant/metrics.py`
-- `src/quant_edai/quant/backtester.py`
-- `src/quant_edai/quant/alpha_synthesis.py`
-- `tests/unit/test_quant_metrics.py`
-- `tests/unit/test_backtester.py`
-
-#### Acceptance Criteria
-- Backtest engine runs completely without look-ahead bias or data leakage.
-- Generates verified quantitative performance tear sheet matching or exceeding target baselines:
-  - $\text{IC} > +0.03$ (Documented target: $+0.048$).
-  - $\text{Rank IC} > +0.03$ (Documented target: $+0.054$).
-  - $\text{Sharpe Ratio} > 1.0$ (Documented target: $1.23$ vs SPY $0.53$).
-  - $\text{Max Drawdown}$ strictly superior to SPY (Documented target: $-11.8\%$ vs SPY $-19.4\%$).
-- MLflow logs all artifacts, plots, and summary JSON cleanly.
-
-#### Commands to Run
-```bash
-make phase6
-```
-
-#### Automated Tests
-- `tests/unit/test_quant_metrics.py`: Mathematical verification of Sharpe, Sortino, Drawdown, and IC against known synthetic benchmarks.
-- `tests/unit/test_backtester.py`: Asserts that shuffling dates in the future does not alter trading decisions on day $t$ (Zero Look-Ahead Bias proof).
-
-#### Evidence to Collect
-- `evidence/phase6/cumulative_returns_vs_benchmark.png`: Cumulative returns graph vs SPY.
-- `evidence/phase6/factor_ic_distribution.png`: Information coefficient histogram.
-- `evidence/phase6/rolling_sharpe_ratio.png`: 6-month rolling Sharpe ratio plot.
-- `evidence/phase6/backtest_summary.json`: Detailed quantitative performance metrics.
-- `evidence/phase6/novel_idea_attribution_report.md`: Proof and comparison of Novel Ideas.
-
-#### Rubric Mapping
-- `M1-37` (Novel Idea 1 - Quant Alpha Backtester): 10.0 pts
-- `M2-55` (Novel Idea 2 - Alpha Synthesis & Risk Parity): 2.0 pts
-
----
-
-### Phase 7: Real-time Paper Trading Simulation
-
-#### Objective & Scope
-Deploy an operational real-time paper trading extension that continuously replays out-of-sample market data, consumes technical indicators from Flink, fetches ML probabilities, generates signals, executes simulated trades with ACID PostgreSQL persistence, and sinks telemetry to Apache Pinot.
-
-#### Task Breakdown
-1. **Sim-01**: Implement `src/quant_edai/generator/streaming_producer.py` replaying out-of-sample OHLCV bars into Kafka topic `market.bars` with configurable speed multipliers (1x, 10x, 100x).
-2. **Sim-02**: Implement `src/quant_edai/quant/signal_generator.py` consuming features from Flink, querying KServe for directional probabilities, and publishing buy/sell signals to `quant.signals` (Rules: $P(\text{Up}) > 0.60 \to \text{BUY}$, $P(\text{Up}) < 0.40 \to \text{SELL}$).
-3. **Sim-03**: Implement `src/quant_edai/quant/paper_trading.py` (FastAPI Simulator):
-   - Consumes `quant.signals` and next-bar Open prices.
-   - Enforces execution idempotency via `trade_event_id`.
-   - Executes atomic transactions updating PostgreSQL tables: `sim_portfolios`, `sim_positions`, `sim_trades`, `sim_ledger`.
-   - Emits filled trades to Kafka topic `quant.paper_trades`.
-4. **Sim-04**: Route `quant.signals` and `quant.paper_trades` into Apache Pinot for sub-50ms real-time dashboard queries.
-5. **Sim-05**: Connect simulation metrics to the unified formulas from `src/quant_edai/quant/metrics.py` to compare batch backtest vs live streaming execution parity.
-
-#### Files & Modules to Implement
-- `src/quant_edai/quant/signal_generator.py`
-- `src/quant_edai/quant/paper_trading.py`
-- `sql/postgres/paper_trading_schema.sql`
-- `sql/pinot/paper_trading_tables.json`
-- `tests/integration/test_paper_trading_sim.py`
-
-#### Acceptance Criteria
-- End-to-end replay $\to$ Flink $\to$ Signal $\to$ Paper Execution loop runs seamlessly without errors.
-- Zero Look-Ahead Bias enforced: Signals generated at bar $t$ close are strictly filled at bar $t+1$ open.
-- End-to-end processing latency from signal arrival to trade persistence is $<50$ ms.
-- 100% idempotent: Replaying identical Kafka partitions produces zero duplicate trades and identical cash balance.
-- Live positions and equity curve queryable via Apache Pinot and PostgreSQL.
-
-#### Commands to Run
-```bash
-make phase7
-make stream-replay SPEED=10x
-make paper-trading-status
-```
-
-#### Automated Tests
-- `tests/integration/test_paper_trading_sim.py`: Verifies ACID state persistence, idempotency on replayed messages, and cash balance conservation.
-- `tests/unit/test_execution_timing.py`: Verifies execution timestamp is strictly $> event\_timestamp$.
-
-#### Evidence to Collect
-- `evidence/phase7/paper_trades_execution.log`: Transaction log showing fills at $t+1$ open.
-- `evidence/phase7/paper_trading_portfolio_state.json`: Active positions and portfolio equity.
-- `evidence/phase7/pinot_realtime_trades_query.png`: Pinot query result screenshot of real-time trade events.
-- `evidence/phase7/batch_vs_stream_parity_report.md`: Metric comparison proving consistency between offline backtest and online paper simulation.
-
-#### Rubric Mapping
-- `M1-38` (Novel Idea 2 - Real-time Paper Trading Simulator): 10.0 pts
 
 ---
 
@@ -946,22 +1060,22 @@ evidence/
 │   ├── kserve_canary_routing.log
 │   └── drift_detection_alert.json
 ├── phase5/
-│   ├── airflow_rag_dag.png
-│   ├── mcp_tools_curl_output.json
-│   ├── agent_gateway_routing.log
-│   ├── investment_memorandum_sample.md
-│   └── langfuse_trace.png
-├── phase6/
 │   ├── cumulative_returns_vs_benchmark.png
 │   ├── factor_ic_distribution.png
 │   ├── rolling_sharpe_ratio.png
 │   ├── backtest_summary.json
 │   └── novel_idea_attribution_report.md
+├── phase6/
+│   ├── paper_trading_execution.json
+│   ├── paper_trading_latency.json
+│   ├── pytest_test_run.txt
+│   └── phase6_summary.json
 ├── phase7/
-│   ├── paper_trades_execution.log
-│   ├── paper_trading_portfolio_state.json
-│   ├── pinot_realtime_trades_query.png
-│   └── batch_vs_stream_parity_report.md
+│   ├── airflow_rag_dag.png
+│   ├── mcp_tools_curl_output.json
+│   ├── agent_gateway_routing.log
+│   ├── investment_memorandum_sample.md
+│   └── langfuse_trace.png
 └── phase8/
     ├── pytest_coverage_report.html
     ├── mutmut_mutation_score.txt

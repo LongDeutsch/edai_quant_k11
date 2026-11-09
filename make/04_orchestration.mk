@@ -21,14 +21,14 @@ test-governance: verify-schema-registry spike-iceberg-rest sync-schema-iceberg #
 
 airflow-up: ## Start Apache Airflow orchestrator, ClickHouse, and Pinot serving layers
 	@echo "==> Starting Airflow, ClickHouse, and Pinot services..."
-	$(DOCKER_COMPOSE) -f infra/docker-compose.yml up -d clickhouse pinot airflow-init airflow-webserver airflow-scheduler
+	$(COMPOSE) up -d clickhouse pinot airflow-init airflow-webserver airflow-scheduler
 	@echo "Airflow Web UI: http://localhost:8080 (admin/admin)"
 	@echo "ClickHouse HTTP: http://localhost:8123"
 	@echo "Pinot Controller: http://localhost:9002 | Broker: http://localhost:8099"
 
 airflow-down: ## Stop Airflow, ClickHouse, and Pinot containers
 	@echo "==> Stopping Airflow, ClickHouse, and Pinot services..."
-	$(DOCKER_COMPOSE) -f infra/docker-compose.yml stop airflow-webserver airflow-scheduler airflow-init clickhouse pinot
+	$(COMPOSE) stop airflow-webserver airflow-scheduler clickhouse pinot
 
 airflow-trigger-dp1: ## Trigger Airflow DAG DP1 (Raw Ingestion & Great Expectations)
 	@echo "==> Triggering Airflow DAG DP1: Raw Ingestion & Quality Gate..."

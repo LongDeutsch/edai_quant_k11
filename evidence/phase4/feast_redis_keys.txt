@@ -1,0 +1,2 @@
+fv_ticker_technical_indicators:AAPL
+fv_ticker_technical_indicators:GOOGL

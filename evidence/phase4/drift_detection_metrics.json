@@ -1,0 +1,87 @@
+{
+  "evaluation_timestamp": "2026-11-09T01:45:17.542221+00:00",
+  "reference_sample_size": 42684,
+  "current_sample_size": 1000,
+  "features_evaluated": 10,
+  "features_with_drift": 10,
+  "features_with_significant_drift": 9,
+  "retrain_recommended": true,
+  "overall_status": "ALERT_TRIGGERED",
+  "metric_thresholds": {
+    "ks_pvalue": 0.05,
+    "psi_moderate": 0.1,
+    "psi_significant": 0.25
+  },
+  "features": {
+    "close_price": {
+      "ks_statistic": 0.8603,
+      "ks_pvalue": 0.0,
+      "psi_score": 12.3424,
+      "status": "SIGNIFICANT_DRIFT",
+      "drift_flag": true
+    },
+    "sma_20": {
+      "ks_statistic": 0.8612,
+      "ks_pvalue": 0.0,
+      "psi_score": 12.34,
+      "status": "SIGNIFICANT_DRIFT",
+      "drift_flag": true
+    },
+    "sma_50": {
+      "ks_statistic": 0.862,
+      "ks_pvalue": 0.0,
+      "psi_score": 12.3399,
+      "status": "SIGNIFICANT_DRIFT",
+      "drift_flag": true
+    },
+    "sma_ratio_20_50": {
+      "ks_statistic": 0.0456,
+      "ks_pvalue": 0.033245,
+      "psi_score": 0.0356,
+      "status": "MODERATE_DRIFT",
+      "drift_flag": true
+    },
+    "rsi_14d": {
+      "ks_statistic": 0.4941,
+      "ks_pvalue": 0.0,
+      "psi_score": 2.1177,
+      "status": "SIGNIFICANT_DRIFT",
+      "drift_flag": true
+    },
+    "macd_12_26": {
+      "ks_statistic": 0.1655,
+      "ks_pvalue": 0.0,
+      "psi_score": 1.7679,
+      "status": "SIGNIFICANT_DRIFT",
+      "drift_flag": true
+    },
+    "macd_signal_9": {
+      "ks_statistic": 0.1631,
+      "ks_pvalue": 0.0,
+      "psi_score": 1.7004,
+      "status": "SIGNIFICANT_DRIFT",
+      "drift_flag": true
+    },
+    "macd_histogram": {
+      "ks_statistic": 0.1783,
+      "ks_pvalue": 0.0,
+      "psi_score": 0.5501,
+      "status": "SIGNIFICANT_DRIFT",
+      "drift_flag": true
+    },
+    "rolling_volatility_30d": {
+      "ks_statistic": 0.953,
+      "ks_pvalue": 0.0,
+      "psi_score": 14.0447,
+      "status": "SIGNIFICANT_DRIFT",
+      "drift_flag": true
+    },
+    "intraday_return_1d": {
+      "ks_statistic": 0.7046,
+      "ks_pvalue": 0.0,
+      "psi_score": 4.3087,
+      "status": "SIGNIFICANT_DRIFT",
+      "drift_flag": true
+    }
+  }
+}

@@ -1,0 +1,44 @@
+apiVersion: "serving.kserve.io/v1beta1"
+kind: "InferenceService"
+metadata:
+  name: "quant-direction-predictor"
+  namespace: "kserve-inference"
+  labels:
+    app: "quant-predictor"
+    component: "model-serving"
+    tier: "serving"
+    project: "quant-edai"
+spec:
+  predictor:
+    serviceAccountName: "sa-kserve-predictor"
+    timeout: 60
+    # Primary Production Champion Model (80% traffic)
+    model:
+      modelFormat:
+        name: "lightgbm"
+      protocolVersion: "v2"
+      storageUri: "s3://lakehouse/models/champion_model.joblib"
+      resources:
+        requests:
+          cpu: "500m"
+          memory: "1Gi"
+        limits:
+          cpu: "2"
+          memory: "2Gi"
+  # Canary Challenger Deployment (20% traffic routing)
+  canaryTrafficPercent: 20
+  canary:
+    serviceAccountName: "sa-kserve-predictor"
+    timeout: 60
+    model:
+      modelFormat:
+        name: "sklearn"
+      protocolVersion: "v2"
+      storageUri: "s3://lakehouse/models/baseline_model.joblib"
+      resources:
+        requests:
+          cpu: "250m"
+          memory: "512Mi"
+        limits:
+          cpu: "1"
+          memory: "1Gi"

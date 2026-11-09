@@ -10,7 +10,7 @@
   "successful_expectations": 9,
   "success_percent": 100.0,
   "status": "PASSED",
-  "evaluated_at": "2026-11-08T16:27:29.536074+00:00",
+  "evaluated_at": "2026-11-09T00:50:56.049774+00:00",
   "results": [
     {
       "expectation_type": "expect_column_to_exist",

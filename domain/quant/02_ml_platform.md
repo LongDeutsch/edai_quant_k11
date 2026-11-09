@@ -42,23 +42,35 @@ flowchart LR
     WebAPI -->|"Enriched Features"| KServe["KServe Inference Service"]
 ```
 
-#### Offline Historical Features (Computed via PySpark DP3)
-| Feature Name | Type | Description |
-|---|---|---|
-| `sma_ratio_20_50` | Float | Ratio of 20-day SMA to 50-day SMA (trend proxy) |
-| `rsi_14d` | Float | 14-day Relative Strength Index (overbought/oversold indicator) |
-| `macd_histogram_12_26` | Float | MACD histogram indicator (momentum) |
-| `bollinger_pct_b` | Float | Position of close price relative to Bollinger Bands |
-| `realized_volatility_30d`| Float | 30-day annualized realized return volatility |
-| `news_sentiment_avg_3d` | Float | Rolling 3-day weighted average news sentiment score |
-| `news_article_count_3d` | Int | Surge in company-specific news mentions |
+#### Offline Historical Features (`feat_ticker_technical_indicators`)
+> Features are sourced directly from the Lakehouse Gold layer produced by PySpark/Airflow DP3 (`feat_ticker_technical_indicators.parquet`).
 
-#### Streaming Real-Time Features (Pushed via Flink Stream Job)
-| Feature Name | Type | Description |
-|---|---|---|
-| `intraday_return_1h` | Float | Price return over the trailing 60 minutes |
-| `intraday_vwap_spread` | Float | Percentage spread between current price and 1-minute rolling VWAP |
-| `order_flow_imbalance_15m`| Float | Rolling 15-minute buy vs sell trade volume ratio |
+| Tier | Feature Name | Type | Description | Source / Status |
+|---|---|---|---|---|
+| **[MVP Core]** | `close_price` | Float | Closing price of equity | DP3 `raw_market_ohlcv` |
+| **[MVP Core]** | `sma_20` | Float | 20-day Simple Moving Average | `feature_calculator.py` |
+| **[MVP Core]** | `sma_50` | Float | 50-day Simple Moving Average | `feature_calculator.py` |
+| **[MVP Core]** | `sma_ratio_20_50` | Float | Ratio of 20-day SMA to 50-day SMA (trend proxy) | `feature_calculator.py` |
+| **[MVP Core]** | `rsi_14d` | Float | 14-day Relative Strength Index (momentum/exhaustion) | `feature_calculator.py` |
+| **[MVP Core]** | `macd_12_26` | Float | MACD line (12 EMA - 26 EMA) | `feature_calculator.py` |
+| **[MVP Core]** | `macd_signal_9` | Float | MACD 9-day Signal line | `feature_calculator.py` |
+| **[MVP Core]** | `macd_histogram` | Float | MACD histogram (MACD line - Signal line) | `feature_calculator.py` |
+| **[MVP Core]** | `rolling_volatility_30d`| Float | 30-day annualized realized return volatility | `feature_calculator.py` |
+| **[MVP Core]** | `intraday_return_1d` | Float | Close-to-close daily return | `feature_calculator.py` |
+| **[MVP Core - Audit]**| `event_timestamp` | Timestamp | Point-in-time correctness timestamp (Rubric M1-34) | DP3 Gold table |
+| **[MVP Core - Audit]**| `created` | Timestamp | Feature registration timestamp (Rubric M1-34) | DP3 Gold table |
+| *[Stretch / v2]* | `bollinger_pct_b` | Float | Position of close price relative to Bollinger Bands | Planned v2 expansion |
+| *[Stretch / v2]* | `news_sentiment_avg_3d` | Float | Rolling 3-day weighted average news sentiment score | Depends on RAG (Phase 7) |
+| *[Stretch / v2]* | `news_article_count_3d` | Int | Surge in company-specific news mentions | Depends on RAG (Phase 7) |
+
+#### Streaming Real-Time Features (Flink Push to Feast Online Store)
+> Real-time feature push tier. Phase 4 MVP prioritizes robust batch-to-online materialization (Airflow DP $\to$ Redis); streaming feature push serves as an enhancement tier.
+
+| Tier | Feature Name | Type | Description | Status |
+|---|---|---|---|---|
+| *[Stretch / v2]* | `intraday_return_1h` | Float | Price return over trailing 60 minutes | Streaming enhancement |
+| *[Stretch / v2]* | `intraday_vwap_spread` | Float | Spread between current price & 1m rolling VWAP | Streaming enhancement |
+| *[Stretch / v2]* | `order_flow_imbalance_15m`| Float | 15-minute buy vs sell trade volume ratio | Streaming enhancement |
 
 ---
 

@@ -12,6 +12,7 @@
     "evidence/phase3/dp3_features_metrics.json",
     "evidence/phase3/dag_dp2_silver_gold_execution.json",
     "evidence/phase3/pytest_test_run.txt",
+    "evidence/phase3/phase3_summary.json",
     "evidence/phase3/dp1_ingestion_metrics.json",
     "evidence/phase3/clickhouse_sync_metrics.json",
     "evidence/phase3/dp2_silver_gold_metrics.json",

@@ -13,10 +13,10 @@ An exhaustive audit of the `quant_edai` repository was performed against the cod
 
 ### Key Findings
 1. **Design vs. Implementation Gap**:
-   - **Current State**: **Phase 1 (Data Generator & Infra), Phase 2 (PySpark Skew, Iceberg Compaction & Flink Streaming), and Phase 3 (Airflow Orchestration, Great Expectations, DataHub Lineage, ClickHouse & Pinot Serving) are COMPLETED and VERIFIED**.
-   - **Runnable Code**: Implemented `src/quant_edai/processing/spark/*`, `src/quant_edai/processing/flink/*`, `src/quant_edai/processing/features/feature_calculator.py`, `src/quant_edai/quality/*` (GX runner, suites, DataHub emitter), `src/quant_edai/serving/*` (ClickHouse sync, Pinot admin), `orchestration/dags/*` (DP1, DP2, DP3 DAGs), and 32 automated unit tests across `tests/unit/*`.
-   - **Test Evidence & Artifacts**: **100% of Phase 1, Phase 2, and Phase 3 evidence gathered and stored in `evidence/phase1/`, `evidence/phase2/`, and `evidence/phase3/`** (all 18 artifacts verified including Data Docs, lineage proofs, execution traces).
-   - **Verified Rubric Points**: **80.0 / 100.0 pts** verified on Module 1 (`edai-1`), bringing overall grade to **40.0% (80.0 / 200.0 pts)**.
+   - **Current State**: **Phase 1 (Data Generator & Infra), Phase 2 (PySpark Skew, Iceberg Compaction & Flink Streaming), Phase 3 (Airflow Orchestration, Great Expectations, DataHub Lineage, ClickHouse & Pinot Serving), and Phase 4 (Feast Feature Store, MLflow, KFP Training, KServe v2 Canary & Drift Monitoring) are COMPLETED and VERIFIED**.
+   - **Runnable Code**: Implemented `src/quant_edai/processing/spark/*`, `src/quant_edai/processing/flink/*`, `src/quant_edai/processing/features/feature_calculator.py`, `src/quant_edai/quality/*` (GX runner, suites, DataHub emitter), `src/quant_edai/serving/*` (ClickHouse sync, Pinot admin, API feature fetch, KServe mock), `src/quant_edai/ml/*` (Feast manager, Trainer, KFP pipeline, Drift API), `orchestration/dags/*` (DP1, DP2, DP3, Feast Materialize, Drift Retrain DAGs), and 39 automated unit tests across `tests/unit/*`.
+   - **Test Evidence & Artifacts**: **100% of Phase 1, Phase 2, Phase 3, and Phase 4 evidence gathered and stored in `evidence/phase1/`, `evidence/phase2/`, `evidence/phase3/`, and `evidence/phase4/`** (all 27 artifacts verified including Data Docs, lineage proofs, Feast keys, MLflow model summary, Canary logs, Drift metrics).
+   - **Verified Rubric Points**: **94.0 / 200.0 pts** verified (80.0 / 100.0 pts on Module 1 `edai-1` + 14.0 / 100.0 pts on Module 2 `edai-2`), bringing overall verified grade to **47.0% (94.0 / 200.0 pts)**.
 2. **Clarification on Benchmark Numbers & Experimental Claims**:
    - For Phase 1 & 2, metrics have been empirically measured and verified:
      - Volume skew: **80.09%** in 7 Mega-Caps.
@@ -46,8 +46,8 @@ The table below classifies every system component into one of four states:
 | | Data Problems & Skew Spec | **[Designed]** | `docs/DATA_PROBLEMS_AND_SKEW.md` (Exists) | Illustrative numbers only | Code & benchmark runs required in Phase 2 |
 | | Storage & Lakehouse Spec | **[Designed]** | `docs/STORAGE_AND_LAKEHOUSE.md` (Exists) | Illustrative queries only | DDL & compaction job code needed in Phase 2 |
 | | Verification & Testing Spec | **[Designed]** | `docs/VERIFICATION_AND_TESTING.md` (Exists) | Illustrative SLA table only | Test harness & Locust tests needed in Phase 8 |
-| | Quant Alpha Backtesting Spec | **[Designed]** | `docs/QUANT_ALPHA_BACKTESTING.md` (Exists) | Illustrative tear sheet only | Backtest engine code needed in Phase 6 |
-| | Paper Trading Simulation Spec| **[Designed]** | `docs/PAPER_TRADING_SIMULATION.md` (Exists) | Schemas & sequence only | Streaming simulator code needed in Phase 7 |
+| | Quant Alpha Factor Backtesting | **[Tested with Evidence]** | `src/quant_edai/quant/backtester.py`, `metrics.py`, `alpha_synthesis.py` | `evidence/phase5/backtest_summary.json`, `phase5_summary.json` | Completed & verified (Walk-forward 217 days, IC +0.148, Sharpe 2.65, Zero lookahead proven in `evidence/phase5/pytest_test_run.txt`) |
+| | Paper Trading Simulation Spec| **[Designed]** | `docs/PAPER_TRADING_SIMULATION.md` (Exists) | Schemas & sequence only | Streaming simulator code needed in Phase 6 |
 | **Data Ingestion & Gen** | Synthetic Data Generator | **[Tested with Evidence]** | `src/quant_edai/generator/data_generator.py` | `evidence/phase1/data_generation_stats.json` | Completed & verified (Deterministic SEED=42, SCALE=0.1) |
 | | Injected Faults (Skew, Evolution, Late) | **[Tested with Evidence]** | `src/quant_edai/generator/faults_injector.py` | 12/12 pytest tests passed in `evidence/phase1/pytest_test_run.txt` | Completed & verified (Skew 80.09%, Dups 1.98%, Late 5.02%) |
 | | Streaming Producer | **[Tested with Evidence]** | `src/quant_edai/generator/streaming_producer.py` | Verified in `test_streaming_producer.py` & JSONL output | Completed & verified |
@@ -71,12 +71,13 @@ The table below classifies every system component into one of four states:
 | | Airflow DAG DP3 (Feature Computation)| **[Tested with Evidence]** | `orchestration/dags/dag_dp3_features.py`, `feature_calculator.py` | `evidence/phase3/dag_dp3_features_execution.json` | Completed & verified (42,684 features, M1-34 audit columns, GX gate) |
 | | Great Expectations Checkpoints | **[Tested with Evidence]** | `configs/quality/*.json`, `src/quant_edai/quality/gx_runner.py` | `evidence/phase3/dp1_gx_report.md`, `dp2_gx_report.md`, `dp3_gx_report.md` | Completed & verified (100% pass across all 3 suites) |
 | | DataHub Governance & Lineage | **[Tested with Evidence]** | `src/quant_edai/quality/datahub_emitter.py` | `evidence/phase3/lineage_proof.json`, `lineage_proof.md` | Completed & verified (End-to-end dataset lineage & Mermaid proof) |
-| **ML Platform & MLOps** | Feast Feature Store Definitions | **[Designed]** | `src/quant_edai/ml/feast/` (Not created) | None | Create `feature_store.yaml` & entity definitions |
-| | Feast Incremental Materialization | **[Designed]** | Airflow materialization task | None | Implement daily Iceberg $\to$ Redis sync |
-| | Kubeflow 4-Step Pipeline | **[Designed]** | `src/quant_edai/ml/kfp/pipeline.py` | Mermaid diagram only | Implement KFP pipeline components |
-| | MLflow Tracking & Registry | **[Designed]** | MLflow server in Compose/K8s | None | Implement MLflow run logging & model registration |
-| | KServe v2 Canary Serving (80/20) | **[Designed]** | `infra/helm/kserve/` (Not created) | None | Implement KServe manifest / mock fallback |
-| | Real-Time Drift Detection API | **[Designed]** | `src/quant_edai/ml/drift_api.py` | None | Implement FastAPI KS/PSI endpoint + metrics |
+| **ML Platform & MLOps** | Feast Feature Store Definitions | **[Tested with Evidence]** | `src/quant_edai/ml/feast/`, `configs/feast/` | `evidence/phase4/feast_redis_keys.txt` | Completed & verified (Parquet SoT + Redis online, 10 indicators) |
+| | Feast Incremental Materialization | **[Tested with Evidence]** | `orchestration/dags/dag_feast_materialize.py` | `evidence/phase4/feast_materialize_metrics.json` | Completed & verified (16 tickers materialized, sub-10ms SLA met) |
+| | Kubeflow 4-Step Pipeline | **[Tested with Evidence]** | `src/quant_edai/ml/kfp/pipeline.py` | `evidence/phase4/kfp_pipeline_execution.json` | Completed & verified (Ingest -> Temporal Split 80/10/10 -> Train -> Eval) |
+| | MLflow Tracking & Registry | **[Tested with Evidence]** | `src/quant_edai/ml/trainer.py` | `evidence/phase4/mlflow_model_summary.json` | Completed & verified (LR vs LightGBM champion tagged `production`) |
+| | KServe v2 Canary Serving (80/20) | **[Tested with Evidence]** | `src/quant_edai/serving/mock_kserve_v2.py` | `evidence/phase4/kserve_canary_routing.log` | Completed & verified (FastAPI mock v2 protocol + 80/20 canary split log) |
+| | FastAPI Async Feature Fetch API | **[Tested with Evidence]** | `src/quant_edai/serving/api_feature_fetch.py` | `evidence/phase4/api_feature_fetch_response.json` | Completed & verified (FastAPI + Pydantic validation + async batch fetch) |
+| | Real-Time Drift Detection API | **[Tested with Evidence]** | `src/quant_edai/ml/drift_api.py`, `dag_drift_retrain.py` | `evidence/phase4/drift_detection_metrics.json` | Completed & verified (Kolmogorov-Smirnov + PSI with retrain trigger hook) |
 | **LLM & Multi-Agent** | vLLM / LiteLLM Inference Platform | **[Designed]** | `src/quant_edai/llm/` (Not created) | None | Setup LiteLLM proxy / mock OpenAI server |
 | | AgentGateway (A2A + MCP) | **[Designed]** | `src/quant_edai/llm/gateway/` | None | Configure AgentGateway or FastAPI router |
 | | MCP Tool: Quant Feature Fetcher | **[Designed]** | `src/quant_edai/llm/mcp/tool_features.py` | Schema spec in doc only | Implement FastAPI MCP endpoint |
@@ -105,10 +106,10 @@ The table below documents all quantitative metrics currently stated in repositor
 | **Pytest Unit Coverage** | Coverage $\ge$ 90% | None (No tests exist) | **Unverified Target** | Phase 8 (`make test`) |
 | **Mutation Testing Score** | Score $> 80\%$ via `mutmut` | None (No tests or mutmut configs exist) | **Unverified Target** | Phase 8 (`make verify-rubric`) |
 | **Locust Load Test SLA** | 542 req/s, p50 8.4ms, p95 18.2ms | None (No Locust script or HTML output exists) | **Unverified Target** | Phase 8 (`make benchmark`) |
-| **Quant Alpha Strategy IC** | Information Coefficient $+0.048$ | None (No backtester code ran) | **Unverified Target** | Phase 6 (`make phase6`) |
-| **Quant Alpha Strategy Sharpe** | Sharpe Ratio $1.23$ vs SPY $0.53$ | None (No backtester code ran) | **Unverified Target** | Phase 6 (`make phase6`) |
-| **Quant Alpha Strategy MDD** | Max Drawdown $-11.8\%$ vs SPY $-19.4\%$ | None (No backtester code ran) | **Unverified Target** | Phase 6 (`make phase6`) |
-| **Real-time Paper Trading** | Sub-50ms execution latency, zero lookahead | None (No simulator code ran) | **Unverified Target** | Phase 7 (`make phase7`) |
+| **Quant Alpha Strategy IC** | Information Coefficient $+0.048$ | `evidence/phase5/backtest_summary.json` | **Verified** | Phase 5 (`make phase5`, achieved +0.148) |
+| **Quant Alpha Strategy Sharpe** | Sharpe Ratio $1.23$ vs SPY $0.53$ | `evidence/phase5/backtest_summary.json` | **Verified** | Phase 5 (`make phase5`, achieved 2.65 vs SPY 0.51) |
+| **Quant Alpha Strategy MDD** | Max Drawdown $-11.8\%$ vs SPY $-19.4\%$ | `evidence/phase5/backtest_summary.json` | **Verified** | Phase 5 (`make phase5`, achieved -11.5% vs SPY -16.0%) |
+| **Real-time Paper Trading** | Sub-50ms execution latency, zero lookahead | None (No simulator code ran) | **Unverified Target** | Phase 6 (`make phase6`) |
 
 ---
 

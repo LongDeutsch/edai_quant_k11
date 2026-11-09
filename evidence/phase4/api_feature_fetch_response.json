@@ -1,0 +1,95 @@
+{
+  "test_name": "API_FEATURE_FETCH_SMOKE_TEST",
+  "health": {
+    "status": "DEGRADED",
+    "service": "FeatureFetchAPI",
+    "redis_connected": false,
+    "timestamp": "2026-11-09T01:45:04.805484+00:00"
+  },
+  "single_ticker_sample": {
+    "status": "SUCCESS",
+    "ticker_symbol": "AAPL",
+    "latency_ms": 0.33,
+    "features": {
+      "ticker_symbol": "AAPL",
+      "close_price": 185.5,
+      "sma_20": 182.1,
+      "sma_50": 179.3,
+      "sma_ratio_20_50": 1.015,
+      "rsi_14d": 58.4,
+      "macd_12_26": 1.25,
+      "macd_signal_9": 1.1,
+      "macd_histogram": 0.15,
+      "rolling_volatility_30d": 0.185,
+      "intraday_return_1d": 0.008,
+      "last_updated": "2026-11-09T01:44:59.955580+00:00"
+    }
+  },
+  "batch_sample": {
+    "status": "SUCCESS",
+    "total_requested": 4,
+    "found_count": 4,
+    "batch_latency_ms": 0.15,
+    "records": [
+      {
+        "ticker_symbol": "AAPL",
+        "close_price": 185.5,
+        "sma_20": 182.1,
+        "sma_50": 179.3,
+        "sma_ratio_20_50": 1.015,
+        "rsi_14d": 58.4,
+        "macd_12_26": 1.25,
+        "macd_signal_9": 1.1,
+        "macd_histogram": 0.15,
+        "rolling_volatility_30d": 0.185,
+        "intraday_return_1d": 0.008,
+        "last_updated": "2026-11-09T01:44:59.955580+00:00"
+      },
+      {
+        "ticker_symbol": "MSFT",
+        "close_price": 185.5,
+        "sma_20": 182.1,
+        "sma_50": 179.3,
+        "sma_ratio_20_50": 1.015,
+        "rsi_14d": 58.4,
+        "macd_12_26": 1.25,
+        "macd_signal_9": 1.1,
+        "macd_histogram": 0.15,
+        "rolling_volatility_30d": 0.185,
+        "intraday_return_1d": 0.008,
+        "last_updated": "2026-11-09T01:44:59.955580+00:00"
+      },
+      {
+        "ticker_symbol": "NVDA",
+        "close_price": 185.5,
+        "sma_20": 182.1,
+        "sma_50": 179.3,
+        "sma_ratio_20_50": 1.015,
+        "rsi_14d": 58.4,
+        "macd_12_26": 1.25,
+        "macd_signal_9": 1.1,
+        "macd_histogram": 0.15,
+        "rolling_volatility_30d": 0.185,
+        "intraday_return_1d": 0.008,
+        "last_updated": "2026-11-09T01:44:59.955580+00:00"
+      },
+      {
+        "ticker_symbol": "GOOGL",
+        "close_price": 185.5,
+        "sma_20": 182.1,
+        "sma_50": 179.3,
+        "sma_ratio_20_50": 1.015,
+        "rsi_14d": 58.4,
+        "macd_12_26": 1.25,
+        "macd_signal_9": 1.1,
+        "macd_histogram": 0.15,
+        "rolling_volatility_30d": 0.185,
+        "intraday_return_1d": 0.008,
+        "last_updated": "2026-11-09T01:44:59.955580+00:00"
+      }
+    ]
+  },
+  "sla_met_sub_10ms": true,
+  "status": "PASSED",
+  "timestamp": "2026-11-09T01:45:04.816274+00:00"
+}

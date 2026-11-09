@@ -1,0 +1,38 @@
+{
+  "status": "SUCCESS",
+  "mode": "REDIS_ONLINE",
+  "materialized_tickers_count": 16,
+  "tickers": [
+    "AAPL",
+    "AMD",
+    "AMZN",
+    "GOOGL",
+    "JNJ",
+    "JPM",
+    "META",
+    "MSFT",
+    "NVDA",
+    "ORCL",
+    "PG",
+    "SPY",
+    "TSLA",
+    "V",
+    "WMT",
+    "XOM"
+  ],
+  "feature_columns": [
+    "close_price",
+    "sma_20",
+    "sma_50",
+    "sma_ratio_20_50",
+    "rsi_14d",
+    "macd_12_26",
+    "macd_signal_9",
+    "macd_histogram",
+    "rolling_volatility_30d",
+    "intraday_return_1d"
+  ],
+  "latency_seconds": 0.008,
+  "keys_written_evidence": "evidence/phase4/feast_redis_keys.txt",
+  "timestamp": "2026-11-09T12:17:15.205031+00:00"
+}

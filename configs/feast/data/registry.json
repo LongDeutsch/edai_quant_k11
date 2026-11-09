@@ -1,0 +1,32 @@
+{
+  "entities": [
+    {
+      "entity": "ticker_symbol",
+      "join_keys": [
+        "ticker_symbol"
+      ],
+      "description": "Stock ticker symbol for US Equities"
+    }
+  ],
+  "feature_views": [
+    {
+      "name": "fv_ticker_technical_indicators",
+      "entity": "ticker_symbol",
+      "features": [
+        "close_price",
+        "sma_20",
+        "sma_50",
+        "sma_ratio_20_50",
+        "rsi_14d",
+        "macd_12_26",
+        "macd_signal_9",
+        "macd_histogram",
+        "rolling_volatility_30d",
+        "intraday_return_1d"
+      ],
+      "source": "/tmp/lakehouse_source/gold_features/feat_ticker_technical_indicators.parquet",
+      "ttl_days": 365,
+      "online": true
+    }
+  ]
+}

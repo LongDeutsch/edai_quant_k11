@@ -1,8 +1,8 @@
 {
-  "status": "STAGED_LOCAL",
+  "status": "FALLBACK_LOCAL_STAGED",
   "mode": "LOCAL_STORAGE",
-  "message": "MinIO container is offline; datasets verified in local staging path.",
-  "staged_files_count": 6378,
-  "total_bytes": 49797826,
+  "reason": "No module named 'minio'",
+  "staged_files_count": 7686,
+  "total_bytes": 62135460,
   "local_path": "/tmp/lakehouse_source"
 }

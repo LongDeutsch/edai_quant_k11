@@ -1,5 +1,5 @@
 # Great Expectations Data Docs: suite_raw_market_data
-> Evaluated at: `2026-11-08T16:27:29.536074+00:00` | Status: **PASSED**
+> Evaluated at: `2026-11-09T00:50:56.049774+00:00` | Status: **PASSED**
 
 - **Evaluated Records**: 42,684
 - **Scorecard**: 9 / 9 expectations (100.0%)

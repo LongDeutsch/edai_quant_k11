@@ -110,8 +110,10 @@ class SCD2DimensionBuilder:
         Enforces: valid_from_ts <= as_of_date <= valid_to_ts.
         """
         as_of_ts = pd.to_datetime(as_of_date)
-        from_ts = pd.to_datetime(df_dim["valid_from_ts"])
-        to_ts = pd.to_datetime(df_dim["valid_to_ts"])
+        from_ts = pd.to_datetime(df_dim["valid_from_ts"], errors="coerce")
+        # Handle 9999-12-31 sentinel date for pandas nanosecond compatibility
+        clean_to = df_dim["valid_to_ts"].astype(str).str.replace("9999-", "2099-")
+        to_ts = pd.to_datetime(clean_to, errors="coerce")
 
         mask = (from_ts <= as_of_ts) & (as_of_ts <= to_ts)
         return df_dim[mask].copy()
