@@ -5,12 +5,12 @@
     "table": "lakehouse.gold.fact_daily_ohlcv",
     "description": "Validation suite for curated Gold Fact and Dimension tables"
   },
-  "evaluated_rows": 38368,
+  "evaluated_rows": 41856,
   "total_expectations": 6,
   "successful_expectations": 6,
   "success_percent": 100.0,
   "status": "PASSED",
-  "evaluated_at": "2026-11-09T00:50:58.425740+00:00",
+  "evaluated_at": "2026-11-10T01:07:16.554139+00:00",
   "results": [
     {
       "expectation_type": "expect_column_to_exist",

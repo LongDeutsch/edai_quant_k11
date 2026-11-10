@@ -30,6 +30,7 @@
     "cumulative_returns_vs_benchmark.png",
     "factor_ic_distribution.png",
     "novel_idea_attribution_report.md",
+    "phase5_summary.json",
     "pytest_test_run.txt",
     "rolling_sharpe_ratio.png"
   ]

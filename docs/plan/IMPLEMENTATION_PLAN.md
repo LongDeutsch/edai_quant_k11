@@ -41,7 +41,7 @@ flowchart TD
         Flink["Apache Flink (RocksDB Dedup, Watermarks)"]
         Airflow["Airflow Orchestrator (DP1, DP2, DP3)"]
         DataHub["DataHub Catalog (Lineage & Governance)"]
-        ServingStores["ClickHouse OLAP & Apache Pinot Real-time"]
+        ServingStores["ClickHouse OLAP Serving (quant_dw, M1-19)"]
     end
 
     subgraph L2["Layer 2: ML Platform (Module 2 - 50%)"]
@@ -119,8 +119,8 @@ quant_edai/
 │       │   └── datahub_emitter.py         # DataHub lineage & assertion emitter
 │       ├── serving/                       # Analytical & operational serving adapters
 │       │   ├── api_feature_fetch.py       # FastAPI online feature fetcher (Pydantic, async)
-│       │   ├── clickhouse_client.py       # ClickHouse historical queries
-│       │   └── pinot_client.py            # Pinot real-time bar queries
+│       │   ├── clickhouse_sync.py         # ClickHouse daily & intraday synchronization (M1-19)
+│       │   └── candlestick_loader.py      # Multi-tier candlestick serving (ClickHouse/Parquet)
 │       ├── ml/                            # Machine learning lifecycle components
 │       │   ├── trainer.py                 # LogisticRegression vs LightGBM trainer
 │       │   ├── drift_api.py               # Real-time KS/PSI drift detection service
@@ -154,8 +154,7 @@ quant_edai/
 │       └── dag_drift_retrain.py           # Periodic drift check -> Kubeflow trigger
 ├── sql/                                   # Database DDLs and schemas
 │   ├── iceberg/                           # Iceberg table definitions & partition specs
-│   ├── clickhouse/                        # ClickHouse OLAP table schemas & indexes
-│   └── pinot/                             # Pinot real-time table configs & schemas
+│   └── clickhouse/                        # ClickHouse OLAP table schemas & indexes
 ├── infra/                                 # Infrastructure as Code & deployment descriptors
 │   ├── docker-compose.yml                 # Local multi-service composition (Silo/MinIO-compatible, Kafka KRaft, Postgres, Redis)
 │   ├── docker/                            # Generator Dockerfiles (baseline + multi-stage)
@@ -244,10 +243,10 @@ The phases are structured with strict topological dependencies. No phase can exe
 flowchart TD
     P1["Phase 1: Generator & Infra Foundation<br>(Docker Compose, MinIO, Kafka, Anomaly Gen)"]
     P2["Phase 2: Big Data Processing<br>(Spark Skew/AQE, Iceberg Compaction, Flink Dedup/Watermarks)"]
-    P3["Phase 3: Orchestration & Governance<br>(Airflow DP1-DP3, Great Expectations, DataHub, ClickHouse/Pinot)"]
+    P3["Phase 3: Orchestration & Governance<br>(Airflow DP1-DP3, Great Expectations, DataHub, ClickHouse Serving)"]
     P4["Phase 4: ML Platform & MLOps<br>(Feast Feature Store, Kubeflow KFP, MLflow, KServe v2, Drift API)"]
     P5["Phase 5: Quant Alpha Evaluation<br>(Walk-Forward Backtesting: IC, Sharpe, MDD vs SPY + Novel Idea 1)"]
-    P6["Phase 6: Real-Time Paper Trading<br>(Out-of-sample Stream Replay, Atomic Accounting, Pinot Serving)"]
+    P6["Phase 6: Real-Time Paper Trading<br>(Out-of-sample Stream Replay, Atomic Accounting, ClickHouse/Streamlit Serving)"]
     P7["Phase 7: Agentic AI & RAG<br>(LiteLLM/vLLM, AgentGateway, MCP Tools, Multi-Agent Fleet, Qdrant)"]
     P8["Phase 8: Full Rubric Verification<br>(Pytest >90%, Mutmut >80%, Locust SLA, CI/CD, NGINX Ingress, Vault)"]
 
@@ -449,7 +448,7 @@ ENGINE=flink make flink-optimized flink-dedup
 ### Phase 3: Airflow + Quality + Governance + Serving
 
 #### Objective & Scope
-Automate end-to-end data pipeline orchestration using Apache Airflow; integrate Great Expectations quality checkpoints; emit metadata and lineage to DataHub; mirror curated Gold datasets to ClickHouse and Pinot serving layers.
+Automate end-to-end data pipeline orchestration using Apache Airflow; integrate Great Expectations quality checkpoints; emit metadata and lineage to DataHub; mirror curated Gold datasets and intraday bars to ClickHouse OLAP serving layer (`quant_dw`, M1-19).
 
 #### Task Breakdown
 1. **Airflow-01**: Implement `orchestration/dags/dag_dp1_raw_ingestion.py` (DP1: External MinIO $\to$ Bronze raw tables + GX checkpoint).
@@ -462,7 +461,7 @@ Automate end-to-end data pipeline orchestration using Apache Airflow; integrate 
 5. **Gov-01**: Configure DataHub lineage plugin in Airflow DAGs, emitting automated lineage graphs from DP1, DP2, DP3 to destination Iceberg tables.
 6. **Gov-02**: Emit Great Expectations assertion results to DataHub as Dataset Quality Assertions.
 7. **Serving-01**: Configure ClickHouse OLAP schema (`sql/clickhouse/schema_quant.sql`) and implement daily sync from Gold Iceberg.
-8. **Serving-02**: Configure Apache Pinot real-time table (`sql/pinot/realtime_bars.json`) consuming 1-minute bars from Kafka.
+8. **Serving-02**: Configure ClickHouse real-time intraday table (`quant_dw.market_intraday_bars`, M1-19) for sub-second candlestick serving and dashboard analytics.
 
 #### Files & Modules to Implement
 - `orchestration/dags/dag_dp1_raw_ingestion.py`
@@ -474,14 +473,12 @@ Automate end-to-end data pipeline orchestration using Apache Airflow; integrate 
 - `src/quant_edai/quality/gx_runner.py`
 - `src/quant_edai/quality/datahub_emitter.py`
 - `sql/clickhouse/schema_quant.sql`
-- `sql/pinot/realtime_bars.json`
 
 #### Acceptance Criteria
 - All 3 Airflow DAGs (DP1, DP2, DP3) execute end-to-end with green status.
 - Great Expectations Data Docs generate HTML reports validating 100% test assertions pass.
 - DataHub catalog displays full lineage: `external-source` $\to$ `raw_market_ohlcv` $\to$ `stg_market_ohlcv` $\to$ `fact_daily_ohlcv` $\to$ `feat_ticker_technical_indicators`.
-- ClickHouse OLAP answers 1-year historical aggregation queries in $<50$ ms.
-- Pinot real-time table serves live 1-minute OHLCV bar queries in $<20$ ms.
+- ClickHouse OLAP answers 1-year historical aggregation queries in $<50$ ms and serves live intraday bar queries in $<20$ ms.
 
 #### Commands to Run
 ```bash
@@ -749,7 +746,7 @@ make phase5
 ### Phase 6: Real-time Paper Trading Simulation & Alpha Dashboard
 
 #### Objective & Scope
-Deploy an operational real-time intraday trading system and multi-page Streamlit analytics dashboard. The engine ingests 1-minute market bars (live via Kafka `market.bars.1m` or via fast market replay at 10x–50x speed), computes intraday momentum and VWAP deviation signals with an optional soft daily ML trend bias, applies institutional scalping risk controls (TP/SL in basis points, EOD flatting, daily drawdown circuit breaker), persists atomic ACID executions to PostgreSQL, and serves interactive visualizations across 3 dedicated Streamlit pages and Apache Pinot.
+Deploy an operational real-time intraday trading system and multi-page Streamlit analytics dashboard. The engine ingests 1-minute market bars (live via Kafka `market.bars.1m` or via fast market replay at 10x–50x speed), computes intraday momentum and VWAP deviation signals with an optional soft daily ML trend bias, applies institutional scalping risk controls (TP/SL in basis points, EOD flatting, daily drawdown circuit breaker), persists atomic ACID executions to PostgreSQL, and serves interactive visualizations across 3 dedicated Streamlit pages and ClickHouse OLAP (quant_dw.market_intraday_bars, M1-19).
 
 #### Task Breakdown
 1. **Sim-01 (M1-38 Engine)**: Implement `src/quant_edai/quant/paper_trading.py`:
@@ -767,7 +764,7 @@ Deploy an operational real-time intraday trading system and multi-page Streamlit
    - Measures and records sub-50ms execution latency SLA.
 4. **Sim-04 (Streamlit 3-Page Dashboard)**: Implement `src/quant_edai/serving/dashboard/`:
    - `pages/1_Live_Trading_and_Risk.py`: Live PnL, positions matrix, real-time Sharpe, max drawdown, and recent execution feed.
-   - `pages/2_Candlestick_Charts.py`: 1m/5m candlesticks from Apache Pinot broker + trade entry/exit markers joined from PostgreSQL.
+   - `pages/2_Candlestick_Charts.py`: 1m/5m candlesticks from ClickHouse OLAP (:8123) + trade entry/exit markers joined from PostgreSQL.
    - `pages/3_Alpha_Quality_Analytics.py`: Clear separation between Live Intraday metrics (from `paper_*`) and Daily Backtest metrics (from `evidence/phase5/` / `backtester.py` M1-37).
 5. **Sim-05 (Verification & Evidence)**: Gather end-to-end performance and latency metrics under `evidence/phase6/`.
 
@@ -787,7 +784,7 @@ Deploy an operational real-time intraday trading system and multi-page Streamlit
 - Dual-mode verified: Same signal, risk, and accounting behavior in both Live Kafka and Replay modes.
 - Idempotency verified: Replaying identical datasets produces zero duplicate orders and exact cash conservation.
 - Sub-50ms execution latency SLA verified per bar.
-- Streamlit multi-page dashboard runs on port `:8501`, visualizes live PnL, Pinot candles, and trade markers.
+- Streamlit multi-page dashboard runs on port `:8501`, visualizes live PnL, ClickHouse candles, and trade markers.
 
 #### Commands to Run
 ```bash

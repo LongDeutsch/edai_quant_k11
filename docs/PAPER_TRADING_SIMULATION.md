@@ -4,11 +4,11 @@
 
 The **Real-time Paper Trading Simulation Module** is an operational, real-time extension built on top of the Quant Data & AI Platform. It demonstrates end-to-end production readiness by connecting:
 
-$$\text{Market Data Replay} \longrightarrow \text{Kafka} \longrightarrow \text{Flink} \longrightarrow \text{Feast} \longrightarrow \text{KServe} \longrightarrow \text{Signal Gen} \longrightarrow \text{Paper Simulator} \longrightarrow \text{Pinot / Dashboard}$$
+$$\text{Market Data Replay} \longrightarrow \text{Kafka} \longrightarrow \text{Flink} \longrightarrow \text{Feast} \longrightarrow \text{KServe} \longrightarrow \text{Signal Gen} \longrightarrow \text{Paper Simulator} \longrightarrow \text{ClickHouse / Dashboard}$$
 
 ### Core Design Principles
 1. **Zero Pipeline Disruption**: Runs as an optional add-on that consumes from existing feeds or a dedicated replay topic; does not break batch Lakehouse or offline training jobs.
-2. **Reusing Existing Tech Stack**: Implemented strictly in Python (FastAPI), Apache Kafka, Apache Flink, Apache Pinot, and PostgreSQL. No external heavy broker APIs or matching engines.
+2. **Reusing Existing Tech Stack**: Implemented strictly in Python (FastAPI), Apache Kafka, Apache Flink, ClickHouse OLAP, and PostgreSQL. No external heavy broker APIs or matching engines.
 3. **Temporal Integrity (Zero Look-Ahead Bias)**: Enforces strict separation between `event_timestamp`, `signal_timestamp`, `prediction_horizon`, and `execution_timestamp`.
 4. **State Persistence & Idempotency**: Resilient against stream retries, Kafka rebalances, and service crashes via PostgreSQL transactions and event deduplication tables.
 5. **Unified Alpha Evaluation**: Reuses the core metrics (IC, Sharpe, Max Drawdown, Benchmark Alpha) established in the offline backtesting module.
@@ -28,7 +28,7 @@ sequenceDiagram
     participant SigGen as Signal Generator
     participant Sim as Paper Trading Simulator
     participant DB as PostgreSQL
-    participant Pinot as Apache Pinot
+    participant CH as ClickHouse OLAP
     participant Dash as Real-time Dashboard
 
     Note over Replay,Kafka: Step 1: Out-of-sample bar replay with speed toggle (1x, 10x, 100x)
@@ -55,9 +55,9 @@ sequenceDiagram
     Sim->>Kafka: Publish to quant.paper_trades
 
     Note over Kafka,Dash: Step 5: Real-time Serving & Telemetry
-    Kafka->>Pinot: Ingest quant.signals & quant.paper_trades
+    DB->>CH: Sync market bars & features
     DB->>Dash: Read portfolio equity & historical PnL
-    Pinot->>Dash: Sub-50ms query for live price & signal candles
+    CH->>Dash: Sub-50ms query for live price & signal candles
 ```
 
 ---
@@ -289,7 +289,7 @@ The platform evaluates and reports:
 
 ## 8. Dashboard Specification (Real-Time Visuals)
 
-A lightweight web dashboard (Streamlit or Grafana) connecting to Pinot and PostgreSQL:
+A lightweight web dashboard (Streamlit or Grafana) connecting to ClickHouse and PostgreSQL:
 1. **Live Price & Candlesticks**: Displays incoming replayed OHLCV with overlaid BUY/SELL markers.
 2. **Model Probability Gauges**: Real-time gauge of $P(\text{Up})$ alongside current feature values (RSI, VWAP spread).
 3. **Portfolio Equity vs. Benchmark**: Live line chart showing simulated $10k portfolio equity vs. SPY Buy & Hold.

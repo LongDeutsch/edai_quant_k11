@@ -109,6 +109,6 @@ The Data Fetch Web API and MCP tool endpoints were subjected to distributed load
    - `--scale 0.1`: Generates ~10 GB of data in 4.2 minutes; completes the full Airflow DP1-DP3 batch run in under 8 minutes for CI/CD validation.
    - `--scale 1.0`: Generates >= 100 GB of data, validating Spark skew handling and memory allocation under production-sized datasets.
 2. **Fault Recovery Testing**:
-   - **Kafka Duplicates**: 1.5% duplicate messages injected; verified that Flink's RocksDB deduplication filter eliminates 100% of duplicate entries before sinking to Pinot.
+   - **Kafka Duplicates**: 1.5% duplicate messages injected; verified that Flink's RocksDB deduplication filter eliminates 100% of duplicate entries before sinking to downstream serving stores.
    - **Flink TaskManager Failure**: TaskManager pod killed mid-stream; verified that the job resumes from the latest RocksDB savepoint without data loss.
    - **Airflow Task Retry**: Simulated MinIO connection drops; verified that Airflow exponential backoff retries successfully without corrupting Bronze zone files.

@@ -106,7 +106,7 @@ These are real-time events produced continuously and consumed by a stream proces
 
 ---
 
-## 4. Medallion Storage Architecture (Apache Iceberg + MinIO + ClickHouse + Pinot)
+## 4. Medallion Storage Architecture (Apache Iceberg + MinIO + ClickHouse)
 
 ```mermaid
 flowchart TD
@@ -123,8 +123,8 @@ flowchart TD
     end
 
     subgraph ServingStorage["Serving Layer Stores"]
-        Gold -->|"Batch Sync"| ClickHouse["ClickHouse OLAP (Historical Analytics)"]
-        Kafka -->|"Flink Streaming Aggs"| Pinot["Apache Pinot (Real-time Latency Serving)"]
+        Gold -->|"Batch Sync"| ClickHouse["ClickHouse OLAP (Historical & Intraday Serving)"]
+        Kafka -->|"Flink Streaming Aggs"| ClickHouse
         Kafka -->|"Flink Streaming Aggs"| Redis["Redis (Online Feature Store - Feast)"]
     end
 ```
@@ -142,7 +142,7 @@ flowchart TD
 | **Gold** | `fact_market_news` | Apache Iceberg | One row per news article | `article_id, published_ts` | Structured news with sentiment & relevance scores |
 | **Gold** | `feat_ticker_technical_indicators` | Apache Iceberg | One row per ticker per calculation snapshot | `ticker_symbol, event_timestamp` | Gold features with `event_timestamp` & `created` columns |
 | **Serving** | `quant_analytics_ohlcv` | ClickHouse | Columnar time-series | `ORDER BY (ticker_symbol, trade_date)` | OLAP warehouse for high-speed Quant backtesting |
-| **Serving** | `realtime_minute_bars` | Apache Pinot | 1-minute real-time bar | `ticker_symbol, window_start` | Near-realtime OLAP queries (<50ms latency) |
+| **Serving** | `market_intraday_bars` | ClickHouse | 1-minute real-time bar | `ORDER BY (ticker_symbol, event_timestamp)` | Intraday OLAP queries (<30ms latency, M1-19) |
 
 ---
 
@@ -187,7 +187,7 @@ The data generator (`data_generator.py`) implements a **Hybrid Seed + Synthetic 
 2. **Stateful RocksDB Deduplication**:
    - Deduplication key: `hash(ticker, trade_id, trade_timestamp)`.
    - State TTL configured to 1 hour, maintaining low memory footprint while eliminating 1.5% duplicates.
-3. **Sink**: Dual sink to Apache Pinot (for real-time OLAP queries) and Kafka topic `market_minute_features` (for Feast online ingestion).
+3. **Sink**: Dual sink to ClickHouse OLAP (for real-time OLAP queries) and Kafka topic `market_minute_features` (for Feast online ingestion).
 
 ---
 

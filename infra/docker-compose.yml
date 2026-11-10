@@ -258,25 +258,7 @@ services:
       retries: 5
 
   # ============================================================================
-  # 10. Low-Latency Realtime Serving Layer: Apache Pinot (Controller :9002, Broker :8099)
-  # ============================================================================
-  pinot:
-    image: apachepinot/pinot:1.1.0
-    container_name: quant_pinot
-    restart: unless-stopped
-    ports:
-      - "9002:9000"
-      - "8099:8099"
-      - "8098:8098"
-    command: QuickStart -type EMPTY
-    depends_on:
-      kafka:
-        condition: service_healthy
-    volumes:
-      - pinot_data:/tmp/quickstart
-
-  # ============================================================================
-  # 11. Pipeline Orchestrator: Apache Airflow (LocalExecutor on quant_postgres)
+  # 10. Pipeline Orchestrator: Apache Airflow (LocalExecutor on quant_postgres)
   # ============================================================================
   airflow-init:
     image: apache/airflow:2.9.0
@@ -357,4 +339,3 @@ volumes:
   redis_data:
   flink_data:
   clickhouse_data:
-  pinot_data:

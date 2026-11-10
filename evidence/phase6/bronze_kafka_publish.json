@@ -1,0 +1,11 @@
+{
+  "status": "PUBLISHED",
+  "bronze_source": "/tmp/lakehouse_source/raw_market_ohlcv",
+  "kafka_bootstrap": "localhost:9092",
+  "rows_loaded": 400,
+  "bars_published": 2000,
+  "ticks_published": 2000,
+  "bars_topic": "market.bars.1m",
+  "ticks_topic": "market.ticks",
+  "published_at": "2026-11-09T16:56:11.006300+00:00"
+}

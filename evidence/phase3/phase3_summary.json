@@ -4,7 +4,6 @@
   "artifacts": [
     "evidence/phase3/dp1_gx_report.md",
     "evidence/phase3/dp2_gx_report.json",
-    "evidence/phase3/pinot_realtime_metrics.json",
     "evidence/phase3/dp3_gx_report.json",
     "evidence/phase3/feature_computation_metrics.json",
     "evidence/phase3/dag_dp1_raw_ingestion_execution.json",

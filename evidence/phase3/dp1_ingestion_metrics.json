@@ -2,7 +2,7 @@
   "status": "FALLBACK_LOCAL_STAGED",
   "mode": "LOCAL_STORAGE",
   "reason": "No module named 'minio'",
-  "staged_files_count": 7686,
-  "total_bytes": 62135460,
+  "staged_files_count": 7904,
+  "total_bytes": 64253688,
   "local_path": "/tmp/lakehouse_source"
 }

@@ -4,8 +4,8 @@
 
 The platform uses a hybrid storage topology optimized for distinct analytical access patterns:
 1. **Lakehouse Foundation (MinIO + Apache Iceberg)**: Serves as the single immutable source of truth for all historical market data, company dimensions, news archives, and computed ML features.
-2. **Historical OLAP Warehouse (ClickHouse)**: Optimized for columnar time-series queries, multi-year backtesting, and vectorized aggregations across billions of rows.
-3. **Real-Time Serving Engine (Apache Pinot)**: Serves sub-50ms queries for real-time 1-minute bars, live anomaly scans, and dashboard telemetry.
+2. **Analytical & Real-Time OLAP Warehouse (ClickHouse)**: Optimized for columnar time-series queries, multi-year backtesting, and sub-second serving of 1-minute intraday candlestick bars (`quant_dw.market_intraday_bars`, M1-19).
+3. **Online Feature Store (Redis + Feast)**: Serves ultra-low latency (<10ms) feature vectors for real-time model inference.
 
 ```mermaid
 flowchart TD
@@ -16,8 +16,8 @@ flowchart TD
     end
 
     subgraph AnalyticalStores["Serving Layer Stores"]
-        GoldIceberg -->|"Periodic Sync"| ClickHouse["ClickHouse OLAP Warehouse"]
-        KafkaTicks["Kafka: market_ticks"] -->|"Flink 1m Bars"| Pinot["Apache Pinot Real-time"]
+        GoldIceberg -->|"Periodic Sync"| ClickHouse["ClickHouse OLAP Warehouse<br>(quant_dw - M1-19)"]
+        KafkaTicks["Kafka: market_ticks"] -->|"Flink / Sync"| ClickHouse
         FeatIceberg -->|"Daily Feast Sync"| Redis["Redis Online Feature Store"]
     end
 ```
@@ -166,10 +166,10 @@ SETTINGS index_granularity = 8192;
 
 ---
 
-## 5. Apache Pinot Real-Time Table Design
+## 5. ClickHouse Real-Time Intraday Table Design (M1-19)
 
-Ingests real-time 1-minute bars directly from Kafka topic `market_minute_features`:
-- **Table Type**: `REALTIME`
-- **Time Column**: `window_start_ts` (Epoch millis)
-- **Inverted Indexes**: Applied on `ticker_symbol` for instant filtering.
-- **Latency SLA**: p99 query latency < 35ms under 1,000 concurrent queries/sec.
+Ingests and serves 1-minute market bars via table `quant_dw.market_intraday_bars`:
+- **Engine**: `ReplacingMergeTree(created)` with primary key `(ticker_symbol, event_timestamp)`
+- **Partitioning**: `PARTITION BY toYYYYMM(event_timestamp)`
+- **LowCardinality**: Applied on `ticker_symbol` and `exchange` for instant filtering.
+- **Latency SLA**: p99 query latency < 30ms for 150-bar candlestick charts.

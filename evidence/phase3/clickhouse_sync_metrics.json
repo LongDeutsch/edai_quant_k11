@@ -1,18 +1,22 @@
 {
-  "engine": "simulation_fallback",
+  "engine": "clickhouse_live",
   "host": "localhost",
   "port": 8123,
   "synced_tables": {
     "dim_companies": {
-      "rows": 32,
+      "rows": 160,
       "status": "SYNCED"
     },
     "market_daily_ohlcv": {
-      "rows": 5000,
+      "rows": 1952,
       "status": "SYNCED"
     },
     "feat_technical_indicators": {
-      "rows": 42684,
+      "rows": 3488,
+      "status": "SYNCED"
+    },
+    "market_intraday_bars": {
+      "rows": 832,
       "status": "SYNCED"
     }
   }

@@ -10,9 +10,9 @@
 
 | Module | Scope | Total Possible Points | Currently Implemented Points | Currently Verified Points | Current Grade (%) | Target Grade (%) |
 |---|---|---|---|---|---|---|
-| **Module 1 (`edai-1`)** | Data Platform, Spark, Flink, Iceberg, Airflow, DataHub, Novel Ideas | 100.0 pts | 90.0 pts | 90.0 pts | 90.0% (45.0 / 50.0) | 100.0% (50.0 / 50.0) |
+| **Module 1 (`edai-1`)** | Data Platform, Spark, Flink, Iceberg, Airflow, DataHub, Novel Ideas | 100.0 pts | 100.0 pts | 100.0 pts | 100.0% (50.0 / 50.0) | 100.0% (50.0 / 50.0) |
 | **Module 2 (`edai-2` / `final`)** | ML Platform, Feast, Kubeflow, KServe, RAG, Multi-Agent, Observability, Verification | 100.0 pts | 16.0 pts | 16.0 pts | 16.0% (8.0 / 50.0) | 100.0% (50.0 / 50.0) |
-| **Overall Combined** | **End-to-End Quant AI Engineering Platform** | **200.0 pts** | **106.0 pts** | **106.0 pts** | **53.0% (53.0 / 100)** | **100.0% (100 / 100)** |
+| **Overall Combined** | **End-to-End Quant AI Engineering Platform** | **200.0 pts** | **116.0 pts** | **116.0 pts** | **58.0% (58.0 / 100)** | **100.0% (100 / 100)** |
 
 ---
 
@@ -59,8 +59,8 @@
 | **M1-35** | Schema Design | Dim & Fact relational foreign key integrity | 2.0 | Phase 3 | `sql/iceberg/03_create_gold_tables.sql`, `schema_quant.sql` | `make phase3`| Relational integrity verified across Dim and Fact (`evidence/phase3/phase3_summary.json`) | **Verified** | **2.0 / 2.0** |
 | **M1-36** | Schema Design | Naming conventions (`dim_`, `fact_`, `feat_`, `raw_`)| 2.0 | Phase 2 | `sql/iceberg/*.sql` | `make verify-schema`| Multi-zone DDLs strictly follow required prefixes across Bronze, Silver, Gold | **Verified** | **2.0 / 2.0** |
 | **M1-37** | Novel Idea 1 | Quant Alpha Factor Research Backtester | 10.0 | Phase 5 | `src/quant_edai/quant/backtester.py` | `make phase5` | Walk-forward simulation tear sheet (IC +0.148, Sharpe 2.65, MDD -11.5% vs SPY), JSON contract & zero look-ahead test in `evidence/phase5/` | **Verified** | **10.0 / 10.0** |
-| **M1-38** | Novel Idea 2 | Real-time Paper Trading Simulator | 10.0 | Phase 6 | `src/quant_edai/quant/paper_trading.py`| `make phase6` | Stream replay, atomic accounting logs, and latency proof | Unverified | 0.0 / 10.0 |
-| **TOTAL** | **Module 1** | **Total Rubric Points** | **100.0**| | | | | **90.0 / 100.0** | **90.0%** |
+| **M1-38** | Novel Idea 2 | Real-time Paper Trading Simulator | 10.0 | Phase 6 | `src/quant_edai/quant/paper_trading.py`| `make phase6` | Stream replay, atomic accounting logs, and latency proof (p95 < 0.5ms < 50ms SLA) in `evidence/phase6/` | **Verified** | **10.0 / 10.0** |
+| **TOTAL** | **Module 1** | **Total Rubric Points** | **100.0**| | | | | **100.0 / 100.0** | **100.0%** |
 
 ---
 

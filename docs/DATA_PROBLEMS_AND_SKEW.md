@@ -32,7 +32,7 @@ flowchart LR
 | **2** | **Schema Evolution** | `raw_market_ohlcv` | From partition `2024-06-01`, feeds introduce `vwap` (DoubleType) and `trade_count` (IntegerType); news adds `sentiment_score` (DoubleType). | **Schema Mismatch Errors**: Standard Parquet readers crash on schema incompatibility when scanning historical partitions alongside modern ones. |
 | **3** | **Offline Duplicates**| `raw_market_ohlcv` | 2.0% duplicate records injected with identical `(ticker_symbol, timestamp)` but distinct `ingestion_ts`. | **Volume Overcounting**: Downstream metrics (daily volume, total liquidity, VWAP) become inflated. |
 | **4** | **Late Arrivals** | `kafka://market_ticks`| 5.0% of streaming messages artificially delayed by 300 to 600 seconds (5–10 mins). | **Data Loss in Tumbling Windows**: Standard processing-time windows drop late records or calculate distorted 1-minute OHLCV candles. |
-| **5** | **Streaming Dups** | `kafka://market_ticks`| 1.5% of Kafka messages emitted twice to simulate producer network retries. | **Double-counted trades**: Overstated real-time volume in Pinot and online feature store. |
+| **5** | **Streaming Dups** | `kafka://market_ticks`| 1.5% of Kafka messages emitted twice to simulate producer network retries. | **Double-counted trades**: Overstated real-time volume in ClickHouse OLAP and online feature store. |
 | **6** | **Feature Drift** | `feat_ticker_technical_indicators` | Market transition from low-volatility Bull market to high-volatility Bear market regime. | **Model Performance Decay**: AUC-ROC degrades due to distribution shifts in RSI, volatility, and return spreads. |
 
 ---

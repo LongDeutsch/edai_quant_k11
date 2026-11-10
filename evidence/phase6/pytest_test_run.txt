@@ -1,0 +1,17 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.13.12, pytest-9.2.0, pluggy-1.7.0 -- /Users/nguyenbuihoanglong/Desktop/FSDS/edai_11/quant_edai/.venv/bin/python
+cachedir: .pytest_cache
+hypothesis profile 'default'
+rootdir: /Users/nguyenbuihoanglong/Desktop/FSDS/edai_11/quant_edai
+configfile: pyproject.toml
+plugins: platformdirs-4.14.5, hypothesis-6.170.15, cov-7.1.0, locust-2.47.0, typeguard-4.6.0, anyio-4.16.0
+collecting ... collected 6 items
+
+tests/unit/test_paper_trading.py::test_paper_trading_on_bar_and_latency PASSED [ 16%]
+tests/unit/test_paper_trading.py::test_idempotency_duplicate_bar_handling PASSED [ 33%]
+tests/unit/test_paper_trading.py::test_take_profit_and_stop_loss_in_bps PASSED [ 50%]
+tests/unit/test_paper_trading.py::test_eod_flatten_at_15_55 PASSED       [ 66%]
+tests/unit/test_paper_trading.py::test_circuit_breaker_max_daily_drawdown PASSED [ 83%]
+tests/unit/test_paper_trading.py::test_market_replay_runner PASSED       [100%]
+
+============================== 6 passed in 1.11s ===============================

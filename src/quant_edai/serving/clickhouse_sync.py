@@ -194,6 +194,50 @@ def sync_clickhouse_gold(
         except Exception as e:
             logger.warning(f"Could not load features parquet: {e}")
 
+    # 4. Sync market_intraday_bars (Real-time & 1m intraday serving)
+    intraday_path = src_path / "raw_market_ohlcv"
+    if intraday_path.exists():
+        try:
+            import glob
+            files = sorted(glob.glob(str(intraday_path / "**/*.parquet"), recursive=True))
+            if files:
+                dfs = [pd.read_parquet(f) for f in files[:20]]
+                df_intra = pd.concat(dfs, ignore_index=True)
+                
+                # Normalize timestamp
+                if "ingestion_timestamp" in df_intra.columns:
+                    df_intra["event_timestamp"] = pd.to_datetime(df_intra["ingestion_timestamp"]).dt.strftime("%Y-%m-%d %H:%M:%S")
+                elif "event_timestamp" in df_intra.columns:
+                    df_intra["event_timestamp"] = pd.to_datetime(df_intra["event_timestamp"]).dt.strftime("%Y-%m-%d %H:%M:%S")
+                elif "trade_date" in df_intra.columns:
+                    df_intra["event_timestamp"] = pd.to_datetime(df_intra["trade_date"]).dt.strftime("%Y-%m-%d %H:%M:%S")
+                else:
+                    df_intra["event_timestamp"] = pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S")
+
+                if "created" not in df_intra.columns:
+                    df_intra["created"] = pd.Timestamp.now().strftime("%Y-%m-%d %H:%M:%S")
+                else:
+                    df_intra["created"] = pd.to_datetime(df_intra["created"]).dt.strftime("%Y-%m-%d %H:%M:%S")
+
+                if "exchange" not in df_intra.columns:
+                    df_intra["exchange"] = "NASDAQ"
+
+                expected_intra = [
+                    "ticker_symbol", "event_timestamp", "open_price", "high_price",
+                    "low_price", "close_price", "volume", "vwap", "trade_count",
+                    "exchange", "created"
+                ]
+                sync_intra = [c for c in expected_intra if c in df_intra.columns]
+                df_intra = df_intra[sync_intra].head(10000)
+                rows_intra = len(df_intra)
+                if is_live:
+                    manager.insert_dataframe("market_intraday_bars", df_intra)
+                    rows_intra = manager.query_count("market_intraday_bars")
+                results["synced_tables"]["market_intraday_bars"] = {"rows": rows_intra, "status": "SYNCED"}
+                logger.info(f"Synced market_intraday_bars: {rows_intra} rows")
+        except Exception as e:
+            logger.warning(f"Could not load intraday parquet: {e}")
+
     # Write output evidence
     out_p = Path(out_file)
     out_p.parent.mkdir(parents=True, exist_ok=True)

@@ -1,7 +1,7 @@
 {
   "strategy_name": "Quant Alpha Walk-Forward Strategy (M1-37)",
   "benchmark_name": "S&P 500 ETF (SPY)",
-  "generated_at": "2026-11-09T15:23:50.997745+00:00",
+  "generated_at": "2026-11-10T04:23:08.608981+00:00",
   "date_range": {
     "start_date": "2024-01-02",
     "end_date": "2024-10-30",

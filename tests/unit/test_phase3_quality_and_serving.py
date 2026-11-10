@@ -9,7 +9,6 @@ from quant_edai.processing.features.feature_calculator import compute_technical_
 from quant_edai.quality.gx_runner import run_gx_checkpoint
 from quant_edai.quality.datahub_emitter import emit_pipeline_lineage
 from quant_edai.serving.clickhouse_sync import ClickHouseSyncManager, sync_clickhouse_gold
-from quant_edai.serving.pinot_admin import PinotAdmin, setup_and_verify_pinot
 
 
 def test_feature_calculator_indicators_and_audit_columns(tmp_path: Path):
@@ -103,6 +102,22 @@ def test_clickhouse_sync_sim_mode(tmp_path: Path):
     })
     df_dim.to_parquet(dim_dir / "dim_companies.parquet")
 
+    # Create mock raw_market_ohlcv for intraday bars
+    ohlcv_dir = tmp_path / "raw_market_ohlcv" / "trade_date=2026-01-01"
+    ohlcv_dir.mkdir(parents=True)
+    df_ohlcv = pd.DataFrame({
+        "ticker_symbol": ["AAPL", "AAPL"],
+        "open_price": [150.0, 151.0],
+        "high_price": [152.0, 153.0],
+        "low_price": [149.0, 150.0],
+        "close_price": [151.0, 152.0],
+        "volume": [1000, 2000],
+        "vwap": [150.5, 151.5],
+        "trade_count": [10, 20],
+        "ingestion_timestamp": ["2026-01-01 09:30:00", "2026-01-01 09:31:00"],
+    })
+    df_ohlcv.to_parquet(ohlcv_dir / "part.parquet")
+
     out_metrics = tmp_path / "ch_metrics.json"
     metrics = sync_clickhouse_gold(
         source_dir=str(tmp_path),
@@ -112,20 +127,6 @@ def test_clickhouse_sync_sim_mode(tmp_path: Path):
 
     assert metrics["engine"] == "simulation_fallback"
     assert "dim_companies" in metrics["synced_tables"]
-    assert out_metrics.exists()
-
-
-def test_pinot_admin_schema_and_table_validation(tmp_path: Path):
-    """Test Pinot schema and realtime table validation."""
-    out_metrics = tmp_path / "pinot_metrics.json"
-    res = setup_and_verify_pinot(
-        schema_path="sql/pinot/realtime_bars_schema.json",
-        table_path="sql/pinot/realtime_bars_table.json",
-        engine="sim",
-        out_file=str(out_metrics),
-    )
-
-    assert res["engine"] == "simulation_fallback"
-    assert res["schema_validation"]["valid"] is True
-    assert res["schema_validation"]["table_type"] == "REALTIME"
+    assert "market_intraday_bars" in metrics["synced_tables"]
+    assert metrics["synced_tables"]["market_intraday_bars"]["rows"] == 2
     assert out_metrics.exists()

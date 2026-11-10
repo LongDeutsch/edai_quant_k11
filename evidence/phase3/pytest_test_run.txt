@@ -1,23 +1,15 @@
 ============================= test session starts ==============================
-platform darwin -- Python 3.13.12, pytest-9.2.0, pluggy-1.7.0 -- /Users/nguyenbuihoanglong/Desktop/FSDS/edai_11/quant_edai/.venv/bin/python
+platform darwin -- Python 3.13.12, pytest-9.2.0, pluggy-1.7.0 -- /Users/nguyenbuihoanglong/Desktop/FSDS/edai_11/quant_edai/.venv/bin/python3
 cachedir: .pytest_cache
 hypothesis profile 'default'
 rootdir: /Users/nguyenbuihoanglong/Desktop/FSDS/edai_11/quant_edai
 configfile: pyproject.toml
-plugins: platformdirs-4.14.5, hypothesis-6.170.15, cov-7.1.0, locust-2.47.0
-collecting ... collected 5 items
+plugins: platformdirs-4.14.5, hypothesis-6.170.15, cov-7.1.0, locust-2.47.0, typeguard-4.6.0, anyio-4.16.0
+collecting ... collected 4 items
 
-tests/unit/test_phase3_quality_and_serving.py::test_feature_calculator_indicators_and_audit_columns PASSED [ 20%]
-tests/unit/test_phase3_quality_and_serving.py::test_great_expectations_runner_bronze_suite PASSED [ 40%]
-tests/unit/test_phase3_quality_and_serving.py::test_datahub_lineage_emitter PASSED [ 60%]
-tests/unit/test_phase3_quality_and_serving.py::test_clickhouse_sync_sim_mode PASSED [ 80%]
-tests/unit/test_phase3_quality_and_serving.py::test_pinot_admin_schema_and_table_validation PASSED [100%]
+tests/unit/test_phase3_quality_and_serving.py::test_feature_calculator_indicators_and_audit_columns PASSED [ 25%]
+tests/unit/test_phase3_quality_and_serving.py::test_great_expectations_runner_bronze_suite PASSED [ 50%]
+tests/unit/test_phase3_quality_and_serving.py::test_datahub_lineage_emitter PASSED [ 75%]
+tests/unit/test_phase3_quality_and_serving.py::test_clickhouse_sync_sim_mode PASSED [100%]
 
-=============================== warnings summary ===============================
-tests/unit/test_phase3_quality_and_serving.py::test_feature_calculator_indicators_and_audit_columns
-  /Users/nguyenbuihoanglong/Desktop/FSDS/edai_11/quant_edai/src/quant_edai/processing/features/feature_calculator.py:47: Pandas4Warning: The inplace keyword in DataFrame.sort_values is deprecated and will be removed in a future version (PDEP-8).
-  See https://pandas.pydata.org/docs/dev/whatsnew/v3.1.0.html#deprecation-inplace for more details.
-    df.sort_values(by=["ticker_symbol", "trade_date"], inplace=True)
-
--- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
-========================= 5 passed, 1 warning in 1.39s =========================
+============================== 4 passed in 0.81s ===============================

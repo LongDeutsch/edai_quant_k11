@@ -4,13 +4,13 @@
 > - **M1-38** (Phase 6 - Real-Time Paper Trading Simulation: 10.0 pts)
 > - **M1-37** (Phase 5 - Quant Alpha Backtester & Tear Sheet: 10.0 pts)  
 > **Status**: Approved Design / Ready for Implementation  
-> **Scope**: Event-Driven Paper Trading Engine, Dual-Mode Replay, PostgreSQL Ledger, Pinot Candlestick Serving, and 3-Page Streamlit Analytics App.
+> **Scope**: Event-Driven Paper Trading Engine, Dual-Mode Replay, PostgreSQL Ledger, ClickHouse Candlestick Serving (M1-19), and 3-Page Streamlit Analytics App.
 
 ---
 
 ## 1. Executive Summary & Architecture
 
-The **Intraday Trading System** extends the Quant Data Platform from offline feature generation and model training (Phases 1–4) into an active, event-driven trading simulation. It ingests 1-minute market bars, evaluates technical momentum and optional ML directional signals, applies institutional risk controls, executes paper trades with realistic execution slippage, persists accounting ledgers in PostgreSQL, and serves interactive visualization dashboards via Streamlit and Apache Pinot.
+The **Intraday Trading System** extends the Quant Data Platform from offline feature generation and model training (Phases 1–4) into an active, event-driven trading simulation. It ingests 1-minute market bars, evaluates technical momentum and optional ML directional signals, applies institutional risk controls, executes paper trades with realistic execution slippage, persists accounting ledgers in PostgreSQL, and serves interactive visualization dashboards via Streamlit and ClickHouse OLAP (quant_dw.market_intraday_bars, M1-19).
 
 ```mermaid
 flowchart TD
@@ -28,12 +28,12 @@ flowchart TD
 
     subgraph Persistence["3. Persistence & OLAP Layer"]
         ExecSim -->|"ACID Transactions"| Postgres[("PostgreSQL: quant_postgres<br>• paper_orders<br>• paper_trades<br>• paper_positions<br>• paper_portfolio_snapshots")]
-        KafkaLive --> Pinot[("Apache Pinot<br>market.bars.1m")]
+        Lakehouse["Lakehouse Parquet / ClickHouse Sync"] --> ClickHouse[("ClickHouse OLAP: quant_dw<br>• market_intraday_bars (M1-19)<br>• market_daily_ohlcv")]
     end
 
     subgraph UI["4. Streamlit Multi-Page App (:8501)"]
         Postgres -->|"Live PnL & Positions"| Page1["Page 1: Live Trading & Risk Monitor"]
-        Pinot -->|"1m/5m Candles"| Page2["Page 2: Intraday Candlestick Charts"]
+        ClickHouse -->|"1m/5m Candles"| Page2["Page 2: Intraday Candlestick Charts"]
         Postgres -->|"Trade Markers (Buy/Sell)"| Page2
         Postgres -->|"Intraday Alpha Metrics"| Page3["Page 3: Alpha Quality Analytics"]
         Backtester["Phase 5: backtester.py<br>(evidence/phase5/)"] -->|"Daily Tear Sheet (M1-37)"| Page3
@@ -93,17 +93,21 @@ class PaperTradingEngine:
         # 1. Update mark price & unrealized PnL
         # 2. Check risk stops (SL, TP, Circuit Breaker, EOD Flatten)
         # 3. Generate signals & execute new entry if capacity allows
-        # 4. Atomic commit to PostgreSQL
+        # 4. Atomic commit to PostgreSQL / SQLite
 ```
-- **Live Mode (`make trader-run`)**: `KafkaConsumer('market.bars.1m')` reads streaming events and invokes `engine.on_bar(bar)`.
-- **Replay Mode (`make trader-replay SPEED=20`)**: `MarketReplayIterator('streaming_ticks.jsonl' or 'market_bars.parquet')` invokes the **exact same** `engine.on_bar(bar)`.
-- `--speed` only tunes the interval between bars; mathematical calculations, slippage, and state transitions remain 100% identical.
+- **Live Mode (`make trader-run`)**: **Kafka consumer only** on `market.bars.1m`. The trader process does **not** open Bronze/Parquet files.
+  - Publish path: `make trader-publish-bronze` reads Bronze `raw_market_ohlcv` once and publishes JSON bars/ticks to Kafka; then `make trader-run` consumes.
+  - Production alternative: `make stream-kafka` → Flink → `market.bars.1m` → same `trader-run`.
+- **Replay Mode (`make trader-replay`)**: **synthetic** 1m bars for offline smoke/unit evidence only (explicitly not a lakehouse Parquet reader).
+- Both modes call the **exact same** `engine.on_bar(bar)`.
 
 ### 6. Idempotency & ACID Accounting (M1-38)
 - **Database Backend**: PostgreSQL container `quant_postgres` (`quant_platform` database).
 - **Idempotency Key**: Deterministic unique constraint:
-  `UNIQUE (ticker_symbol, bar_timestamp, action)`
-  Re-running replay against the same session will not duplicate trades or distort PnL.
+  `UNIQUE (session_id, ticker_symbol, bar_timestamp, direction, order_type)`
+  Re-running the same bar events in-session will not duplicate trades or distort PnL.
+- **Positions PK**: `(session_id, ticker_symbol)`.
+- **Postgres URL default**: `postgresql://quant:quant_password@localhost:5432/quant_db` (Compose service `postgres`); SQLite fallback when unreachable.
 - **Clean Slate**: Replay CLI supports `--reset-db` to drop and recreate clean tables for deterministic testing.
 - **ACID Transactions**: Order placement, trade execution, position update, and cash balance deduction are wrapped in a single database transaction (`with conn.transaction(): ...`).
 - **Latency SLA**: Measure and record processing latency per bar (Sub-50ms SLA recorded in evidence).
@@ -175,15 +179,15 @@ CREATE TABLE IF NOT EXISTS paper_portfolio_snapshots (
 
 ---
 
-## 4. Pinot vs PostgreSQL Responsibilities
+## 4. ClickHouse vs PostgreSQL Responsibilities (M1-19 & M1-38)
 
 | Responsibility | Storage Engine | Query Method | Latency Target |
 |---|---|---|---|
-| **Intraday Candlestick Bars (1m / 5m)** | **Apache Pinot** | SQL via Pinot Broker REST (`:8099`) | $\approx 20\text{--}50\text{ ms}$ |
-| **Live VWAP & Bar Volume** | **Apache Pinot** | SQL aggregation over `market_bars_1m` | $\approx 20\text{--}50\text{ ms}$ |
-| **Active Orders, Positions & PnL** | **PostgreSQL** | SQL connection pool | $< 10\text{ ms}$ |
+| **Intraday Candlestick Bars (1m / 5m)** | **ClickHouse OLAP** (`quant_dw.market_intraday_bars`) | HTTP REST (`:8123`) JSON query | $\approx 10\text{--}30\text{ ms}$ |
+| **Daily OHLCV & Technical Indicators** | **ClickHouse OLAP** (`quant_dw.market_daily_ohlcv`) | HTTP REST (`:8123`) JSON query | $\approx 10\text{--}30\text{ ms}$ |
+| **Active Orders, Positions & PnL** | **PostgreSQL** (`paper_positions`, `paper_orders`) | SQL connection pool | $< 10\text{ ms}$ |
 | **Sharpe Ratio & Drawdown History** | **PostgreSQL** | Time series select on `paper_portfolio_snapshots` | $< 10\text{ ms}$ |
-| **Candle Buy/Sell Markers** | **Python Client (Join)** | Pinot candles joined with PostgreSQL trades | Sub-second client render |
+| **Candle Buy/Sell Markers** | **Python Client (Join)** | ClickHouse candles joined with PostgreSQL trades | Sub-second client render |
 
 ---
 
@@ -219,7 +223,7 @@ Directory: `src/quant_edai/serving/dashboard/`
 ### Required Compose Services
 For local execution and demo:
 ```bash
-docker compose up -d quant_postgres quant_kafka quant_pinot
+docker compose up -d quant_postgres quant_kafka quant_clickhouse
 ```
 *(Flink and KServe are optional; if KServe is offline, trader operates in pure technical Momentum+VWAP mode).*
 
@@ -252,7 +256,7 @@ phase6: ## Execute complete Phase 6 Paper Trading workflow and save evidence
 flowchart TD
     Step1["Step 1: PostgreSQL Schema & Engine Core<br>• sql/postgres/02_paper_trading_schema.sql<br>• paper_trading.py (on_bar, SL/TP in bps, EOD flatten)<br>• Unit tests for PnL & risk limits"]
     Step2["Step 2: Dual-Mode Market Replay<br>• market_replay.py with --speed and --reset-db<br>• Idempotency verification (zero double fills)<br>• Sub-50ms latency measurement"]
-    Step3["Step 3: Streamlit Pages 1 & 2<br>• Page 1: Live Trading, Positions & Risk KPIs<br>• Page 2: Pinot Candlestick Charts + Postgres Trade Markers"]
+    Step3["Step 3: Streamlit Pages 1 & 2<br>• Page 1: Live Trading, Positions & Risk KPIs<br>• Page 2: ClickHouse Candlestick Charts + Postgres Trade Markers"]
     Step4["Step 4: Streamlit Page 3 & Phase 5/6 Tear Sheets<br>• Page 3: Intraday Metrics Tab + Daily Backtester Tab<br>• Stub / Connect Phase 5 Backtester"]
     Step5["Step 5: End-to-End Verification & Evidence<br>• make phase6 / make test-quant<br>• Generate evidence/phase6/* & update RUBRIC_TRACKER.md (M1-38)"]
 
@@ -268,5 +272,5 @@ flowchart TD
 - [x] **Risk Limits**: Added position sizing (\$10k), max 5 positions, 1 per ticker, -2% daily loss circuit breaker, and 15:55 EST EOD flattening.
 - [x] **Dual-Mode Single Codepath**: Shared `on_bar(bar)` logic across Kafka and Replay.
 - [x] **Idempotency**: PostgreSQL unique constraints and `--reset-db` support.
-- [x] **Data Separation**: Pinot for market candles; PostgreSQL for transactions and accounting.
+- [x] **Data Separation**: ClickHouse (M1-19) for market candles; PostgreSQL for transactions and accounting.
 - [x] **Page 3 Split**: Clear separation between live intraday metrics and Phase 5 daily backtest metrics.

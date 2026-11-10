@@ -33,7 +33,7 @@ The platform continuously consumes and analyzes two core information streams:
 
 ### Key Capabilities
 - **Medallion Lakehouse Storage**: Apache Iceberg on MinIO S3 (Bronze, Silver, Gold with SCD Type 2 dimension tables).
-- **Dual Analytical Serving**: ClickHouse for historical OLAP/backtesting, Apache Pinot for sub-50ms real-time queries.
+- **Analytical Serving**: ClickHouse OLAP for historical factor backtesting and real-time 1m intraday candlestick queries (M1-19).
 - **Fault-Tolerant Processing**: Spark batch jobs resolving data skew via key salting and AQE; Apache Flink streaming handling out-of-order late arrivals via watermarks and stateful RocksDB deduplication.
 - **Enterprise ML Lifecycle**: Feast feature store (offline Iceberg, online Redis), Kubeflow Pipelines, MLflow model registry, KServe v2 serving with 80/20 canary deployment, and real-time drift detection.
 - **Hierarchical Agent Fleet**: vLLM/LiteLLM, AgentGateway routing Agent-to-Agent (A2A) interactions, 3 containerized MCP tools (FastAPI), and a Coordinator Agent orchestrating investment briefings.
@@ -65,8 +65,7 @@ flowchart TD
     subgraph S_Processing["03. Processing & Analytical Serving"]
         SparkCluster["PySpark Cluster<br>(Salting, AQE, Compaction)"]
         FlinkCluster["Apache Flink Cluster<br>(RocksDB Dedup, Watermarks)"]
-        ClickHouse["ClickHouse OLAP<br>(Historical Quant Analytics)"]
-        Pinot["Apache Pinot<br>(Real-time Serving)"]
+        ClickHouse["ClickHouse OLAP<br>(Historical & Intraday Serving - M1-19)"]
     end
 
     %% ML Platform
@@ -103,7 +102,7 @@ flowchart TD
     Gold -->|"7. Sync historical time-series"| ClickHouse
 
     Kafka -->|"8. Consume streaming ticks"| FlinkCluster
-    FlinkCluster -->|"9. Ingest 1m aggregates"| Pinot
+    FlinkCluster -->|"9. Ingest 1m aggregates"| ClickHouse
     FlinkCluster -->|"10. Push streaming features"| FeastOnline
 
     Gold -->|"11. DP3 Compute technical features"| Gold
@@ -159,7 +158,7 @@ quant_edai/
 │   │   ├── 02_ml_platform.md
 │   │   └── 03_llm_agent_platform.md
 │   └── quant/                          # Implemented Quant Domain Architecture
-│       ├── 01_data_platform.md         # Iceberg, MinIO, ClickHouse, Pinot, Spark/Flink
+│       ├── 01_data_platform.md         # Iceberg, MinIO, ClickHouse, Spark/Flink
 │       ├── 02_ml_platform.md           # Feast, Kubeflow, MLflow, KServe, Drift, Backtest
 │       └── 03_llm_agent_platform.md    # AgentGateway, MCP Tools, Multi-Agent, RAG
 ├── docs/                               # Detailed technical reports and rubric proofs
@@ -226,8 +225,7 @@ quant_edai/
     - `dim_companies`: Slowly Changing Dimension Type 2 (SCD2) with `valid_from_ts`, `valid_to_ts`, and `is_current` flags.
     - `feat_ticker_technical_indicators`: Gold feature table adhering to rubric naming convention with `event_timestamp` and `created` columns.
 - **Serving Layer**:
-  - **ClickHouse OLAP**: Mirrored from Gold Iceberg for high-speed historical queries and multi-year quant backtesting.
-  - **Apache Pinot**: Ingests real-time 1m bars from Flink/Kafka for sub-50ms dashboard and API retrieval.
+  - **ClickHouse OLAP Serving**: Serves both multi-year historical factor backtesting and sub-second 1-minute intraday candlestick bars for real-time dashboard analytics (M1-19).
 
 ---
 

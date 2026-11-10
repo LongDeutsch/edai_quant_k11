@@ -7,7 +7,7 @@ Each group (num. of students = 1) will design and implement an end-to-end Data +
 An example of how to formulate the problem for the e-commerce domain is in [domain/ecommerce](domain/ecommerce).
 
 The full system design and implementation for the chosen **Quant Finance Domain** is detailed in [domain/quant](domain/quant):
-- [01_data_platform.md](domain/quant/01_data_platform.md): Medallion Iceberg Lakehouse, MinIO, ClickHouse, Pinot, Spark & Flink jobs, Skew/Late/Evolution anomalies, Airflow & DataHub.
+- [01_data_platform.md](domain/quant/01_data_platform.md): Medallion Iceberg Lakehouse, MinIO, ClickHouse, Spark & Flink jobs, Skew/Late/Evolution anomalies, Airflow & DataHub.
 - [02_ml_platform.md](domain/quant/02_ml_platform.md): Feast Feature Store, Kubeflow Pipelines, MLflow, KServe v2, Real-time Drift Detection, Quant Alpha Backtesting module.
 - [03_llm_agent_platform.md](domain/quant/03_llm_agent_platform.md): vLLM/LiteLLM, AgentGateway, MCP Tools, Financial News RAG, Coordinator & Multi-Agent Fleet.
 

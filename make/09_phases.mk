@@ -32,23 +32,21 @@ phase2: ## Execute Phase 2: PySpark Skew, Iceberg Compaction & Flink Streaming (
 	PYTHONPATH=src $(PYTHON) -m pytest tests/unit/test_spark_salting.py tests/unit/test_flink_streaming.py tests/unit/test_iceberg_scd2.py tests/unit/test_schema_registry_and_avro.py tests/unit/test_dlq_and_kafka.py -v > evidence/phase2/pytest_test_run.txt
 	@echo "==> Phase 2 completed successfully. Evidence saved to evidence/phase2/"
 
-phase3: ## Execute Phase 3: Orchestration (DP1/2/3), Great Expectations, Lineage & Serving (ClickHouse/Pinot)
+phase3: ## Execute Phase 3: Orchestration (DP1/2/3), Great Expectations, Lineage & Serving (ClickHouse OLAP)
 	@echo "==> Executing Phase 3: Airflow Orchestration, Data Quality & Serving (ENGINE=$(ENGINE))..."
 	@mkdir -p evidence/phase3
 	@test -d $(OUT_DIR)/raw_market_ohlcv || (echo "Generating input data first..." && $(MAKE) phase1)
-	@echo "1/7. Triggering DP1 (Raw Ingestion & Great Expectations)..."
+	@echo "1/6. Triggering DP1 (Raw Ingestion & Great Expectations)..."
 	@$(MAKE) airflow-trigger-dp1
-	@echo "2/7. Triggering DP2 (Silver & Gold Lakehouse Processing)..."
+	@echo "2/6. Triggering DP2 (Silver & Gold Lakehouse Processing)..."
 	@$(MAKE) airflow-trigger-dp2
-	@echo "3/7. Triggering DP3 (Quant Technical Features & Quality Gate)..."
+	@echo "3/6. Triggering DP3 (Quant Technical Features & Quality Gate)..."
 	@$(MAKE) airflow-trigger-dp3
-	@echo "4/7. Administering Apache Pinot realtime streaming table..."
-	@$(MAKE) pinot-setup
-	@echo "5/7. Synchronizing Gold datasets to ClickHouse OLAP..."
+	@echo "4/6. Synchronizing Gold & Intraday datasets to ClickHouse OLAP (M1-19)..."
 	@$(MAKE) clickhouse-sync
-	@echo "6/7. Emitting DataHub end-to-end dataset lineage..."
+	@echo "5/6. Emitting DataHub end-to-end dataset lineage..."
 	@$(MAKE) datahub-lineage
-	@echo "7/7. Running Phase 3 automated test suite..."
+	@echo "6/6. Running Phase 3 automated test suite..."
 	PYTHONPATH=src $(PYTHON) -m pytest tests/unit/test_phase3_quality_and_serving.py -v > evidence/phase3/pytest_test_run.txt
 	@$(PYTHON) -c "import json, glob; summary = {'phase': 3, 'status': 'COMPLETED', 'artifacts': glob.glob('evidence/phase3/*')}; json.dump(summary, open('evidence/phase3/phase3_summary.json', 'w'), indent=2); print('Phase 3 Complete:', json.dumps(summary, indent=2))"
 	@echo "==> Phase 3 completed successfully. Evidence saved to evidence/phase3/"
@@ -84,10 +82,13 @@ phase5: ## Execute Phase 5: Quant Alpha Evaluation & Walk-Forward Backtesting (M
 	@echo "==> Phase 5 completed successfully. Evidence saved to evidence/phase5/"
 
 phase6: ## Execute Phase 6: Real-time Paper Trading Simulation & Alpha Dashboard (M1-38)
-	@echo "Notice: Target '$@' executes Phase 6: Paper Trading & Streamlit Dashboard (paper_trading.py)."
-	@echo "Evidence will be stored in evidence/phase6/."
-	@echo "Refer to docs/plan/INTRADAY_TRADING_DASHBOARD.md."
-	@exit 1
+	@echo "==> Executing Phase 6: Paper Trading Simulation & Market Replay..."
+	@mkdir -p evidence/phase6
+	$(MAKE) trader-replay SPEED=50
+	@echo "==> Running Paper Trading & Idempotency unit tests..."
+	PYTHONPATH=src $(PYTHON) -m pytest tests/unit/test_paper_trading.py -v > evidence/phase6/pytest_test_run.txt
+	@$(PYTHON) -c 'import json, glob, os; files = sorted([os.path.basename(p) for p in glob.glob("evidence/phase6/*")]); ex = json.load(open("evidence/phase6/paper_trading_execution.json")); lat = json.load(open("evidence/phase6/paper_trading_latency.json")); json.dump({"phase": "phase6", "status": "PASSED", "rubrics_verified": ["M1-38"], "execution_snapshot": ex["execution"], "financials_snapshot": ex["financials"], "latency_p95_ms": lat["p95_ms"], "sla_met": lat["sla_met"], "evidence_files": files}, open("evidence/phase6/phase6_summary.json", "w"), indent=2); print("==> Phase 6 Summary written to evidence/phase6/phase6_summary.json")'
+	@echo "==> Phase 6 completed successfully. Evidence saved to evidence/phase6/"
 
 phase7: ## Execute Phase 7: Agentic AI, RAG Pipeline, MCP Tools & Multi-Agent Fleet (M2-01..M2-25)
 	@echo "Notice: Target '$@' executes Phase 7: LLM, RAG & Multi-Agent Fleet."
@@ -100,6 +101,9 @@ phase8 demo:
 	@echo "Currently completed and verified milestones: Phase 1, Phase 2, Phase 3 & Phase 4."
 	@echo "Refer to docs/plan/IMPLEMENTATION_STATUS.md for detailed status and evidence."
 	@exit 1
+
+phase:
+	@echo "⚠️  Lỗi cú pháp: Vui lòng gõ 'make phase5' hoặc 'make phase6' (không có dấu cách giữa 'phase' và số)."
 
 clean: ## Clean generated temporary files and output directory
 	@echo "==> Cleaning generated output directory ($(OUT_DIR))..."

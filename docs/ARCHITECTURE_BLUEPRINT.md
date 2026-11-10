@@ -33,8 +33,7 @@ flowchart TD
     end
 
     subgraph ServingLayer["4. Analytical & Operational Serving"]
-        ClickHouseDB["ClickHouse OLAP Database<br>(Columnar Historical Quant Backtesting)"]
-        PinotRealtime["Apache Pinot<br>(Real-time 1m Bar Queries)"]
+        ClickHouseDB["ClickHouse OLAP Database (quant_dw)<br>(ReplacingMergeTree: Daily & 1m Intraday Bars - M1-19)"]
         RedisOnline["Redis Cluster<br>(Feast Online Feature Store)"]
     end
 
@@ -66,7 +65,7 @@ flowchart TD
         ReplayEngine["Market Data Replay Service<br>(1x, 10x, 100x Speed Toggle)"]
         SignalEngine["Signal Generator Service<br>(Rules: >0.6 BUY, <0.4 SELL)"]
         PaperSim["Paper Trading Simulator<br>(FastAPI + PostgreSQL State)"]
-        LiveDash["Real-time Dashboard<br>(Streamlit / Pinot / PostgreSQL)"]
+        LiveDash["Real-time Dashboard<br>(Streamlit / ClickHouse / PostgreSQL)"]
     end
 
     %% Key interconnections
@@ -78,7 +77,7 @@ flowchart TD
     SparkBatch --> SilverZone
     SilverZone --> GoldZone
     GoldZone --> ClickHouseDB
-    FlinkStream --> PinotRealtime
+    FlinkStream --> ClickHouseDB
     FlinkStream --> RedisOnline
     GoldZone --> FeastOffline
     FeastOffline --> RedisOnline
@@ -97,10 +96,9 @@ flowchart TD
     FlinkStream -->|"quant.features"| SignalEngine
     SignalEngine -->|"Inference Request"| KServeInfra
     SignalEngine -->|"quant.signals"| PaperSim
-    PaperSim -->|"quant.paper_trades"| PinotRealtime
     PaperSim -->|"State Persistence"| PostgreSQLState["PostgreSQL State Store"]
     PostgreSQLState --> LiveDash
-    PinotRealtime --> LiveDash
+    ClickHouseDB --> LiveDash
 ```
 
 ---
@@ -132,15 +130,11 @@ flowchart TD
 
 ---
 
-## 4. Analytical Serving (ClickHouse & Pinot)
+## 4. Analytical Serving (ClickHouse OLAP - M1-19)
 
-1. **ClickHouse OLAP Engine**:
-   - Source: Synced in micro-batches from Gold Iceberg.
-   - Purpose: Multi-year historical factor backtesting and high-speed analytical aggregations across billions of rows.
-   - Engine: `ReplacingMergeTree` with `ORDER BY (ticker_symbol, trade_date)`.
-2. **Apache Pinot Real-Time Engine**:
-   - Source: Real-time ingestion stream directly from Apache Kafka.
-   - Purpose: Sub-50ms queries for intraday 1-minute bars, live price anomalies, and real-time dashboard visualization.
+- **Source**: Synced in micro-batches from Gold Iceberg (`market_daily_ohlcv`, `feat_technical_indicators`) and Lakehouse Parquet/Kafka (`market_intraday_bars`).
+- **Purpose**: Multi-year historical factor backtesting and sub-second analytical queries (<30ms) for real-time 1m/5m candlestick dashboard visualization.
+- **Engine**: `ReplacingMergeTree` with `ORDER BY (ticker_symbol, event_timestamp)` and primary key indexing (satisfies Rubric **M1-19**).
 
 ---
 
@@ -174,6 +168,6 @@ To demonstrate real-time closed-loop decision making, the platform includes a de
 - **Streaming Pipeline**: Flink consumes bars, computes rolling indicators, and publishes to `quant.features`.
 - **ML Scoring**: Signal Generator queries KServe v2 for $P(\text{Up})$ and emits BUY/SELL/HOLD events to `quant.signals`.
 - **Execution Simulator**: Ingests signals, executes orders at Next Bar Open with realistic transaction costs (5 bps), and persists state in PostgreSQL (`sim_portfolios`, `sim_positions`, `sim_trades`).
-- **Telemetry & Visualization**: Apache Pinot and PostgreSQL power a live dashboard tracking real-time equity curves, win rates, Sharpe Ratio, and Alpha vs. SPY Buy & Hold.
+- **Telemetry & Visualization**: ClickHouse OLAP and PostgreSQL power a live dashboard tracking real-time equity curves, win rates, Sharpe Ratio, and Alpha vs. SPY Buy & Hold.
 
 Detailed contracts, state schemas, and verification plans are in [PAPER_TRADING_SIMULATION.md](PAPER_TRADING_SIMULATION.md).

@@ -1,0 +1,12 @@
+{
+  "target_sla_ms": 50.0,
+  "bars_measured": 300,
+  "mean_ms": 0.826,
+  "p50_ms": 0.094,
+  "p95_ms": 4.492,
+  "p99_ms": 6.372,
+  "max_ms": 6.924,
+  "min_ms": 0.004,
+  "sla_met": true,
+  "mode": "replay"
+}

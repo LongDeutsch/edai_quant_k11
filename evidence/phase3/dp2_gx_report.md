@@ -1,7 +1,7 @@
 # Great Expectations Data Docs: suite_gold_market_data
-> Evaluated at: `2026-11-09T00:50:58.425740+00:00` | Status: **PASSED**
+> Evaluated at: `2026-11-10T01:07:16.554139+00:00` | Status: **PASSED**
 
-- **Evaluated Records**: 38,368
+- **Evaluated Records**: 41,856
 - **Scorecard**: 6 / 6 expectations (100.0%)
 
 ## Detailed Results

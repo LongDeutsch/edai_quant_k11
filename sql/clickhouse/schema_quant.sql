@@ -57,3 +57,21 @@ CREATE TABLE IF NOT EXISTS quant_dw.feat_technical_indicators (
 PARTITION BY toYYYYMM(event_timestamp)
 PRIMARY KEY (ticker_symbol, event_timestamp)
 ORDER BY (ticker_symbol, event_timestamp);
+
+-- 4. Market Intraday Bars Table (1-minute / sub-second intraday serving, M1-19 aligned)
+CREATE TABLE IF NOT EXISTS quant_dw.market_intraday_bars (
+    ticker_symbol LowCardinality(String),
+    event_timestamp DateTime,
+    open_price Float64,
+    high_price Float64,
+    low_price Float64,
+    close_price Float64,
+    volume UInt64,
+    vwap Float64,
+    trade_count UInt32 DEFAULT 1,
+    exchange LowCardinality(String) DEFAULT 'NASDAQ',
+    created DateTime DEFAULT now()
+) ENGINE = ReplacingMergeTree(created)
+PARTITION BY toYYYYMM(event_timestamp)
+PRIMARY KEY (ticker_symbol, event_timestamp)
+ORDER BY (ticker_symbol, event_timestamp);
