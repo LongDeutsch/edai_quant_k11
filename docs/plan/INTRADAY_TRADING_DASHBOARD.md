@@ -116,7 +116,7 @@ class PaperTradingEngine:
 
 ## 3. Database Schema Specification (PostgreSQL)
 
-File: `sql/postgres/02_paper_trading_schema.sql`
+File: `sql/postgres/02_paper_trading_schema.sql` (Implemented and unit tested in [paper_db.py](file:///Users/nguyenbuihoanglong/Desktop/FSDS/edai_11/quant_edai/src/quant_edai/quant/paper_db.py)):
 
 ```sql
 -- 1. Orders Table
@@ -124,14 +124,18 @@ CREATE TABLE IF NOT EXISTS paper_orders (
     order_id VARCHAR(64) PRIMARY KEY,
     session_id VARCHAR(64) NOT NULL,
     ticker_symbol VARCHAR(16) NOT NULL,
-    order_type VARCHAR(16) NOT NULL,    -- 'MARKET', 'STOP_LOSS', 'TAKE_PROFIT', 'EOD_FLAT'
+    order_type VARCHAR(16) NOT NULL,    -- 'MARKET', 'STOP_LOSS', 'TAKE_PROFIT', 'EOD_FLAT', 'CIRCUIT_BREAKER'
     direction VARCHAR(8) NOT NULL,      -- 'BUY', 'SELL'
     quantity NUMERIC(14, 4) NOT NULL,
     requested_price NUMERIC(14, 4) NOT NULL,
     status VARCHAR(16) NOT NULL,        -- 'FILLED', 'REJECTED', 'CANCELLED'
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
-    CONSTRAINT uq_order_idempotency UNIQUE (ticker_symbol, created_at, direction, order_type)
+    bar_timestamp TIMESTAMP WITH TIME ZONE NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    CONSTRAINT uq_order_idempotency UNIQUE (session_id, ticker_symbol, bar_timestamp, direction, order_type)
 );
+
+CREATE INDEX IF NOT EXISTS idx_paper_orders_session ON paper_orders(session_id);
+CREATE INDEX IF NOT EXISTS idx_paper_orders_ticker ON paper_orders(ticker_symbol);
 
 -- 2. Executed Trades Table
 CREATE TABLE IF NOT EXISTS paper_trades (
@@ -148,17 +152,23 @@ CREATE TABLE IF NOT EXISTS paper_trades (
     executed_at TIMESTAMP WITH TIME ZONE NOT NULL
 );
 
+CREATE INDEX IF NOT EXISTS idx_paper_trades_ticker ON paper_trades(ticker_symbol);
+CREATE INDEX IF NOT EXISTS idx_paper_trades_executed_at ON paper_trades(executed_at);
+
 -- 3. Live Positions Table
 CREATE TABLE IF NOT EXISTS paper_positions (
-    ticker_symbol VARCHAR(16) PRIMARY KEY,
     session_id VARCHAR(64) NOT NULL,
+    ticker_symbol VARCHAR(16) NOT NULL,
     side VARCHAR(8) NOT NULL,           -- 'LONG', 'SHORT'
     quantity NUMERIC(14, 4) NOT NULL,
     average_entry_price NUMERIC(14, 4) NOT NULL,
     current_mark_price NUMERIC(14, 4) NOT NULL,
     unrealized_pnl NUMERIC(14, 4) NOT NULL DEFAULT 0.0,
     unrealized_pnl_pct NUMERIC(8, 4) NOT NULL DEFAULT 0.0,
-    updated_at TIMESTAMP WITH TIME ZONE NOT NULL
+    stop_loss_price NUMERIC(14, 4),
+    take_profit_price NUMERIC(14, 4),
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    PRIMARY KEY (session_id, ticker_symbol)
 );
 
 -- 4. Portfolio Snapshots Table (for Sharpe, Drawdown & Equity Curve)
@@ -167,13 +177,11 @@ CREATE TABLE IF NOT EXISTS paper_portfolio_snapshots (
     session_id VARCHAR(64) NOT NULL,
     cash_balance NUMERIC(16, 4) NOT NULL,
     invested_equity NUMERIC(16, 4) NOT NULL,
-    total_portfolio_value NUMERIC(16, 4) NOT NULL,
-    realized_pnl_cumulative NUMERIC(16, 4) NOT NULL,
-    unrealized_pnl_current NUMERIC(16, 4) NOT NULL,
-    rolling_sharpe_ratio NUMERIC(8, 4) NOT NULL DEFAULT 0.0,
-    max_drawdown_pct NUMERIC(8, 4) NOT NULL DEFAULT 0.0,
-    active_positions_count INT NOT NULL DEFAULT 0,
-    recorded_at TIMESTAMP WITH TIME ZONE NOT NULL
+    total_portfolio_equity NUMERIC(16, 4) NOT NULL,
+    realized_pnl NUMERIC(16, 4) NOT NULL DEFAULT 0.0,
+    unrealized_pnl NUMERIC(16, 4) NOT NULL DEFAULT 0.0,
+    drawdown_pct NUMERIC(8, 4) NOT NULL DEFAULT 0.0,
+    snapshot_timestamp TIMESTAMP WITH TIME ZONE NOT NULL
 );
 ```
 

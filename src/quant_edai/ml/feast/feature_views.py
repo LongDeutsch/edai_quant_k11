@@ -35,6 +35,7 @@ fv_ticker_technical_indicators = FeatureView(
     ttl=timedelta(days=365),
     schema=[
         Field(name="close_price", dtype=Float64, description="Closing price"),
+        Field(name="volume", dtype=Float64, description="Trading volume"),
         Field(name="sma_20", dtype=Float64, description="20-day Simple Moving Average"),
         Field(name="sma_50", dtype=Float64, description="50-day Simple Moving Average"),
         Field(name="sma_ratio_20_50", dtype=Float64, description="Ratio of 20 SMA to 50 SMA"),

@@ -103,11 +103,28 @@ The Data Fetch Web API and MCP tool endpoints were subjected to distributed load
 
 ---
 
-## 6. Scale Testing & Recovery Verification
+## 7. Mathematical Consistency Auditing (Tick-to-Bar Conservation)
 
-1. **Dual-Scale Execution**:
-   - `--scale 0.1`: Generates ~10 GB of data in 4.2 minutes; completes the full Airflow DP1-DP3 batch run in under 8 minutes for CI/CD validation.
-   - `--scale 1.0`: Generates >= 100 GB of data, validating Spark skew handling and memory allocation under production-sized datasets.
+To ensure that resampling raw market ticks into OHLCV bars introduces zero financial distortion or data loss, the platform executes a deterministic audit:
+
+### Mathematical Conservation Invariants
+1. **Volume Conservation**: For every ticker and trade date:
+   $$\sum_{i \in \text{bars}_{1m}} \text{volume}_i = \text{volume}_{\text{daily}}$$
+2. **Trade Count Conservation**: Total number of trades in intraday 1m buckets must exactly equal the daily trade count:
+   $$\sum_{i \in \text{bars}_{1m}} \text{trade\_count}_i = \text{trade\_count}_{\text{daily}}$$
+3. **Price Bounds Envelope**:
+   $$\min_{i \in \text{bars}_{1m}} (\text{low}_i) = \text{low}_{\text{daily}} \quad \text{and} \quad \max_{i \in \text{bars}_{1m}} (\text{high}_i) = \text{high}_{\text{daily}}$$
+4. **First/Last Boundaries**: Open price of the first 1m bar equals daily open; close price of the final 1m bar equals daily close.
+
+### Audit Evidence
+- **Automated Test**: `tests/unit/test_tick_resample_and_silver.py`
+- **Audit Artifact**: `evidence/phase2/tick_consistency_audit.json`
+- **Result**: 1,874 (ticker, date) bar pairs verified across 3-year historical dataset with **100.0% volume conservation**, **100.0% trade count conservation**, and **100.0% price bounds consistency** (0 violations).
+
+1. **Dual-Scale Execution** (`SCALE` = online tick row budget, not OHLCV volume multiplier):
+   - `SCALE=0.1`: smoke offline daily window + smaller online tick corpus (`make generate-data`); suitable for CI and Airflow DP1–DP3 smoke.
+   - `SCALE=1.0`: ~10× tick rows vs `0.1` under `raw_market_ticks_online/` for Spark/Flink density benches; daily OHLCV row counts stay window-driven.
+   - Windows are contiguous and disjoint: offline `2022-11-01`→`2025-10-31`, online `2025-11-01`→`2026-11-10`. `make stream-test` replays the prebuilt corpus.
 2. **Fault Recovery Testing**:
    - **Kafka Duplicates**: 1.5% duplicate messages injected; verified that Flink's RocksDB deduplication filter eliminates 100% of duplicate entries before sinking to downstream serving stores.
    - **Flink TaskManager Failure**: TaskManager pod killed mid-stream; verified that the job resumes from the latest RocksDB savepoint without data loss.

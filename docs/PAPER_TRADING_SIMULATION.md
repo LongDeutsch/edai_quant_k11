@@ -157,68 +157,92 @@ Simulated order fill event published after executing against the next bar's Open
 
 ## 4. Simulator State & PostgreSQL Storage Schema
 
-To ensure **idempotency** and **instant recovery** after pod restarts, the simulator stores state in PostgreSQL using relational tables and unique constraints.
+To ensure **idempotency** and **instant recovery** after pod restarts, the simulator stores state in PostgreSQL (or SQLite fallback via `PaperDatabase`) using relational tables and unique constraints matching [02_paper_trading_schema.sql](file:///Users/nguyenbuihoanglong/Desktop/FSDS/edai_11/quant_edai/sql/postgres/02_paper_trading_schema.sql) and [paper_db.py](file:///Users/nguyenbuihoanglong/Desktop/FSDS/edai_11/quant_edai/src/quant_edai/quant/paper_db.py):
 
 ```sql
--- 1. Portfolio Account
-CREATE TABLE sim_portfolios (
-    portfolio_id VARCHAR(64) PRIMARY KEY,
-    portfolio_name VARCHAR(128) NOT NULL,
-    initial_cash NUMERIC(16, 4) NOT NULL DEFAULT 10000.00,
-    cash_balance NUMERIC(16, 4) NOT NULL DEFAULT 10000.00,
-    total_equity NUMERIC(16, 4) NOT NULL DEFAULT 10000.00,
-    realized_pnl NUMERIC(16, 4) NOT NULL DEFAULT 0.00,
-    unrealized_pnl NUMERIC(16, 4) NOT NULL DEFAULT 0.00,
-    max_equity NUMERIC(16, 4) NOT NULL DEFAULT 10000.00,
-    max_drawdown_pct NUMERIC(8, 4) NOT NULL DEFAULT 0.00,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
-
--- 2. Open Positions (Long/Flat only, no shorting)
-CREATE TABLE sim_positions (
-    portfolio_id VARCHAR(64) REFERENCES sim_portfolios(portfolio_id),
+-- 1. Paper Orders (Atomic order generation & deduplication key)
+CREATE TABLE IF NOT EXISTS paper_orders (
+    order_id VARCHAR(64) PRIMARY KEY,
+    session_id VARCHAR(64) NOT NULL,
     ticker_symbol VARCHAR(16) NOT NULL,
-    quantity NUMERIC(16, 4) NOT NULL DEFAULT 0,
-    average_entry_price NUMERIC(16, 4) NOT NULL DEFAULT 0,
-    current_market_price NUMERIC(16, 4) NOT NULL DEFAULT 0,
-    unrealized_pnl NUMERIC(16, 4) NOT NULL DEFAULT 0,
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    PRIMARY KEY (portfolio_id, ticker_symbol)
+    order_type VARCHAR(16) NOT NULL,    -- 'MARKET', 'STOP_LOSS', 'TAKE_PROFIT', 'EOD_FLAT', 'CIRCUIT_BREAKER'
+    direction VARCHAR(8) NOT NULL,      -- 'BUY', 'SELL'
+    quantity NUMERIC(14, 4) NOT NULL,
+    requested_price NUMERIC(14, 4) NOT NULL,
+    status VARCHAR(16) NOT NULL,        -- 'FILLED', 'REJECTED', 'CANCELLED'
+    bar_timestamp TIMESTAMP WITH TIME ZONE NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    CONSTRAINT uq_order_idempotency UNIQUE (session_id, ticker_symbol, bar_timestamp, direction, order_type)
 );
 
--- 3. Simulated Orders & Trades
-CREATE TABLE sim_trades (
+-- 2. Paper Trades (Executed fills with slippage, commission, and PnL)
+CREATE TABLE IF NOT EXISTS paper_trades (
     trade_id VARCHAR(64) PRIMARY KEY,
-    portfolio_id VARCHAR(64) REFERENCES sim_portfolios(portfolio_id),
-    signal_id VARCHAR(64) NOT NULL UNIQUE, -- Idempotency key
+    order_id VARCHAR(64) REFERENCES paper_orders(order_id),
+    session_id VARCHAR(64) NOT NULL,
     ticker_symbol VARCHAR(16) NOT NULL,
-    side VARCHAR(8) NOT NULL CHECK (side IN ('BUY', 'SELL')),
-    quantity NUMERIC(16, 4) NOT NULL,
-    price NUMERIC(16, 4) NOT NULL,
-    slippage NUMERIC(16, 4) DEFAULT 0.00,
-    transaction_cost NUMERIC(16, 4) DEFAULT 0.00,
-    realized_pnl NUMERIC(16, 4) DEFAULT 0.00,
-    execution_timestamp TIMESTAMP WITH TIME ZONE NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    direction VARCHAR(8) NOT NULL,
+    fill_price NUMERIC(14, 4) NOT NULL,
+    fill_quantity NUMERIC(14, 4) NOT NULL,
+    slippage_bps NUMERIC(8, 2) NOT NULL DEFAULT 5.0,
+    commission NUMERIC(10, 4) NOT NULL DEFAULT 0.0,
+    realized_pnl NUMERIC(14, 4) NOT NULL DEFAULT 0.0,
+    executed_at TIMESTAMP WITH TIME ZONE NOT NULL
 );
 
--- 4. Equity Time-Series Snapshots (for drawdown & Sharpe calculation)
-CREATE TABLE sim_equity_snapshots (
+-- 3. Paper Positions (Active mark-to-market positions)
+CREATE TABLE IF NOT EXISTS paper_positions (
+    session_id VARCHAR(64) NOT NULL,
+    ticker_symbol VARCHAR(16) NOT NULL,
+    side VARCHAR(8) NOT NULL,
+    quantity NUMERIC(14, 4) NOT NULL,
+    average_entry_price NUMERIC(14, 4) NOT NULL,
+    current_mark_price NUMERIC(14, 4) NOT NULL,
+    unrealized_pnl NUMERIC(14, 4) NOT NULL DEFAULT 0.0,
+    unrealized_pnl_pct NUMERIC(8, 4) NOT NULL DEFAULT 0.0,
+    stop_loss_price NUMERIC(14, 4),
+    take_profit_price NUMERIC(14, 4),
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    PRIMARY KEY (session_id, ticker_symbol)
+);
+
+-- 4. Equity Time-Series Snapshots (Drawdown, Sharpe, and portfolio valuation)
+CREATE TABLE IF NOT EXISTS paper_portfolio_snapshots (
     snapshot_id BIGSERIAL PRIMARY KEY,
-    portfolio_id VARCHAR(64) REFERENCES sim_portfolios(portfolio_id),
-    snapshot_timestamp TIMESTAMP WITH TIME ZONE NOT NULL,
+    session_id VARCHAR(64) NOT NULL,
     cash_balance NUMERIC(16, 4) NOT NULL,
-    portfolio_equity NUMERIC(16, 4) NOT NULL,
-    benchmark_price NUMERIC(16, 4) NOT NULL, -- SPY benchmark price
-    benchmark_equity NUMERIC(16, 4) NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    invested_equity NUMERIC(16, 4) NOT NULL,
+    total_portfolio_equity NUMERIC(16, 4) NOT NULL,
+    realized_pnl NUMERIC(16, 4) NOT NULL DEFAULT 0.0,
+    unrealized_pnl NUMERIC(16, 4) NOT NULL DEFAULT 0.0,
+    drawdown_pct NUMERIC(8, 4) NOT NULL DEFAULT 0.0,
+    snapshot_timestamp TIMESTAMP WITH TIME ZONE NOT NULL
 );
 
--- 5. Idempotent Event Log (Deduplication against Kafka replay)
-CREATE TABLE sim_processed_events (
-    event_id VARCHAR(128) PRIMARY KEY,
-    event_type VARCHAR(32) NOT NULL,
-    processed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+-- 5. ML Model Provenance & Signal Tables (Shared with Alpha Serving)
+CREATE TABLE IF NOT EXISTS alpha_registry (
+    alpha_id VARCHAR(64) PRIMARY KEY,
+    alpha_name VARCHAR(128) NOT NULL,
+    alpha_type VARCHAR(32) NOT NULL,
+    formula_or_model VARCHAR(256) NOT NULL,
+    hyperparams JSONB DEFAULT '{}'::jsonb,
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS alpha_signals_daily (
+    signal_id BIGSERIAL PRIMARY KEY,
+    alpha_id VARCHAR(64) REFERENCES alpha_registry(alpha_id),
+    ticker_symbol VARCHAR(16) NOT NULL,
+    trade_date DATE NOT NULL,
+    raw_score NUMERIC(12, 6) NOT NULL,
+    rank_score NUMERIC(6, 4) NOT NULL,
+    target_weight NUMERIC(6, 4) NOT NULL,
+    model_version VARCHAR(64) NOT NULL,
+    dataset_id VARCHAR(64) NOT NULL,
+    feature_source VARCHAR(64) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    CONSTRAINT uq_signal_date UNIQUE (alpha_id, ticker_symbol, trade_date)
 );
 ```
 
@@ -267,8 +291,8 @@ The simulator exposes clean, asynchronous REST endpoints for control and telemet
 - Given the same seed and input parquet files, running replay at `1x`, `10x`, or `100x` must yield the exact identical sequence of signals, trades, and ending equity down to the penny.
 
 ### 2. Idempotency & Duplicate Resiliency
-- Injected duplicates in `market.bars` (1.5%) and re-delivered messages on `quant.signals` must be filtered out by `sim_processed_events` and database unique constraints.
-- Assert that zero duplicate trades are inserted into `sim_trades`.
+- Injected duplicates in `market.bars` (1.5%) and re-delivered messages on `quant.signals` must be filtered out by `uq_order_idempotency UNIQUE (session_id, ticker_symbol, bar_timestamp, direction, order_type)`.
+- Assert that zero duplicate orders/trades are inserted into `paper_orders` and `paper_trades`.
 
 ### 3. Timestamp & Anti-Lookahead Audit
 - For every simulated trade:

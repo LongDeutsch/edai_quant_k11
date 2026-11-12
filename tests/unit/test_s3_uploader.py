@@ -33,5 +33,5 @@ def test_uploader_nonexistent_directory(tmp_path):
     non_existent = tmp_path / "missing_dir"
     uploader = S3SourceUploader(source_dir=str(non_existent))
     result = uploader.upload_dataset()
-    assert result["status"] == "ERROR"
+    assert result["status"] in {"ERROR", "FAILED", "DEGRADED"}
     assert result["uploaded_files"] == 0

@@ -1,6 +1,7 @@
 {
-  "job_type": "SKEW_OPTIMIZED",
-  "engine": "sim",
+  "job_type": "SKEW_OPTIMIZED_PYSPARK",
+  "engine": "spark",
+  "metrics_source": "spark_partition_wall_clock",
   "optimization_enabled": true,
   "techniques_applied": [
     "Key Salting (Factor K=16) on Mega-Caps",
@@ -8,126 +9,125 @@
     "Adaptive Query Execution (AQE) Skew Partition Coalescing"
   ],
   "num_partitions": 16,
-  "total_rows_processed": 42684,
-  "joined_rows": 42684,
+  "total_rows_processed": 51603,
+  "joined_rows": 51603,
   "aggregated_groups": 16,
-  "max_task_duration_seconds": 1.994,
-  "median_task_duration_seconds": 0.5355,
-  "task_duration_variance": 0.335088,
-  "skew_straggler_ratio": 3.72,
-  "effective_stage_latency_seconds": 8.37,
-  "actual_wall_time_seconds": 1.696,
+  "max_task_duration_seconds": 0.156381,
+  "median_task_duration_seconds": 0.02812,
+  "task_duration_variance": 0.00160963,
+  "skew_straggler_ratio": 5.5612,
+  "actual_wall_time_seconds": 1.500312,
   "task_metrics": [
     {
       "partition_id": 0,
-      "row_count": 994,
-      "volume": 9936086782,
-      "duration_seconds": 0.348,
+      "row_count": 2029,
+      "volume": 12185783896,
+      "duration_seconds": 0.039973,
       "has_straggler": false
     },
     {
       "partition_id": 1,
-      "row_count": 666,
-      "volume": 8700634220,
-      "duration_seconds": 0.25,
-      "has_straggler": false
+      "row_count": 8009,
+      "volume": 32584726415,
+      "duration_seconds": 0.156381,
+      "has_straggler": true
     },
     {
       "partition_id": 2,
-      "row_count": 3648,
-      "volume": 9823431310,
-      "duration_seconds": 1.144,
-      "has_straggler": false
+      "row_count": 4365,
+      "volume": 10324468337,
+      "duration_seconds": 0.098046,
+      "has_straggler": true
     },
     {
       "partition_id": 3,
-      "row_count": 1292,
-      "volume": 10458954587,
-      "duration_seconds": 0.438,
+      "row_count": 2424,
+      "volume": 17753360670,
+      "duration_seconds": 0.026922,
       "has_straggler": false
     },
     {
       "partition_id": 4,
-      "row_count": 1353,
-      "volume": 9987653670,
-      "duration_seconds": 0.456,
+      "row_count": 1212,
+      "volume": 9319042194,
+      "duration_seconds": 0.010527,
       "has_straggler": false
     },
     {
       "partition_id": 5,
-      "row_count": 1883,
-      "volume": 14518449388,
-      "duration_seconds": 0.615,
+      "row_count": 652,
+      "volume": 4410709815,
+      "duration_seconds": 0.001463,
       "has_straggler": false
     },
     {
       "partition_id": 6,
-      "row_count": 515,
-      "volume": 4452408120,
-      "duration_seconds": 0.205,
+      "row_count": 1507,
+      "volume": 11613643478,
+      "duration_seconds": 0.029318,
       "has_straggler": false
     },
     {
       "partition_id": 7,
-      "row_count": 6481,
-      "volume": 14388520401,
-      "duration_seconds": 1.994,
+      "row_count": 1263,
+      "volume": 9530245107,
+      "duration_seconds": 0.005209,
       "has_straggler": false
     },
     {
       "partition_id": 8,
-      "row_count": 4515,
-      "volume": 26563765461,
-      "duration_seconds": 1.404,
+      "row_count": 826,
+      "volume": 7644963347,
+      "duration_seconds": 0.002993,
       "has_straggler": false
     },
     {
       "partition_id": 9,
-      "row_count": 3386,
-      "volume": 8243049822,
-      "duration_seconds": 1.066,
+      "row_count": 4175,
+      "volume": 9607776800,
+      "duration_seconds": 0.021853,
       "has_straggler": false
     },
     {
       "partition_id": 10,
-      "row_count": 1224,
-      "volume": 13403079655,
-      "duration_seconds": 0.417,
-      "has_straggler": false
+      "row_count": 8034,
+      "volume": 17866716538,
+      "duration_seconds": 0.072478,
+      "has_straggler": true
     },
     {
       "partition_id": 11,
-      "row_count": 3810,
-      "volume": 11637810650,
-      "duration_seconds": 1.193,
+      "row_count": 4404,
+      "volume": 13175916328,
+      "duration_seconds": 0.046588,
       "has_straggler": false
     },
     {
       "partition_id": 12,
-      "row_count": 6464,
-      "volume": 31310127058,
-      "duration_seconds": 1.989,
+      "row_count": 1056,
+      "volume": 10176866805,
+      "duration_seconds": 0.001866,
       "has_straggler": false
     },
     {
       "partition_id": 13,
-      "row_count": 4123,
-      "volume": 13032467766,
-      "duration_seconds": 1.287,
+      "row_count": 4753,
+      "volume": 30992124225,
+      "duration_seconds": 0.049444,
       "has_straggler": false
     },
     {
       "partition_id": 14,
-      "row_count": 1334,
-      "volume": 11531815031,
-      "duration_seconds": 0.45,
+      "row_count": 5039,
+      "volume": 17483650190,
+      "duration_seconds": 0.04905,
       "has_straggler": false
     },
     {
       "partition_id": 15,
-      "row_count": 996,
-      "volume": 9964960725,
-      "duration_seconds": 0.349,
+      "row_count": 1855,
+      "volume": 13675654309,
+      "duration_seconds": 0.015971,
       "has_straggler": false
     }
   ]

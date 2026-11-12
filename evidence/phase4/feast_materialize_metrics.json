@@ -1,5 +1,8 @@
 {
   "status": "SUCCESS",
+  "execution_mode": "LIVE",
+  "dataset_id": "ds_g5_master_1794467581",
+  "feature_source": "/tmp/lakehouse_source/runs/ds_g5_master_1794467581/gold_features/feat_ticker_technical_indicators.parquet",
   "mode": "REDIS_ONLINE",
   "materialized_tickers_count": 16,
   "tickers": [
@@ -22,6 +25,7 @@
   ],
   "feature_columns": [
     "close_price",
+    "volume",
     "sma_20",
     "sma_50",
     "sma_ratio_20_50",
@@ -32,7 +36,7 @@
     "rolling_volatility_30d",
     "intraday_return_1d"
   ],
-  "latency_seconds": 0.008,
+  "latency_seconds": 0.0224,
   "keys_written_evidence": "evidence/phase4/feast_redis_keys.txt",
-  "timestamp": "2026-11-09T12:17:15.205031+00:00"
+  "timestamp": "2026-11-12T13:50:52.094990+00:00"
 }

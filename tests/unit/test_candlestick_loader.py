@@ -93,6 +93,11 @@ def test_load_candlestick_data_offline_fallback(tmp_path):
     with patch("urllib.request.urlopen", side_effect=Exception("Connection refused")):
         df, source = load_candlestick_data("NVDA")
         assert len(df) > 0
-        assert source in ["Lakehouse Storage (/tmp/lakehouse_source)", "Simulated Real-time Feed"]
+        assert source in [
+            "Lakehouse Storage (/tmp/lakehouse_source)",
+            "Paper DB Session Store (SQLite)",
+            "Paper DB Session Store (PostgreSQL)",
+            "Simulated Real-time Feed",
+        ]
         assert "close_price" in df.columns
         assert "open_price" in df.columns

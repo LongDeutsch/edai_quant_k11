@@ -1,0 +1,37 @@
+{
+  "dataset_id": "ds_gate3_1794451716",
+  "test_type": "STAGE_2_MULTI_LATE_RECONCILIATION",
+  "target_window": "2024-01-02 14:38:00",
+  "ticker_symbol": "AAPL",
+  "late_ticks_injected": 3,
+  "duplicate_ticks_tested": 1,
+  "observed_versions": [
+    1,
+    2,
+    3,
+    4
+  ],
+  "final_version": 4,
+  "spark_final_bar": {
+    "open": 168.0,
+    "high": 195.0,
+    "low": 168.0,
+    "close": 195.0,
+    "volume": 246,
+    "vwap": 183.5644,
+    "trade_count": 4
+  },
+  "flink_final_bar": {
+    "open": 168.0,
+    "high": 195.0,
+    "low": 168.0,
+    "close": 195.0,
+    "volume": 246,
+    "vwap": 183.5644,
+    "trade_count": 4,
+    "version": 4
+  },
+  "vwap_diff": 0.0,
+  "mathematical_consistency": "100.0%",
+  "status": "VERIFIED"
+}

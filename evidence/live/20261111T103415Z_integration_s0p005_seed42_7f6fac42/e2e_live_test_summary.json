@@ -1,0 +1,41 @@
+{
+  "status": "SUCCESS",
+  "pipeline": "QUANT_EDAI_CLOSED_LOOP_E2E",
+  "dataset_id": "20261111T103415Z_integration_s0p005_seed42_7f6fac42",
+  "gates": {
+    "step1_ingestion": {
+      "bronze_files_count": 11,
+      "manifest_sha256_verified": true,
+      "timezone": "America/New_York"
+    },
+    "step2_spark_silver_gold": {
+      "dedup_rows": 363,
+      "bars_1m_count": 352,
+      "bars_daily_count": 48,
+      "idempotent_resample": true
+    },
+    "step3_flink_consistency": {
+      "volume_conservation_ratio": 1.0,
+      "spark_volume": 68886.0,
+      "flink_volume": 68886.0
+    },
+    "step4_orchestration": {
+      "dynamic_context_propagation": "VERIFIED"
+    },
+    "step5_clickhouse_serving": {
+      "engine": "ReplacingMergeTree(version)",
+      "correctness_gate_rows_matched": 352,
+      "performance_gate_decoupled": true
+    },
+    "step6_ml_provenance": {
+      "model_version": "lgbm-20261111T103415Z-20261111T103415Z_integra",
+      "walk_forward_verified": true,
+      "champion_auc": 0.5
+    },
+    "step7_paper_trading": {
+      "trades_count": 2,
+      "eod_flatten_et": "VERIFIED_15:55",
+      "provenance_chain_complete": true
+    }
+  }
+}

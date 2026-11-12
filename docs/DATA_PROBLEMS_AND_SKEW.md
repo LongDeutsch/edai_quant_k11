@@ -4,21 +4,30 @@
 
 To rigorously demonstrate big data processing capabilities under real-world conditions, the platform injects 6 targeted data problems into the simulated US Equities dataset.
 
+**Canonical vs SIMULATED flow:** Smoke/CI may use `ENGINE=sim` but every artifact must carry `execution_mode=SIMULATED` / `PASSED_SIMULATED` (never bare production `SUCCESS`). `MODE=integration|full` requires live MinIO/Spark/Airflow/ClickHouse/Flink for the phase scope — missing services → `FAILED`, no silent fallback.
+
+**Immutable Bronze + dataset_id:** Each `make generate` mints a new `dataset_id` under `OUT_DIR/runs/{dataset_id}/` (append-only; prior runs are never deleted). `OUT_DIR/CURRENT_DATASET` / `CURRENT_DATASET_ID` points at the active snapshot. Dedup happens only in Silver. Downstream jobs resolve via `DATASET_ID` / `resolve_dataset_root`.
+
+**Bronze vs Gold path (Tick-First Architecture):** `make generate` / `make generate-offline` (`generate-ticks`) write **Bronze raw market ticks only** (`raw_market_ticks`, news, labels, `dim_companies`). Synthetic OHLCV bars are **never directly generated**. Offline daily window is **`2022-11-01` → `2025-10-31`**. Schema evolution occurs on ticks post-**`2024-06-01`** (adding `quote_condition`, `bid_price`, `ask_price`) and regime drift at **`2024-08-01`** (inside the offline window). Silver processing via Spark dedup (`stg_market_ticks`) normalizes schemas and deduplicates by `trade_id`. Gold Resampler (`resample_job.py`) then produces `gold_market_bars_1m` and `gold_market_bars_daily` before technical features (`feat_ticker_technical_indicators`) are computed. ML signals/fills must carry provenance: `model_version`, `dataset_id`, `feature_source`.
+
+**SCALE = tick budget:** `SCALE` scales the number of generated raw market ticks (e.g. `SCALE=0.1` produces ~10% sample, `SCALE=1.0` produces full historical volume). High cardinality is maintained with millions of unique UUID `trade_id` records. Streaming late (~5%) / dup (~1.5%) faults are applied when the corpus is materialized; `make stream-test` / `stream-kafka` **replay** that tick corpus. Full sync: `make phase2` resamples Silver ticks to Gold OHLCV bars.
+
 ```mermaid
 flowchart LR
-    subgraph OfflineProblems["Offline Injected Problems (Parquet / Iceberg)"]
-        P1["Volume Skew<br>(80% volume in 7 Mega-Cap tickers)"]
-        P2["Schema Evolution<br>(vwap & trade_count added mid-stream)"]
-        P3["Offline Duplicates<br>(~2.0% retry duplicates)"]
+    subgraph OfflineProblems["Offline Injected Problems (raw_market_ticks)"]
+        P1["Volume Skew<br>(80% tick volume in 7 Mega-Cap tickers)"]
+        P2["Schema Evolution<br>(quote_condition, bid/ask added post 2024-06-01)"]
+        P3["Offline Duplicates<br>(~2.0% trade_id duplicates)"]
+        P4["High Cardinality<br>(Unique UUID trade_id per tick)"]
     end
 
-    subgraph StreamingProblems["Streaming Injected Problems (Kafka)"]
-        P4["Late Arrivals<br>(5-10 minute delayed tick feeds)"]
-        P5["Streaming Duplicates<br>(~1.5% at-least-once duplicates)"]
+    subgraph StreamingProblems["Streaming Injected Problems (Kafka market_ticks)"]
+        P5["Late Arrivals<br>(5-10 minute delayed tick feeds)"]
+        P6["Streaming Duplicates<br>(~1.5% at-least-once duplicates)"]
     end
 
     subgraph MLOpsProblems["MLOps Injected Problems"]
-        P6["Market Regime Drift<br>(Volatile Bear Market regime shift)"]
+        P7["Market Regime Drift<br>(Volatile Bear Market regime shift)"]
     end
 ```
 
@@ -28,12 +37,13 @@ flowchart LR
 
 | # | Anomaly Type | Target Dataset | Mechanism & Parameters | Engineering Consequence Without Optimization |
 |---|---|---|---|---|
-| **1** | **Volume Skew** | `raw_market_ohlcv` | 80% of all trade volume & row count assigned to AAPL, NVDA, MSFT, AMZN, GOOGL, META, TSLA. | **Severe Executor Stragglers**: In standard hash partitioning (`hash(ticker) % N`), executors assigned these partitions process 10x more data, causing job execution to stall at 99%. |
-| **2** | **Schema Evolution** | `raw_market_ohlcv` | From partition `2024-06-01`, feeds introduce `vwap` (DoubleType) and `trade_count` (IntegerType); news adds `sentiment_score` (DoubleType). | **Schema Mismatch Errors**: Standard Parquet readers crash on schema incompatibility when scanning historical partitions alongside modern ones. |
-| **3** | **Offline Duplicates**| `raw_market_ohlcv` | 2.0% duplicate records injected with identical `(ticker_symbol, timestamp)` but distinct `ingestion_ts`. | **Volume Overcounting**: Downstream metrics (daily volume, total liquidity, VWAP) become inflated. |
-| **4** | **Late Arrivals** | `kafka://market_ticks`| 5.0% of streaming messages artificially delayed by 300 to 600 seconds (5–10 mins). | **Data Loss in Tumbling Windows**: Standard processing-time windows drop late records or calculate distorted 1-minute OHLCV candles. |
-| **5** | **Streaming Dups** | `kafka://market_ticks`| 1.5% of Kafka messages emitted twice to simulate producer network retries. | **Double-counted trades**: Overstated real-time volume in ClickHouse OLAP and online feature store. |
-| **6** | **Feature Drift** | `feat_ticker_technical_indicators` | Market transition from low-volatility Bull market to high-volatility Bear market regime. | **Model Performance Decay**: AUC-ROC degrades due to distribution shifts in RSI, volatility, and return spreads. |
+| **1** | **Volume Skew** | `raw_market_ticks` | 80% of all trade ticks & row count assigned to AAPL, NVDA, MSFT, AMZN, GOOGL, META, TSLA. | **Severe Executor Stragglers**: In standard hash partitioning (`hash(ticker) % N`), executors assigned these partitions process 10x more data, causing job execution to stall at 99%. |
+| **2** | **Schema Evolution** | `raw_market_ticks` | From partition `2024-06-01`, tick feeds introduce `quote_condition` (StringType), `bid_price` (DoubleType), `ask_price` (DoubleType); news adds `sentiment_score` (DoubleType). | **Schema Mismatch Errors**: Standard Parquet readers crash on schema incompatibility when scanning historical partitions alongside modern ones. |
+| **3** | **Offline Duplicates**| `raw_market_ticks` | 2.0% duplicate records injected with identical `trade_id` but distinct `ingestion_timestamp`. | **Volume Overcounting**: Without `ROW_NUMBER() OVER (PARTITION BY trade_id ORDER BY ingestion_timestamp ASC) = 1`, resampled OHLCV bars have inflated volume & incorrect VWAP. |
+| **4** | **High Cardinality** | `raw_market_ticks` | Millions of globally unique UUID `trade_id` records. | **Memory Pressure / Hash Spill**: Aggregations or joins on unindexed high-cardinality keys risk executor OOM without columnar indexing. |
+| **5** | **Late Arrivals** | `kafka://market_ticks`| 5.0% of streaming messages artificially delayed by 300 to 600 seconds (5–10 mins). | **Data Loss in Tumbling Windows**: Standard processing-time windows drop late records or calculate distorted 1-minute OHLCV candles. |
+| **6** | **Streaming Dups** | `kafka://market_ticks`| 1.5% of Kafka messages emitted twice to simulate producer network retries. | **Double-counted trades**: Overstated real-time volume in ClickHouse OLAP and online feature store. |
+| **7** | **Feature Drift** | `feat_ticker_technical_indicators` | Market transition from low-volatility Bull market to high-volatility Bear market regime. | **Model Performance Decay**: AUC-ROC degrades due to distribution shifts in RSI, volatility, and return spreads. |
 
 ---
 

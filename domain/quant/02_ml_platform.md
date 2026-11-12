@@ -30,24 +30,24 @@ To eliminate **look-ahead bias** and data leakage:
 ## 3. Feature Store Plan (Feast)
 
 ### Offline & Online Architecture
-- **Offline Store**: Apache Iceberg Gold table `feat_ticker_technical_indicators`.
+- **Offline Store**: Apache Iceberg Gold table `feat_technical_indicators` (partitioned/tracked by `dataset_id`).
 - **Online Store**: Redis cluster for sub-10ms point-in-time feature lookup.
 
 ### Feature Definitions
 ```mermaid
 flowchart LR
-    Iceberg["Iceberg Gold (Offline Store)"] -->|"Airflow Daily Incremental Materialize"| FeastOnline["Feast Online Store (Redis)"]
+    Iceberg["Iceberg Gold: feat_technical_indicators<br>(Offline Store)"] -->|"Airflow DP3 Materialize"| FeastOnline["Feast Online Store<br>(Redis)"]
     Flink["Flink Streaming Engine"] -->|"Real-time Ingestion"| FeastOnline
-    FeastOnline -->|"Sub-10ms Feature Retrieval"| WebAPI["Data Fetch Web API (FastAPI)"]
-    WebAPI -->|"Enriched Features"| KServe["KServe Inference Service"]
+    FeastOnline -->|"Sub-10ms Feature Retrieval"| WebAPI["Data Fetch Web API<br>(FastAPI)"]
+    WebAPI -->|"Enriched Features"| KServe["KServe v2 Inference Service<br>(FastAPI Runner)"]
 ```
 
-#### Offline Historical Features (`feat_ticker_technical_indicators`)
-> Features are sourced directly from the Lakehouse Gold layer produced by PySpark/Airflow DP3 (`feat_ticker_technical_indicators.parquet`).
+#### Offline Historical Features (`feat_technical_indicators`)
+> Features are sourced directly from the Lakehouse Gold layer produced by PySpark/Airflow DP3 (`feat_technical_indicators`).
 
 | Tier | Feature Name | Type | Description | Source / Status |
 |---|---|---|---|---|
-| **[MVP Core]** | `close_price` | Float | Closing price of equity | DP3 `raw_market_ohlcv` |
+| **[MVP Core]** | `close_price` | Float | Closing price of equity | DP3 Gold table |
 | **[MVP Core]** | `sma_20` | Float | 20-day Simple Moving Average | `feature_calculator.py` |
 | **[MVP Core]** | `sma_50` | Float | 50-day Simple Moving Average | `feature_calculator.py` |
 | **[MVP Core]** | `sma_ratio_20_50` | Float | Ratio of 20-day SMA to 50-day SMA (trend proxy) | `feature_calculator.py` |
@@ -58,6 +58,7 @@ flowchart LR
 | **[MVP Core]** | `rolling_volatility_30d`| Float | 30-day annualized realized return volatility | `feature_calculator.py` |
 | **[MVP Core]** | `intraday_return_1d` | Float | Close-to-close daily return | `feature_calculator.py` |
 | **[MVP Core - Audit]**| `event_timestamp` | Timestamp | Point-in-time correctness timestamp (Rubric M1-34) | DP3 Gold table |
+| **[MVP Core - Audit]**| `dataset_id` | String | Dataset isolation key matching Bronze/Silver/Gold | DP3 Gold table |
 | **[MVP Core - Audit]**| `created` | Timestamp | Feature registration timestamp (Rubric M1-34) | DP3 Gold table |
 | *[Stretch / v2]* | `bollinger_pct_b` | Float | Position of close price relative to Bollinger Bands | Planned v2 expansion |
 | *[Stretch / v2]* | `news_sentiment_avg_3d` | Float | Rolling 3-day weighted average news sentiment score | Depends on RAG (Phase 7) |
@@ -132,3 +133,18 @@ A specialized, reproducible evaluation module using Python and Pandas/NumPy:
   - **Maximum Drawdown (MDD)**: Peak-to-trough decline measurement.
   - **Benchmark Comparison**: Evaluated against SPY (S&P 500 ETF) Buy & Hold.
 - **Artifacts**: Backtest performance curves and tear sheets logged directly to MLflow.
+
+---
+
+## 8. Implemented & Planned Codebase Architecture Mapping
+
+| Component | Source File / Module | Implementation Status | Description & Verification |
+|---|---|---|---|
+| **Feature Calculator** | [feature_calculator.py](file:///Users/nguyenbuihoanglong/Desktop/FSDS/edai_11/quant_edai/src/quant_edai/processing/features/feature_calculator.py) | `LIVE VERIFIED` (Gate 5) | Generates SMA, RSI, MACD, volatility from Iceberg Gold `market_daily_ohlcv` with zero lookahead bias. |
+| **Feature Store (Feast & Redis)** | [feast_manager.py](file:///Users/nguyenbuihoanglong/Desktop/FSDS/edai_11/quant_edai/src/quant_edai/ml/feast/feast_manager.py) | `UNIT TESTED` | Offline store on Iceberg Gold `feat_technical_indicators`, online store materialization to Redis (`redis:6379`). |
+| **Model Trainer & Registry** | [trainer.py](file:///Users/nguyenbuihoanglong/Desktop/FSDS/edai_11/quant_edai/src/quant_edai/ml/trainer.py) | `UNIT TESTED` | Trains LogisticRegression & LightGBM with walk-forward temporal split; logs to MLflow (`sqlite:///mlflow.db`). |
+| **Alpha Registry & Catalog** | [alpha_registry.py](file:///Users/nguyenbuihoanglong/Desktop/FSDS/edai_11/quant_edai/src/quant_edai/quant/alpha_registry.py), [alpha_catalog.py](file:///Users/nguyenbuihoanglong/Desktop/FSDS/edai_11/quant_edai/src/quant_edai/quant/alpha_catalog.py) | `UNIT TESTED` | Registers alpha models with metadata provenance (`model_version`, `dataset_id`, `feature_source`). |
+| **Alpha Serving & Signal Server** | [alpha_serving.py](file:///Users/nguyenbuihoanglong/Desktop/FSDS/edai_11/quant_edai/src/quant_edai/quant/alpha_serving.py) | `UNIT TESTED` | Microservice serving directional probabilities and ranking signals from ML models and Feast features. |
+| **KServe v2 Protocol Serving** | `src/quant_edai/serving/kserve_v2_runner.py` / `mock_kserve_v2.py` | `PLANNED (Gate 6)` | Standalone FastAPI KServe v2 runner implementing `POST /v2/models/{name}/infer`, loading champion models from MLflow. |
+| **Paper Trading Engine** | [paper_trading.py](file:///Users/nguyenbuihoanglong/Desktop/FSDS/edai_11/quant_edai/src/quant_edai/quant/paper_trading.py), [paper_db.py](file:///Users/nguyenbuihoanglong/Desktop/FSDS/edai_11/quant_edai/src/quant_edai/quant/paper_db.py) | `UNIT TESTED` | Long/Flat order execution at next-bar Open with ACID deduplication and idempotency in PostgreSQL. |
+| **Live Closed-Loop E2E** | `tests/live/test_live_05_ml_serving_and_paper_trading.py` | `PLANNED (Gate 6)` | Live integration test verifying Tick/Bar $\to$ ClickHouse $\to$ Feast Redis $\to$ KServe v2 $\to$ Paper Trading. |

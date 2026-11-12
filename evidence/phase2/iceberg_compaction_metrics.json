@@ -3,11 +3,11 @@
   "strategy": "binpack",
   "engine": "sim",
   "table": "lakehouse.gold.fact_daily_ohlcv",
-  "initial_file_count": 2616,
-  "compacted_file_count": 43,
-  "file_reduction_percentage": "98.36%",
-  "initial_total_bytes": 23461340,
-  "compacted_total_bytes": 564947,
-  "total_rows_preserved": 42684,
+  "initial_file_count": 3052,
+  "compacted_file_count": 49,
+  "file_reduction_percentage": "98.39%",
+  "initial_total_bytes": 27224297,
+  "compacted_total_bytes": 704719,
+  "total_rows_preserved": 48115,
   "compaction_status": "SUCCESS"
 }

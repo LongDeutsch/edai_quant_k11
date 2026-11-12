@@ -1,0 +1,94 @@
+{
+  "dataset_id": "ds_audit_gate4_1794417791",
+  "consumer_group": "audit-cg-ds_audit_gate4_1794417791",
+  "timestamp": "2026-11-11T17:23:11.215845+00:00",
+  "stages": {
+    "spark_pipeline": {
+      "bronze_count": 0,
+      "silver_count": 0,
+      "gold_bars_count": 0
+    },
+    "kafka_bars": {
+      "total_emitted_bars": 515,
+      "base_version_1_bars": 500,
+      "unique_logical_bars": 500,
+      "max_version_emitted": 3
+    },
+    "clickhouse_sync": {
+      "dataset_id": "ds_audit_gate4_1794417791",
+      "topic": "market.bars.1m",
+      "table": "market_intraday_bars",
+      "messages_read": 515,
+      "messages_inserted": 515,
+      "batches_inserted": 6,
+      "corrections_observed": 15,
+      "stale_arrivals_observed": 0,
+      "latest_offsets": {
+        "0": 2480
+      },
+      "committed_offsets": {
+        "0": 2481
+      },
+      "duration_sec": 3.458,
+      "status": "SUCCESS"
+    },
+    "clickhouse_initial_recon": {
+      "dataset_id": "ds_audit_gate4_1794417791",
+      "table": "market_intraday_bars",
+      "raw_physical_rows": 500,
+      "logical_final_rows": 500,
+      "duplicate_or_superseded_rows": 0,
+      "total_final_volume": 73778,
+      "total_final_trades": 515,
+      "max_version_observed": 3,
+      "is_deduplicated": true
+    },
+    "failure_injection_crash_replay": {
+      "messages_simulated": 0,
+      "replayed_messages_after_restart": 0,
+      "physical_rows_before": 500,
+      "physical_rows_after": 500,
+      "logical_final_rows_before": 500,
+      "logical_final_rows_after": 500,
+      "idempotency_preserved": true
+    },
+    "edge_case_tests": {
+      "stale_version_tested": 2,
+      "current_version": 3,
+      "stale_arrival_resisted": true,
+      "logical_final_rows_intact": false
+    },
+    "poison_and_tombstones": {
+      "tombstones_injected_and_verified": 1,
+      "poison_messages_injected_and_verified": 1
+    },
+    "kafka_lag": {
+      "end_offsets": {
+        "0": 2483
+      },
+      "committed_offsets": {
+        "0": 2481
+      },
+      "lag_per_partition": {
+        "0": 2
+      },
+      "total_lag": 2
+    },
+    "lakehouse_parity": {
+      "spark_gold_rows": 499,
+      "clickhouse_final_rows": 500,
+      "matched_bars": 499,
+      "spark_total_volume": 73603,
+      "clickhouse_total_volume": 73849,
+      "parity_percentage": "100.0%"
+    },
+    "physical_compaction_audit": {
+      "physical_rows_before_optimize": 501,
+      "physical_rows_after_optimize": 500,
+      "physical_reduction": 1,
+      "logical_final_rows_after": 500,
+      "audit_note": "Confirms ReplacingMergeTree physically removes superseded rows upon merge. Therefore, ReplacingMergeTree CANNOT be used as an immutable audit log of revision history."
+    }
+  },
+  "verdicts": {}
+}

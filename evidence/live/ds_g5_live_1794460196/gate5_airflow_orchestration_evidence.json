@@ -1,0 +1,221 @@
+{
+  "dataset_id": "ds_g5_live_1794460196",
+  "timestamp": "2026-11-12T05:11:44.003376+00:00",
+  "runs": {
+    "dag_dp1_raw_ingestion": {
+      "status": "SUCCESS",
+      "dag_id": "dag_dp1_raw_ingestion",
+      "data": {
+        "conf": {
+          "DATASET_ID": "ds_g5_live_1794460196",
+          "ENGINE": "spark",
+          "MODE": "integration",
+          "OUT_DIR": "/tmp/lakehouse_source"
+        },
+        "dag_id": "dag_dp1_raw_ingestion",
+        "dag_run_id": "manual__2026-11-12T05:09:59.440527+00:00",
+        "data_interval_end": "2026-11-12T00:00:00+00:00",
+        "data_interval_start": "2026-11-11T00:00:00+00:00",
+        "end_date": null,
+        "execution_date": "2026-11-12T05:09:59.440527+00:00",
+        "external_trigger": true,
+        "last_scheduling_decision": null,
+        "logical_date": "2026-11-12T05:09:59.440527+00:00",
+        "note": null,
+        "run_type": "manual",
+        "start_date": null,
+        "state": "queued"
+      },
+      "wait": {
+        "dag_id": "dag_dp1_raw_ingestion",
+        "dag_run_id": "manual__2026-11-12T05:09:59.440527+00:00",
+        "state": "success",
+        "data": {
+          "conf": {
+            "DATASET_ID": "ds_g5_live_1794460196",
+            "ENGINE": "spark",
+            "MODE": "integration",
+            "OUT_DIR": "/tmp/lakehouse_source"
+          },
+          "dag_id": "dag_dp1_raw_ingestion",
+          "dag_run_id": "manual__2026-11-12T05:09:59.440527+00:00",
+          "data_interval_end": "2026-11-12T00:00:00+00:00",
+          "data_interval_start": "2026-11-11T00:00:00+00:00",
+          "end_date": "2026-11-12T05:10:07.473117+00:00",
+          "execution_date": "2026-11-12T05:09:59.440527+00:00",
+          "external_trigger": true,
+          "last_scheduling_decision": "2026-11-12T05:10:07.471552+00:00",
+          "logical_date": "2026-11-12T05:09:59.440527+00:00",
+          "note": null,
+          "run_type": "manual",
+          "start_date": "2026-11-12T05:10:00.339150+00:00",
+          "state": "success"
+        }
+      },
+      "terminal_state": "success"
+    },
+    "dag_dp2_silver_gold": {
+      "status": "SUCCESS",
+      "dag_id": "dag_dp2_silver_gold",
+      "data": {
+        "conf": {
+          "DATASET_ID": "ds_g5_live_1794460196",
+          "ENGINE": "spark",
+          "MODE": "integration",
+          "OUT_DIR": "/tmp/lakehouse_source"
+        },
+        "dag_id": "dag_dp2_silver_gold",
+        "dag_run_id": "manual__2026-11-12T05:10:08.119865+00:00",
+        "data_interval_end": "2026-11-12T00:00:00+00:00",
+        "data_interval_start": "2026-11-11T00:00:00+00:00",
+        "end_date": null,
+        "execution_date": "2026-11-12T05:10:08.119865+00:00",
+        "external_trigger": true,
+        "last_scheduling_decision": null,
+        "logical_date": "2026-11-12T05:10:08.119865+00:00",
+        "note": null,
+        "run_type": "manual",
+        "start_date": null,
+        "state": "queued"
+      },
+      "wait": {
+        "dag_id": "dag_dp2_silver_gold",
+        "dag_run_id": "manual__2026-11-12T05:10:08.119865+00:00",
+        "state": "success",
+        "data": {
+          "conf": {
+            "DATASET_ID": "ds_g5_live_1794460196",
+            "ENGINE": "spark",
+            "MODE": "integration",
+            "OUT_DIR": "/tmp/lakehouse_source"
+          },
+          "dag_id": "dag_dp2_silver_gold",
+          "dag_run_id": "manual__2026-11-12T05:10:08.119865+00:00",
+          "data_interval_end": "2026-11-12T00:00:00+00:00",
+          "data_interval_start": "2026-11-11T00:00:00+00:00",
+          "end_date": "2026-11-12T05:11:34.775958+00:00",
+          "execution_date": "2026-11-12T05:10:08.119865+00:00",
+          "external_trigger": true,
+          "last_scheduling_decision": "2026-11-12T05:11:34.774259+00:00",
+          "logical_date": "2026-11-12T05:10:08.119865+00:00",
+          "note": null,
+          "run_type": "manual",
+          "start_date": "2026-11-12T05:10:08.498450+00:00",
+          "state": "success"
+        }
+      },
+      "terminal_state": "success"
+    },
+    "dag_dp3_features": {
+      "status": "SUCCESS",
+      "dag_id": "dag_dp3_features",
+      "data": {
+        "conf": {
+          "DATASET_ID": "ds_g5_live_1794460196",
+          "ENGINE": "spark",
+          "MODE": "integration",
+          "OUT_DIR": "/tmp/lakehouse_source"
+        },
+        "dag_id": "dag_dp3_features",
+        "dag_run_id": "manual__2026-11-12T05:11:35.168376+00:00",
+        "data_interval_end": "2026-11-12T00:00:00+00:00",
+        "data_interval_start": "2026-11-11T00:00:00+00:00",
+        "end_date": null,
+        "execution_date": "2026-11-12T05:11:35.168376+00:00",
+        "external_trigger": true,
+        "last_scheduling_decision": null,
+        "logical_date": "2026-11-12T05:11:35.168376+00:00",
+        "note": null,
+        "run_type": "manual",
+        "start_date": null,
+        "state": "queued"
+      },
+      "wait": {
+        "dag_id": "dag_dp3_features",
+        "dag_run_id": "manual__2026-11-12T05:11:35.168376+00:00",
+        "state": "success",
+        "data": {
+          "conf": {
+            "DATASET_ID": "ds_g5_live_1794460196",
+            "ENGINE": "spark",
+            "MODE": "integration",
+            "OUT_DIR": "/tmp/lakehouse_source"
+          },
+          "dag_id": "dag_dp3_features",
+          "dag_run_id": "manual__2026-11-12T05:11:35.168376+00:00",
+          "data_interval_end": "2026-11-12T00:00:00+00:00",
+          "data_interval_start": "2026-11-11T00:00:00+00:00",
+          "end_date": "2026-11-12T05:11:39.342110+00:00",
+          "execution_date": "2026-11-12T05:11:35.168376+00:00",
+          "external_trigger": true,
+          "last_scheduling_decision": "2026-11-12T05:11:39.340197+00:00",
+          "logical_date": "2026-11-12T05:11:35.168376+00:00",
+          "note": null,
+          "run_type": "manual",
+          "start_date": "2026-11-12T05:11:36.149568+00:00",
+          "state": "success"
+        }
+      },
+      "terminal_state": "success"
+    },
+    "dag_dp4_clickhouse_sync": {
+      "status": "SUCCESS",
+      "dag_id": "dag_dp4_clickhouse_sync",
+      "data": {
+        "conf": {
+          "DATASET_ID": "ds_g5_live_1794460196",
+          "ENGINE": "spark",
+          "MODE": "integration",
+          "OUT_DIR": "/tmp/lakehouse_source"
+        },
+        "dag_id": "dag_dp4_clickhouse_sync",
+        "dag_run_id": "manual__2026-11-12T05:11:39.609683+00:00",
+        "data_interval_end": "2026-11-12T00:00:00+00:00",
+        "data_interval_start": "2026-11-11T00:00:00+00:00",
+        "end_date": null,
+        "execution_date": "2026-11-12T05:11:39.609683+00:00",
+        "external_trigger": true,
+        "last_scheduling_decision": null,
+        "logical_date": "2026-11-12T05:11:39.609683+00:00",
+        "note": null,
+        "run_type": "manual",
+        "start_date": null,
+        "state": "queued"
+      },
+      "wait": {
+        "dag_id": "dag_dp4_clickhouse_sync",
+        "dag_run_id": "manual__2026-11-12T05:11:39.609683+00:00",
+        "state": "success",
+        "data": {
+          "conf": {
+            "DATASET_ID": "ds_g5_live_1794460196",
+            "ENGINE": "spark",
+            "MODE": "integration",
+            "OUT_DIR": "/tmp/lakehouse_source"
+          },
+          "dag_id": "dag_dp4_clickhouse_sync",
+          "dag_run_id": "manual__2026-11-12T05:11:39.609683+00:00",
+          "data_interval_end": "2026-11-12T00:00:00+00:00",
+          "data_interval_start": "2026-11-11T00:00:00+00:00",
+          "end_date": "2026-11-12T05:11:43.283085+00:00",
+          "execution_date": "2026-11-12T05:11:39.609683+00:00",
+          "external_trigger": true,
+          "last_scheduling_decision": "2026-11-12T05:11:43.281185+00:00",
+          "logical_date": "2026-11-12T05:11:39.609683+00:00",
+          "note": null,
+          "run_type": "manual",
+          "start_date": "2026-11-12T05:11:40.148008+00:00",
+          "state": "success"
+        }
+      },
+      "terminal_state": "success"
+    }
+  },
+  "clickhouse_serving": {
+    "market_daily_ohlcv": 3488,
+    "feat_technical_indicators": 3488,
+    "dim_companies": 32,
+    "market_intraday_bars": 0
+  },
+  "status": "PASSED"
+}

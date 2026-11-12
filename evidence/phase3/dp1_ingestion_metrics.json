@@ -1,8 +1,14 @@
 {
-  "status": "FALLBACK_LOCAL_STAGED",
-  "mode": "LOCAL_STORAGE",
-  "reason": "No module named 'minio'",
-  "staged_files_count": 7904,
-  "total_bytes": 64253688,
-  "local_path": "/tmp/lakehouse_source"
+  "status": "SUCCESS",
+  "execution_mode": "LIVE",
+  "dataset_id": "ds_g5_master_1794467581",
+  "run_id": "ds_g5_master_1794467581",
+  "mode_transport": "MINIO_S3",
+  "bucket": "external-source",
+  "endpoint": "http://minio:9000",
+  "uploaded_files_count": 658,
+  "total_bytes": 6700268,
+  "bronze_uri": "s3a://lakehouse/bronze/runs/ds_g5_master_1794467581",
+  "external_prefix": "s3://external-source/bronze/runs/ds_g5_master_1794467581",
+  "mode": "MINIO_S3"
 }

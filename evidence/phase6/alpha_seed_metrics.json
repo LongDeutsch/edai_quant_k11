@@ -1,0 +1,29 @@
+{
+  "status": "SUCCESS",
+  "registry": {
+    "registry_rows": 20,
+    "strategies": 10,
+    "status": "PAPER_TRIAL",
+    "version": "v1.0.0"
+  },
+  "daily_signals": {
+    "feature_source": "synthetic_panel",
+    "asof_date": "2026-11-10",
+    "effective_date": "2026-11-11",
+    "signals_prepared": 44,
+    "signals_inserted": 44,
+    "tickers": [
+      "AAPL",
+      "MSFT",
+      "NVDA",
+      "AMZN",
+      "GOOGL",
+      "META",
+      "TSLA",
+      "JPM",
+      "PG",
+      "SPY"
+    ]
+  },
+  "db_backend": "sqlite"
+}

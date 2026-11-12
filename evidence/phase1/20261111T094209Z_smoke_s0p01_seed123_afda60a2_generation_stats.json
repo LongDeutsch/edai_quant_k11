@@ -1,0 +1,369 @@
+{
+  "dataset_id": "20261111T094209Z_smoke_s0p01_seed123_afda60a2",
+  "run_id": "20261111T094209Z_smoke_s0p01_seed123_afda60a2",
+  "execution_mode": "SIMULATED",
+  "status": "SUCCESS",
+  "mode": "smoke",
+  "scale": 0.01,
+  "scale_mode": "tick_budget",
+  "ohlcv_volume_scaled_by_scale": false,
+  "seed": 123,
+  "start_date": "2024-01-02",
+  "end_date": "2024-03-29",
+  "offline_start": "2024-01-02",
+  "offline_end": "2024-03-29",
+  "span_years": 0.24,
+  "trading_days": 64,
+  "total_raw_ticks": 7828,
+  "total_raw_volume": 1335970,
+  "volume_skew_ratio": 0.8005,
+  "offline_duplicate_rate": 0.0199,
+  "schema_evolution_boundary": "2024-06-01",
+  "schema_evolution_populated_ticks": 0,
+  "schema_evolved_rows": 0,
+  "offline_duplicates_count": 153,
+  "regime_drift_boundary": "2024-08-01",
+  "schema_before_evolution": [
+    "trade_id",
+    "ticker_symbol",
+    "trade_date",
+    "price",
+    "size",
+    "event_timestamp",
+    "ingestion_timestamp",
+    "exchange"
+  ],
+  "schema_after_evolution": [
+    "trade_id",
+    "ticker_symbol",
+    "trade_date",
+    "price",
+    "size",
+    "event_timestamp",
+    "ingestion_timestamp",
+    "exchange",
+    "quote_condition",
+    "bid_price",
+    "ask_price"
+  ],
+  "cardinality_profile": {
+    "raw_market_ticks": {
+      "trade_id": {
+        "unique_values": 7675,
+        "total_rows": 7828,
+        "cardinality_ratio": 0.980455,
+        "category": "HIGH"
+      },
+      "ticker_symbol": {
+        "unique_values": 16,
+        "total_rows": 7828,
+        "cardinality_ratio": 0.002044,
+        "category": "LOW"
+      },
+      "trade_date": {
+        "unique_values": 64,
+        "total_rows": 7828,
+        "cardinality_ratio": 0.008176,
+        "category": "LOW"
+      },
+      "price": {
+        "unique_values": 7333,
+        "total_rows": 7828,
+        "cardinality_ratio": 0.936765,
+        "category": "HIGH"
+      },
+      "size": {
+        "unique_values": 12,
+        "total_rows": 7828,
+        "cardinality_ratio": 0.001533,
+        "category": "LOW"
+      },
+      "event_timestamp": {
+        "unique_values": 7675,
+        "total_rows": 7828,
+        "cardinality_ratio": 0.980455,
+        "category": "HIGH"
+      },
+      "ingestion_timestamp": {
+        "unique_values": 7828,
+        "total_rows": 7828,
+        "cardinality_ratio": 1.0,
+        "category": "HIGH"
+      },
+      "exchange": {
+        "unique_values": 2,
+        "total_rows": 7828,
+        "cardinality_ratio": 0.000255,
+        "category": "ULTRA_LOW"
+      },
+      "market_regime": {
+        "unique_values": 1,
+        "total_rows": 7828,
+        "cardinality_ratio": 0.000128,
+        "category": "ULTRA_LOW"
+      },
+      "quote_condition": {
+        "unique_values": 1,
+        "total_rows": 7828,
+        "cardinality_ratio": 0.000128,
+        "category": "ULTRA_LOW"
+      },
+      "bid_price": {
+        "unique_values": 1,
+        "total_rows": 7828,
+        "cardinality_ratio": 0.000128,
+        "category": "ULTRA_LOW"
+      },
+      "ask_price": {
+        "unique_values": 1,
+        "total_rows": 7828,
+        "cardinality_ratio": 0.000128,
+        "category": "ULTRA_LOW"
+      }
+    },
+    "market_ohlcv": {
+      "trade_id": {
+        "unique_values": 1024,
+        "total_rows": 1024,
+        "cardinality_ratio": 1.0,
+        "category": "HIGH"
+      },
+      "ticker_symbol": {
+        "unique_values": 16,
+        "total_rows": 1024,
+        "cardinality_ratio": 0.015625,
+        "category": "LOW"
+      },
+      "trade_date": {
+        "unique_values": 64,
+        "total_rows": 1024,
+        "cardinality_ratio": 0.0625,
+        "category": "MEDIUM"
+      },
+      "open_price": {
+        "unique_values": 616,
+        "total_rows": 1024,
+        "cardinality_ratio": 0.601562,
+        "category": "MEDIUM"
+      },
+      "high_price": {
+        "unique_values": 611,
+        "total_rows": 1024,
+        "cardinality_ratio": 0.59668,
+        "category": "MEDIUM"
+      },
+      "low_price": {
+        "unique_values": 617,
+        "total_rows": 1024,
+        "cardinality_ratio": 0.602539,
+        "category": "MEDIUM"
+      },
+      "close_price": {
+        "unique_values": 621,
+        "total_rows": 1024,
+        "cardinality_ratio": 0.606445,
+        "category": "MEDIUM"
+      },
+      "volume": {
+        "unique_values": 455,
+        "total_rows": 1024,
+        "cardinality_ratio": 0.444336,
+        "category": "MEDIUM"
+      },
+      "exchange": {
+        "unique_values": 2,
+        "total_rows": 1024,
+        "cardinality_ratio": 0.001953,
+        "category": "LOW"
+      },
+      "ingestion_timestamp": {
+        "unique_values": 1024,
+        "total_rows": 1024,
+        "cardinality_ratio": 1.0,
+        "category": "HIGH"
+      },
+      "market_regime": {
+        "unique_values": 1,
+        "total_rows": 1024,
+        "cardinality_ratio": 0.000977,
+        "category": "ULTRA_LOW"
+      },
+      "vwap": {
+        "unique_values": 1014,
+        "total_rows": 1024,
+        "cardinality_ratio": 0.990234,
+        "category": "HIGH"
+      },
+      "trade_count": {
+        "unique_values": 25,
+        "total_rows": 1024,
+        "cardinality_ratio": 0.024414,
+        "category": "LOW"
+      }
+    },
+    "financial_news": {
+      "article_id": {
+        "unique_values": 358,
+        "total_rows": 358,
+        "cardinality_ratio": 1.0,
+        "category": "HIGH"
+      },
+      "ticker_symbol": {
+        "unique_values": 16,
+        "total_rows": 358,
+        "cardinality_ratio": 0.044693,
+        "category": "LOW"
+      },
+      "publish_date": {
+        "unique_values": 64,
+        "total_rows": 358,
+        "cardinality_ratio": 0.178771,
+        "category": "MEDIUM"
+      },
+      "published_ts": {
+        "unique_values": 355,
+        "total_rows": 358,
+        "cardinality_ratio": 0.99162,
+        "category": "HIGH"
+      },
+      "headline": {
+        "unique_values": 135,
+        "total_rows": 358,
+        "cardinality_ratio": 0.377095,
+        "category": "MEDIUM"
+      },
+      "summary": {
+        "unique_values": 16,
+        "total_rows": 358,
+        "cardinality_ratio": 0.044693,
+        "category": "LOW"
+      },
+      "sentiment_score": {
+        "unique_values": 347,
+        "total_rows": 358,
+        "cardinality_ratio": 0.969274,
+        "category": "HIGH"
+      },
+      "source_outlet": {
+        "unique_values": 4,
+        "total_rows": 358,
+        "cardinality_ratio": 0.011173,
+        "category": "LOW"
+      }
+    },
+    "dim_companies": {
+      "company_key": {
+        "unique_values": 32,
+        "total_rows": 32,
+        "cardinality_ratio": 1.0,
+        "category": "HIGH"
+      },
+      "ticker_symbol": {
+        "unique_values": 16,
+        "total_rows": 32,
+        "cardinality_ratio": 0.5,
+        "category": "MEDIUM"
+      },
+      "company_name": {
+        "unique_values": 16,
+        "total_rows": 32,
+        "cardinality_ratio": 0.5,
+        "category": "MEDIUM"
+      },
+      "sector": {
+        "unique_values": 8,
+        "total_rows": 32,
+        "cardinality_ratio": 0.25,
+        "category": "MEDIUM"
+      },
+      "industry": {
+        "unique_values": 13,
+        "total_rows": 32,
+        "cardinality_ratio": 0.40625,
+        "category": "MEDIUM"
+      },
+      "market_cap_category": {
+        "unique_values": 4,
+        "total_rows": 32,
+        "cardinality_ratio": 0.125,
+        "category": "MEDIUM"
+      },
+      "valid_from_ts": {
+        "unique_values": 2,
+        "total_rows": 32,
+        "cardinality_ratio": 0.0625,
+        "category": "MEDIUM"
+      },
+      "valid_to_ts": {
+        "unique_values": 2,
+        "total_rows": 32,
+        "cardinality_ratio": 0.0625,
+        "category": "MEDIUM"
+      },
+      "is_current": {
+        "unique_values": 2,
+        "total_rows": 32,
+        "cardinality_ratio": 0.0625,
+        "category": "MEDIUM"
+      }
+    },
+    "labels": {
+      "ticker_symbol": {
+        "unique_values": 16,
+        "total_rows": 1008,
+        "cardinality_ratio": 0.015873,
+        "category": "LOW"
+      },
+      "label_date": {
+        "unique_values": 63,
+        "total_rows": 1008,
+        "cardinality_ratio": 0.0625,
+        "category": "MEDIUM"
+      },
+      "close_price": {
+        "unique_values": 609,
+        "total_rows": 1008,
+        "cardinality_ratio": 0.604167,
+        "category": "MEDIUM"
+      },
+      "next_day_close": {
+        "unique_values": 613,
+        "total_rows": 1008,
+        "cardinality_ratio": 0.608135,
+        "category": "MEDIUM"
+      },
+      "daily_return_fwd": {
+        "unique_values": 409,
+        "total_rows": 1008,
+        "cardinality_ratio": 0.405754,
+        "category": "MEDIUM"
+      },
+      "direction_label": {
+        "unique_values": 2,
+        "total_rows": 1008,
+        "cardinality_ratio": 0.001984,
+        "category": "LOW"
+      }
+    }
+  },
+  "total_data_volume_bytes": 1809455,
+  "total_data_volume_mb": 1.73,
+  "total_market_rows": 1024,
+  "total_volume": 1335970,
+  "mega_cap_volume": 1069470,
+  "total_news_articles": 358,
+  "total_label_rows": 1008,
+  "total_dimension_rows": 32,
+  "gold_features_written": false,
+  "bronze_immutable": true,
+  "lakehouse_bronze_uri": "s3a://lakehouse/bronze/runs/20261111T094209Z_smoke_s0p01_seed123_afda60a2",
+  "paths": {
+    "base_out_dir": "/private/var/folders/df/p7lmy0917s36_bmbrvhq4tn00000gp/T/pytest-of-nguyenbuihoanglong/pytest-166/test_generator_datasets_and_sc0/lakehouse_test",
+    "run_root": "/private/var/folders/df/p7lmy0917s36_bmbrvhq4tn00000gp/T/pytest-of-nguyenbuihoanglong/pytest-166/test_generator_datasets_and_sc0/lakehouse_test/runs/20261111T094209Z_smoke_s0p01_seed123_afda60a2",
+    "raw_market_ticks": "/private/var/folders/df/p7lmy0917s36_bmbrvhq4tn00000gp/T/pytest-of-nguyenbuihoanglong/pytest-166/test_generator_datasets_and_sc0/lakehouse_test/runs/20261111T094209Z_smoke_s0p01_seed123_afda60a2/raw_market_ticks",
+    "raw_market_ohlcv": "/private/var/folders/df/p7lmy0917s36_bmbrvhq4tn00000gp/T/pytest-of-nguyenbuihoanglong/pytest-166/test_generator_datasets_and_sc0/lakehouse_test/runs/20261111T094209Z_smoke_s0p01_seed123_afda60a2/raw_market_ohlcv",
+    "dim_companies": "/private/var/folders/df/p7lmy0917s36_bmbrvhq4tn00000gp/T/pytest-of-nguyenbuihoanglong/pytest-166/test_generator_datasets_and_sc0/lakehouse_test/runs/20261111T094209Z_smoke_s0p01_seed123_afda60a2/dim_companies/dim_companies.parquet",
+    "financial_news": "/private/var/folders/df/p7lmy0917s36_bmbrvhq4tn00000gp/T/pytest-of-nguyenbuihoanglong/pytest-166/test_generator_datasets_and_sc0/lakehouse_test/runs/20261111T094209Z_smoke_s0p01_seed123_afda60a2/raw_financial_news",
+    "labels": "/private/var/folders/df/p7lmy0917s36_bmbrvhq4tn00000gp/T/pytest-of-nguyenbuihoanglong/pytest-166/test_generator_datasets_and_sc0/lakehouse_test/runs/20261111T094209Z_smoke_s0p01_seed123_afda60a2/label_ticker_daily_return/labels.parquet"
+  }
+}

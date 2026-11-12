@@ -14,6 +14,7 @@
       "entity": "ticker_symbol",
       "features": [
         "close_price",
+        "volume",
         "sma_20",
         "sma_50",
         "sma_ratio_20_50",
@@ -24,7 +25,7 @@
         "rolling_volatility_30d",
         "intraday_return_1d"
       ],
-      "source": "/tmp/lakehouse_source/gold_features/feat_ticker_technical_indicators.parquet",
+      "source": "/tmp/lakehouse_source/runs/ds_g5_master_1794467581/gold_features/feat_ticker_technical_indicators.parquet",
       "ttl_days": 365,
       "online": true
     }

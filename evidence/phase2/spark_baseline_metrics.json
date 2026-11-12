@@ -1,128 +1,128 @@
 {
-  "job_type": "BASELINE_UNOPTIMIZED",
-  "engine": "sim",
+  "job_type": "BASELINE_UNOPTIMIZED_PYSPARK",
+  "engine": "spark",
+  "metrics_source": "spark_partition_wall_clock",
   "optimization_enabled": false,
   "num_partitions": 16,
-  "total_rows_processed": 42684,
-  "joined_rows": 42684,
+  "total_rows_processed": 51603,
+  "joined_rows": 51603,
   "aggregated_groups": 16,
-  "max_task_duration_seconds": 681.958,
-  "median_task_duration_seconds": 94.36250000000001,
-  "task_duration_variance": 31790.5804,
-  "skew_straggler_ratio": 7.23,
-  "effective_stage_latency_seconds": 12616.22,
-  "actual_wall_time_seconds": 1.607,
+  "max_task_duration_seconds": 0.208017,
+  "median_task_duration_seconds": 0.050017,
+  "task_duration_variance": 0.00417281,
+  "skew_straggler_ratio": 4.1589,
+  "actual_wall_time_seconds": 1.790778,
   "task_metrics": [
     {
       "partition_id": 0,
-      "row_count": 2688,
-      "volume": 9925343762,
-      "duration_seconds": 96.26,
-      "has_straggler": true
+      "row_count": 3289,
+      "volume": 33009937869,
+      "duration_seconds": 0.087971,
+      "has_straggler": false
     },
     {
       "partition_id": 1,
-      "row_count": 5304,
-      "volume": 32089629740,
-      "duration_seconds": 323.207,
+      "row_count": 6523,
+      "volume": 19921968780,
+      "duration_seconds": 0.159163,
       "has_straggler": true
     },
     {
       "partition_id": 2,
-      "row_count": 2640,
-      "volume": 3313427104,
-      "duration_seconds": 93.227,
-      "has_straggler": true
+      "row_count": 3191,
+      "volume": 10898524200,
+      "duration_seconds": 0.046488,
+      "has_straggler": false
     },
     {
       "partition_id": 3,
-      "row_count": 2640,
-      "volume": 1365157860,
-      "duration_seconds": 93.227,
+      "row_count": 6429,
+      "volume": 60235964550,
+      "duration_seconds": 0.192652,
       "has_straggler": true
     },
     {
       "partition_id": 4,
-      "row_count": 2688,
-      "volume": 1619891140,
-      "duration_seconds": 96.26,
-      "has_straggler": true
+      "row_count": 0,
+      "volume": 0,
+      "duration_seconds": 7e-06,
+      "has_straggler": false
     },
     {
       "partition_id": 5,
-      "row_count": 5304,
-      "volume": 16114220672,
-      "duration_seconds": 323.207,
-      "has_straggler": true
+      "row_count": 3146,
+      "volume": 1499100024,
+      "duration_seconds": 0.053547,
+      "has_straggler": false
     },
     {
       "partition_id": 6,
-      "row_count": 2688,
-      "volume": 15469959782,
-      "duration_seconds": 96.26,
-      "has_straggler": true
+      "row_count": 0,
+      "volume": 0,
+      "duration_seconds": 3e-06,
+      "has_straggler": false
     },
     {
       "partition_id": 7,
-      "row_count": 0,
-      "volume": 0,
-      "duration_seconds": 0.05,
+      "row_count": 3352,
+      "volume": 12028845796,
+      "duration_seconds": 0.073735,
       "has_straggler": false
     },
     {
       "partition_id": 8,
-      "row_count": 2640,
-      "volume": 2742543888,
-      "duration_seconds": 93.227,
-      "has_straggler": true
+      "row_count": 3274,
+      "volume": 21890391982,
+      "duration_seconds": 0.065674,
+      "has_straggler": false
     },
     {
       "partition_id": 9,
-      "row_count": 8052,
-      "volume": 60631993618,
-      "duration_seconds": 681.958,
-      "has_straggler": true
+      "row_count": 0,
+      "volume": 0,
+      "duration_seconds": 9e-06,
+      "has_straggler": false
     },
     {
       "partition_id": 10,
-      "row_count": 0,
-      "volume": 0,
-      "duration_seconds": 0.05,
+      "row_count": 3154,
+      "volume": 3638378937,
+      "duration_seconds": 0.031314,
       "has_straggler": false
     },
     {
       "partition_id": 11,
-      "row_count": 2676,
-      "volume": 40446537428,
-      "duration_seconds": 95.498,
-      "has_straggler": true
-    },
-    {
-      "partition_id": 12,
       "row_count": 0,
       "volume": 0,
-      "duration_seconds": 0.05,
+      "duration_seconds": 3e-06,
       "has_straggler": false
     },
     {
+      "partition_id": 12,
+      "row_count": 6488,
+      "volume": 18857920806,
+      "duration_seconds": 0.208017,
+      "has_straggler": true
+    },
+    {
       "partition_id": 13,
-      "row_count": 0,
-      "volume": 0,
-      "duration_seconds": 0.05,
+      "row_count": 3143,
+      "volume": 2226395571,
+      "duration_seconds": 0.033701,
       "has_straggler": false
     },
     {
       "partition_id": 14,
-      "row_count": 5364,
-      "volume": 24234509652,
-      "duration_seconds": 329.768,
-      "has_straggler": true
+      "row_count": 3139,
+      "volume": 3011523369,
+      "duration_seconds": 0.036884,
+      "has_straggler": false
     },
     {
       "partition_id": 15,
-      "row_count": 0,
-      "volume": 0,
-      "duration_seconds": 0.05,
+      "row_count": 6475,
+      "volume": 41126696570,
+      "duration_seconds": 0.083301,
       "has_straggler": false
     }
   ]

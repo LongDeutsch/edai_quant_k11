@@ -1,5 +1,5 @@
 ============================= test session starts ==============================
-platform darwin -- Python 3.13.12, pytest-9.2.0, pluggy-1.7.0 -- /Users/nguyenbuihoanglong/Desktop/FSDS/edai_11/quant_edai/.venv/bin/python3
+platform darwin -- Python 3.13.12, pytest-9.2.0, pluggy-1.7.0 -- /Users/nguyenbuihoanglong/Desktop/FSDS/edai_11/quant_edai/.venv/bin/python
 cachedir: .pytest_cache
 hypothesis profile 'default'
 rootdir: /Users/nguyenbuihoanglong/Desktop/FSDS/edai_11/quant_edai
@@ -12,4 +12,4 @@ tests/unit/test_phase3_quality_and_serving.py::test_great_expectations_runner_br
 tests/unit/test_phase3_quality_and_serving.py::test_datahub_lineage_emitter PASSED [ 75%]
 tests/unit/test_phase3_quality_and_serving.py::test_clickhouse_sync_sim_mode PASSED [100%]
 
-============================== 4 passed in 0.81s ===============================
+============================== 4 passed in 1.73s ===============================

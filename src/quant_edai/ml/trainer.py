@@ -25,6 +25,10 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score, f1_score, log_loss, roc_auc_score
 from sklearn.preprocessing import StandardScaler
 
+from quant_edai.common.dataset_paths import resolve_dataset_root
+from quant_edai.common.execution_status import assert_integration_ready, is_integration_mode
+from quant_edai.common.ml_provenance import dataset_id_from_path, resolve_dataset_id, write_model_card
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("MLTrainer")
 
@@ -65,12 +69,27 @@ class QuantModelTrainer:
         models_dir: str = "models",
         mlflow_tracking_uri: Optional[str] = None,
     ) -> None:
-        self.features_path = features_path or self._find_path(
-            os.path.join(os.getenv("OUT_DIR", "/tmp/lakehouse_source"), "gold_features", "feat_ticker_technical_indicators.parquet"),
-            "evidence/phase3/feat_ticker_technical_indicators.parquet",
-        )
+        out_dir = os.getenv("OUT_DIR", "/tmp/lakehouse_source")
+        try:
+            ds_root = str(resolve_dataset_root(out_dir))  # OUT_DIR/runs/{dataset_id}
+        except FileNotFoundError:
+            ds_root = out_dir
+        feat_candidates = [
+            os.path.join(ds_root, "gold_features", "feat_ticker_technical_indicators.parquet"),
+            os.path.join(out_dir, "gold_features", "feat_ticker_technical_indicators.parquet"),
+        ]
+        if not is_integration_mode():
+            feat_candidates.append("evidence/phase3/feat_ticker_technical_indicators.parquet")
+        self.features_path = features_path or self._find_path(*feat_candidates)
         self.labels_path = labels_path or self._find_path(
-            os.path.join(os.getenv("OUT_DIR", "/tmp/lakehouse_source"), "label_ticker_daily_return"),
+            os.path.join(ds_root, "label_ticker_daily_return"),
+            os.path.join(out_dir, "label_ticker_daily_return"),
+        )
+        # ML provenance stamped on the model card, MLflow tags and downstream signals
+        self.dataset_id = dataset_id_from_path(self.features_path) or resolve_dataset_id(out_dir)
+        self.feature_source = str(self.features_path)
+        self.model_version = os.getenv("MODEL_VERSION") or "lgbm-{}-{}".format(
+            datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ"), (self.dataset_id or "nodataset")[:24]
         )
         self.models_dir = Path(models_dir)
         self.models_dir.mkdir(parents=True, exist_ok=True)
@@ -83,7 +102,12 @@ class QuantModelTrainer:
         return candidates[0]
 
     def load_and_prepare_dataset(self) -> pd.DataFrame:
-        """Join features and labels point-in-time."""
+        """Join features and labels point-in-time (integration|full: Gold features + labels are mandatory)."""
+        assert_integration_ready(
+            condition=os.path.exists(self.features_path) and os.path.exists(self.labels_path),
+            message=f"Gold features ({self.features_path}) or labels ({self.labels_path}) missing; "
+            "run `make features` / generator first.",
+        )
         logger.info(f"Loading features from {self.features_path}...")
         df_feat = pd.read_parquet(self.features_path)
 
@@ -214,6 +238,13 @@ class QuantModelTrainer:
         joblib.dump({"model": lr, "features": feature_cols}, baseline_path)
         joblib.dump({"model": champion_model, "features": feature_cols, "scaler": champion_scaler}, champion_path)
         joblib.dump(scaler, scaler_path)
+        card_path = write_model_card(
+            champion_path,
+            model_version=self.model_version,
+            dataset_id=self.dataset_id,
+            feature_source=self.feature_source,
+            extra={"trained_at": datetime.now(timezone.utc).isoformat(), "features": feature_cols},
+        )
 
         logger.info(f"Saved models to {self.models_dir}")
         logger.info(f"Baseline Metrics: {lr_metrics}")
@@ -230,6 +261,12 @@ class QuantModelTrainer:
                 "baseline_path": str(baseline_path),
                 "champion_path": str(champion_path),
                 "scaler_path": str(scaler_path),
+                "model_card_path": str(card_path),
+            },
+            "provenance": {
+                "model_version": self.model_version,
+                "dataset_id": self.dataset_id,
+                "feature_source": self.feature_source,
             },
             "test_sample_size": len(y_test),
         }
@@ -267,6 +304,9 @@ class QuantModelTrainer:
                 mlflow.set_tag("stage", "production")
                 mlflow.set_tag("candidate_role", "champion")
                 mlflow.set_tag("walk_forward_verified", "true")
+                mlflow.set_tag("model_version", self.model_version)
+                mlflow.set_tag("dataset_id", str(self.dataset_id))
+                mlflow.set_tag("feature_source", self.feature_source)
 
                 run_id = run.info.run_id
                 logger.info(f"MLflow Run recorded: {run_id} (Tagged as 'production')")
@@ -284,9 +324,11 @@ class QuantModelTrainer:
 
 def run_training_pipeline(
     out_file: str = "evidence/phase4/mlflow_model_summary.json",
+    features_path: Optional[str] = None,
+    labels_path: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Execute complete training lifecycle and save evidence."""
-    trainer = QuantModelTrainer()
+    trainer = QuantModelTrainer(features_path=features_path, labels_path=labels_path)
     df = trainer.load_and_prepare_dataset()
     df_train, df_val, df_test = trainer.temporal_walk_forward_split(df)
     results = trainer.train_models(df_train, df_val, df_test)
@@ -299,8 +341,19 @@ def run_training_pipeline(
         "test_rows": len(df_test),
         "results": results,
         "status": "COMPLETED",
+        "model_version": trainer.model_version,
+        "dataset_id": trainer.dataset_id,
+        "feature_source": trainer.feature_source,
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
+
+    # Also sync model_card.json directly to evidence/phase4/model_card.json if requested or standard
+    ev_card = Path("evidence/phase4/model_card.json")
+    ev_card.parent.mkdir(parents=True, exist_ok=True)
+    src_card = Path(results["artifacts"]["model_card_path"])
+    if src_card.exists():
+        import shutil
+        shutil.copyfile(src_card, ev_card)
 
     out_p = Path(out_file)
     out_p.parent.mkdir(parents=True, exist_ok=True)
@@ -318,7 +371,7 @@ def main():
     parser.add_argument("--out-file", default="evidence/phase4/mlflow_model_summary.json")
     args = parser.parse_args()
 
-    run_training_pipeline(out_file=args.out_file)
+    run_training_pipeline(out_file=args.out_file, features_path=args.features, labels_path=args.labels)
 
 
 if __name__ == "__main__":

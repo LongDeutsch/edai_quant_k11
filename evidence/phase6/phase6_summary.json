@@ -6,24 +6,25 @@
   ],
   "execution_snapshot": {
     "bars_processed": 300,
-    "wall_time_seconds": 4.09,
-    "bars_per_second": 73.32,
-    "filled_trades_count": 56,
-    "active_positions_count": 2,
-    "events_count": 56
+    "wall_time_seconds": 4.63,
+    "bars_per_second": 64.83,
+    "filled_trades_count": 5,
+    "active_positions_count": 5,
+    "events_count": 5
   },
   "financials_snapshot": {
     "starting_cash": 100000.0,
-    "final_equity": 99524.94,
-    "net_pnl": -475.06,
-    "net_pnl_pct": -0.4751,
-    "realized_pnl_cumulative": -442.16,
-    "win_rate": 0.2222,
-    "max_drawdown_pct": -0.0055
+    "final_equity": 99846.95,
+    "net_pnl": -153.05,
+    "net_pnl_pct": -0.153,
+    "realized_pnl_cumulative": 0.0,
+    "win_rate": 0.0,
+    "max_drawdown_pct": -0.0015
   },
-  "latency_p95_ms": 4.492,
+  "latency_p95_ms": 4.173,
   "sla_met": true,
   "evidence_files": [
+    "alpha_seed_metrics.json",
     "bronze_kafka_publish.json",
     "paper_trading_execution.json",
     "paper_trading_latency.json",

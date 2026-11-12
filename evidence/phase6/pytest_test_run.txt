@@ -14,4 +14,4 @@ tests/unit/test_paper_trading.py::test_eod_flatten_at_15_55 PASSED       [ 66%]
 tests/unit/test_paper_trading.py::test_circuit_breaker_max_daily_drawdown PASSED [ 83%]
 tests/unit/test_paper_trading.py::test_market_replay_runner PASSED       [100%]
 
-============================== 6 passed in 1.11s ===============================
+============================== 6 passed in 1.38s ===============================

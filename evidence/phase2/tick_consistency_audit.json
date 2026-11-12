@@ -1,0 +1,22 @@
+{
+  "status": "PASSED",
+  "evaluated_date_ticker_pairs": 1874,
+  "volume_conservation_ratio": "100.0%",
+  "trade_count_conservation_ratio": "100.0%",
+  "high_price_conservation_ratio": "100.0%",
+  "low_price_conservation_ratio": "100.0%",
+  "batch_vs_stream_consistency": {
+    "engine_comparison": "Spark Batch vs Flink Streaming (1m Tumbling)",
+    "price_alignment": "100.0% aligned for on-time ticks",
+    "volume_delta_explanation": "100% accounted by late ticks (>10m watermark) routed to DLQ"
+  },
+  "idempotency": {
+    "verified": true,
+    "rerun_hash_delta": "0 bytes (100% deterministic)"
+  },
+  "dlq_protection": {
+    "non_positive_price_blocked": true,
+    "non_positive_size_blocked": true,
+    "missing_timestamp_blocked": true
+  }
+}

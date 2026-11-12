@@ -33,7 +33,17 @@ class IcebergCompactionJob:
         compacted_dir: str = "/tmp/lakehouse_source/compacted_market_ohlcv",
         target_rows_per_file: int = 1000,
     ):
-        self.table_dir = Path(table_dir)
+        p = Path(table_dir)
+        if not p.exists():
+            from quant_edai.common.dataset_paths import resolve_dataset_root
+            try:
+                resolved_root = resolve_dataset_root(p.parent, allow_legacy=True)
+                cand = resolved_root / p.name
+                if cand.exists():
+                    p = cand
+            except Exception:
+                pass
+        self.table_dir = p
         self.compacted_dir = Path(compacted_dir)
         self.target_rows_per_file = target_rows_per_file
 
@@ -113,8 +123,11 @@ class IcebergCompactionJob:
         if initial_file_count == 0:
             return {"status": "NOOP", "initial_file_count": 0}
 
+        from quant_edai.processing.spark.spark_metrics import read_market_ohlcv
+
         spark = get_spark_session(app_name="quant_edai_compaction_spark", master="local[*]")
-        df_all = spark.read.parquet(str(self.table_dir))
+        # Fixed schema projection: evolved trade_count DOUBLE/BIGINT mismatch breaks naive reads.
+        df_all = read_market_ohlcv(spark, self.table_dir, compact=True)
         total_rows = df_all.count()
 
         num_target_files = max(1, (total_rows + self.target_rows_per_file - 1) // self.target_rows_per_file)
@@ -124,7 +137,7 @@ class IcebergCompactionJob:
         df_all.coalesce(num_target_files).write.mode("overwrite").parquet(str(self.compacted_dir))
         spark.stop()
 
-        compacted_files = list(self.compacted_dir.glob("*.parquet"))
+        compacted_files = list(self.compacted_dir.glob("**/*.parquet"))
         compacted_file_count = len(compacted_files)
         compacted_bytes = sum(f.stat().st_size for f in compacted_files)
 
@@ -135,7 +148,7 @@ class IcebergCompactionJob:
         stats = {
             "procedure": "rewrite_data_files",
             "strategy": "binpack",
-            "engine": "pyspark",
+            "engine": "spark",
             "table": "lakehouse.gold.fact_daily_ohlcv",
             "initial_file_count": initial_file_count,
             "compacted_file_count": compacted_file_count,
@@ -151,14 +164,15 @@ class IcebergCompactionJob:
 
     def run(self, engine: Optional[str] = None) -> Dict[str, Any]:
         """Runs either simulation or real PySpark job based on ENGINE setting."""
-        selected_engine = engine or os.environ.get("ENGINE", "sim").lower()
-        if selected_engine == "spark":
-            try:
-                return self.run_spark()
-            except Exception as e:
-                print(f"[Iceberg Compaction] PySpark run encountered ({e}), falling back to simulation.")
-                return self.run_sim()
-        return self.run_sim()
+        from quant_edai.common.engine_guard import run_with_engine
+
+        return run_with_engine(
+            engine=engine,
+            run_sim=self.run_sim,
+            run_live=self.run_spark,
+            live_token="spark",
+            job_name="Iceberg Compaction",
+        )
 
 
 def main():

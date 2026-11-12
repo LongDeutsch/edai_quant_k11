@@ -23,19 +23,45 @@ default_args = {
     "email_on_retry": False,
     "retries": 1,
     "retry_delay": timedelta(minutes=1),
+    "execution_timeout": timedelta(minutes=15),
 }
 
 
-def task_ingest_external_source(**kwargs) -> dict:
-    """Ingest external raw market files into lakehouse bronze."""
-    source_dir = os.environ.get("OUT_DIR", "/tmp/lakehouse_source")
-    endpoint = os.environ.get("MINIO_ENDPOINT", "http://minio:9000")
-    engine = os.environ.get("ENGINE", "auto")
+def get_dag_param(kwargs: dict, key: str, default: Any = None) -> Any:
+    """Extract runtime parameter prioritizing dag_run.conf over os.environ."""
+    dag_run = kwargs.get("dag_run")
+    if dag_run and getattr(dag_run, "conf", None) and key in dag_run.conf:
+        return dag_run.conf[key]
+    return os.environ.get(key, default)
 
-    from quant_edai.ingestion.s3_uploader import sync_lakehouse_data
-    logger.info(f"Running Ingestion from {source_dir} (MinIO: {endpoint}, Engine: {engine})")
-    stats = sync_lakehouse_data(source_dir=source_dir, endpoint=endpoint)
-    
+
+def _dataset_root(kwargs: dict | None = None) -> str:
+    from quant_edai.common.dataset_paths import resolve_dataset_root
+
+    kw = kwargs or {}
+    out = get_dag_param(kw, "OUT_DIR", "/tmp/lakehouse_source")
+    ds = get_dag_param(kw, "DATASET_ID")
+    try:
+        return str(resolve_dataset_root(out, ds, allow_legacy=True))
+    except Exception:
+        return out
+
+
+def task_ingest_external_source(**kwargs) -> dict:
+    """Ingest external raw market files into lakehouse bronze (MinIO preferred)."""
+    source_dir = _dataset_root(kwargs)
+    endpoint = get_dag_param(kwargs, "MINIO_ENDPOINT", "http://minio:9000")
+    engine = get_dag_param(kwargs, "SPARK_ENGINE") or get_dag_param(kwargs, "ENGINE", "auto")
+    mode = get_dag_param(kwargs, "MODE", "smoke")
+    dataset_id = get_dag_param(kwargs, "DATASET_ID")
+
+    from quant_edai.ingestion.s3_uploader import S3SourceUploader
+    logger.info(f"Running Ingestion from {source_dir} (MinIO: {endpoint}, Engine: {engine}, MODE={mode}, DS={dataset_id})")
+    uploader = S3SourceUploader(source_dir=source_dir, endpoint_url=endpoint, mode=mode, dataset_id=dataset_id)
+    stats = uploader.upload_dataset()
+    if stats.get("status") in {"FAILED", "ERROR"}:
+        raise RuntimeError(stats.get("detail") or stats.get("message") or "ingestion failed")
+
     evidence_dir = Path(repo_path("evidence", "phase3"))
     evidence_dir.mkdir(parents=True, exist_ok=True)
     with open(evidence_dir / "dp1_ingestion_metrics.json", "w") as f:
@@ -45,13 +71,15 @@ def task_ingest_external_source(**kwargs) -> dict:
 
 def task_quality_gate_raw(**kwargs) -> dict:
     """Validate bronze ingestion against Great Expectations suite."""
-    source_dir = os.environ.get("OUT_DIR", "/tmp/lakehouse_source")
-    raw_path = Path(source_dir) / "raw_market_ohlcv"
+    source_dir = _dataset_root(kwargs)
+    raw_ticks = Path(source_dir) / "raw_market_ticks"
+    raw_ohlcv = Path(source_dir) / "raw_market_ohlcv"
+    raw_path = raw_ohlcv if raw_ohlcv.exists() else raw_ticks
     suite_path = repo_path("configs", "quality", "suite_raw_market_data.json")
     doc_out = repo_path("evidence", "phase3", "dp1_gx_report.md")
 
     from quant_edai.quality.gx_runner import run_gx_checkpoint
-    logger.info(f"Running Bronze Quality Gate against {suite_path} (repo={repo_root()})")
+    logger.info(f"Running Bronze Quality Gate against {suite_path} on {raw_path} (repo={repo_root()})")
     results = run_gx_checkpoint(data_path=str(raw_path), suite_path=suite_path, doc_out_path=doc_out)
     if not results.get("success", False):
         raise ValueError(f"Bronze Quality Gate failed: {results.get('unsuccessful_expectations')} failed expectations")

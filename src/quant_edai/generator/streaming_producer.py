@@ -68,7 +68,7 @@ class StreamingTickProducer:
             ticker = self.rng.choice(self.tickers)
             price = round(float(self.rng.uniform(100.0, 500.0)), 2)
             volume = int(self.rng.choice([10, 50, 100, 200, 500, 1000]))
-            event_ts = ts + pd.Timedelta(milliseconds=i * 10)
+            event_ts = ts + pd.to_timedelta(float(i * 10), unit="ms")
 
             records.append({
                 "trade_id": f"trd_{int(event_ts.timestamp() * 1000)}_{i}",
@@ -186,16 +186,60 @@ class StreamingTickProducer:
         out_file: Optional[str] = None,
         publish_kafka: bool = True,
         inject_malformed: bool = False,
+        from_corpus: Optional[str] = None,
+        max_ticks: Optional[int] = None,
+        synthetic_batch: bool = False,
     ) -> Dict[str, Any]:
-        """
-        Emits tick batches to Kafka if reachable; otherwise records to disk for audit.
-        """
-        all_ticks = []
-        for b in range(num_batches):
-            batch = self.generate_tick_batch(batch_size=batch_size, inject_malformed=inject_malformed)
-            all_ticks.append(batch)
+        """Replay online tick corpus (default) or emit synthetic batches for injector unit tests."""
+        mode = "synthetic_batch"
+        if from_corpus and not synthetic_batch:
+            from quant_edai.generator.tick_corpus import load_tick_corpus
 
-        df_all = pd.concat(all_ticks, ignore_index=True)
+            corpus_path = Path(from_corpus)
+            if not corpus_path.exists():
+                raise FileNotFoundError(
+                    f"Online tick corpus missing at {corpus_path}. "
+                    "Run `make generate-online-ticks` (or `make generate-data`) first."
+                )
+            df_all = load_tick_corpus(str(corpus_path), max_ticks=max_ticks)
+            mode = "corpus_replay"
+            if inject_malformed and len(df_all) > 10:
+                # Append malformed probes without rewriting the persisted corpus
+                ts = datetime.now(timezone.utc).isoformat()
+                extra = pd.DataFrame(
+                    [
+                        {
+                            "trade_id": f"bad_trd_neg_price_{int(time.time())}",
+                            "ticker_symbol": "AAPL",
+                            "event_timestamp": ts,
+                            "price": -99.99,
+                            "size": 100,
+                            "exchange": "NASDAQ",
+                            "is_late": False,
+                            "is_duplicate": False,
+                        },
+                        {
+                            "trade_id": f"bad_trd_missing_ticker_{int(time.time())}",
+                            "ticker_symbol": "",
+                            "event_timestamp": ts,
+                            "price": 150.0,
+                            "size": -10,
+                            "exchange": "NASDAQ",
+                            "is_late": False,
+                            "is_duplicate": False,
+                        },
+                    ]
+                )
+                df_all = pd.concat([df_all, extra], ignore_index=True)
+        else:
+            all_ticks = []
+            for _ in range(num_batches):
+                batch = self.generate_tick_batch(
+                    batch_size=batch_size, inject_malformed=inject_malformed
+                )
+                all_ticks.append(batch)
+            df_all = pd.concat(all_ticks, ignore_index=True)
+
         records = df_all.to_dict(orient="records")
 
         published_kafka_count = 0
@@ -213,6 +257,8 @@ class StreamingTickProducer:
 
         stats = {
             "total_streaming_ticks": total,
+            "mode": mode,
+            "from_corpus": from_corpus if mode == "corpus_replay" else None,
             "message_format": self.message_format,
             "late_arrival_count": num_late,
             "late_arrival_ratio": round(num_late / max(1, total), 4),
@@ -228,7 +274,7 @@ class StreamingTickProducer:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Streaming Market Tick Producer")
+    parser = argparse.ArgumentParser(description="Streaming Market Tick Producer / Corpus Replay")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--batches", type=int, default=5)
     parser.add_argument("--batch-size", type=int, default=200)
@@ -238,6 +284,17 @@ def main():
     parser.add_argument("--format", type=str, default="avro", choices=["avro", "json"])
     parser.add_argument("--registry-url", type=str, default=None)
     parser.add_argument("--inject-malformed", action="store_true", default=False, help="Inject malformed records for DLQ verification")
+    parser.add_argument(
+        "--from-corpus",
+        default=os.path.join(os.getenv("OUT_DIR", "/tmp/lakehouse_source"), "raw_market_ticks_online"),
+        help="Replay pre-materialized online tick corpus (default)",
+    )
+    parser.add_argument("--max-ticks", type=int, default=None, help="Cap replay size for CI/smoke")
+    parser.add_argument(
+        "--synthetic-batch",
+        action="store_true",
+        help="Legacy random batches (injector unit tests only); ignores corpus",
+    )
 
     args = parser.parse_args()
     producer = StreamingTickProducer(
@@ -252,6 +309,9 @@ def main():
         batch_size=args.batch_size,
         out_file=args.out_file,
         inject_malformed=args.inject_malformed,
+        from_corpus=None if args.synthetic_batch else args.from_corpus,
+        max_ticks=args.max_ticks,
+        synthetic_batch=args.synthetic_batch,
     )
     print(json.dumps(stats, indent=2))
 

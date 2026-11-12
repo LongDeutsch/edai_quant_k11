@@ -56,9 +56,9 @@ flowchart TD
 
     %% Storage & Lakehouse
     subgraph S_Storage["02. Storage & Lakehouse Layer (MinIO S3)"]
-        Bronze["Bronze Zone (MinIO S3)<br>raw_market_ohlcv, raw_news"]
-        Silver["Silver Zone (Apache Iceberg)<br>stg_market_ohlcv, stg_news"]
-        Gold["Gold Zone (Apache Iceberg)<br>dim_companies (SCD2), fact_ohlcv, feat_tables"]
+        Bronze["Bronze Zone (MinIO S3)<br>raw_market_ticks, raw_news"]
+        Silver["Silver Zone (Apache Iceberg)<br>stg_market_ticks (trade_id dedup), stg_news"]
+        Gold["Gold Zone (Apache Iceberg & Resampled Bars)<br>gold_market_bars_1m, gold_market_bars_daily,<br>dim_companies (SCD2), feat_tables"]
     end
 
     %% Processing & Serving
@@ -212,55 +212,106 @@ quant_edai/
 
 ---
 
-## 4. Medallion Architecture & Data Flow
+## 4. Medallion Architecture & Data Flow (Tick-First Architecture)
 
-- **Bronze Zone (`raw_market_ohlcv`, `raw_financial_news`)**:
+The platform strictly enforces a **Tick-First Architecture**: market data is generated and ingested exclusively at the atomic tick level (`trade_id, ticker_symbol, price, size, event_timestamp, ingestion_timestamp, exchange`). All 1-minute bars and daily OHLCV candles are aggregated and resampled through the Medallion stages.
+
+```
+[Raw Market Ticks] (Bronze Zone)
+   ├── Stored partitioned by trade_date on MinIO / Parquet
+   ├── Contains 80% Mega-Cap Skew, Schema Evolution (2024-06-01), 2% Duplicates
+   ↓
+[Silver Spark Dedup & Evolution Job] (Silver Zone)
+   ├── Window Dedup: ROW_NUMBER() OVER (PARTITION BY trade_id ORDER BY ingestion_timestamp ASC) = 1
+   ├── Quality Filter: price > 0, size > 0, non-null event_timestamp
+   ├── Schema Normalization: Imputes 'REGULAR' quote condition, synthetic bid/ask bounds
+   └── Target: stg_market_ticks (Silver) & stg_market_ohlcv (backward-compatible)
+   ↓
+[Gold Spark Resampler Job] (Gold Zone)
+   ├── 1-Minute Tumbling Window: gold_market_bars_1m (OHLCV + VWAP + trade_count)
+   └── Daily Session Window: gold_market_bars_daily (OHLCV + VWAP + trade_count)
+   ↓
+[Downstream Serving & Analytics]
+   ├── ClickHouse OLAP: quant_dw.market_intraday_bars & quant_dw.market_daily_ohlcv
+   ├── Feature Calculator: 10 Technical Indicators from gold_market_bars_daily
+   ├── Great Expectations Quality Gates: Bronze (DP1), Gold (DP2), Features (DP3)
+   ├── Feast Feature Store: Materialization & Sub-10ms Feature Fetch API
+   └── Paper Trading & Alpha Store: Live trading execution on Gold 1m / Daily bars
+```
+
+- **Bronze Zone (`raw_market_ticks`, `raw_financial_news`)**:
   - Ingested directly as append-only raw Parquet and JSON files on MinIO.
-  - Preserves exact source schema and audit metadata (`ingestion_timestamp`, `source_filename`).
-- **Silver Zone (`stg_market_ohlcv`, `stg_financial_news`)**:
-  - Apache Iceberg tables stored on MinIO.
-  - Implements automated deduplication (`ticker_symbol`, `timestamp`), handles schema evolution, drops corrupted price points, and parses raw text.
-- **Gold Zone (`dim_companies`, `fact_daily_ohlcv`, `fact_market_news`, `feat_ticker_technical_indicators`)**:
-  - Curated, business-ready Iceberg tables modeled in a **Star Schema**:
+  - Preserves exact tick-level execution schema and audit metadata (`event_timestamp`, `ingestion_timestamp`).
+  - No OHLCV bars are generated directly.
+- **Silver Zone (`stg_market_ticks`, `stg_market_ohlcv`, `stg_financial_news`)**:
+  - Cleaned, deduplicated tables stored on MinIO / Iceberg.
+  - Implements automated deduplication (`trade_id`), handles schema evolution, drops corrupted price points, and normalizes quote conditions.
+- **Gold Zone (`dim_companies`, `gold_market_bars_1m`, `gold_market_bars_daily`, `feat_ticker_technical_indicators`)**:
+  - Curated, business-ready tables modeled in a **Star Schema**:
+    - `gold_market_bars_1m`: High-frequency 1-minute tumbling window OHLCV + VWAP + trade count.
+    - `gold_market_bars_daily`: Daily session OHLCV + VWAP.
     - `dim_companies`: Slowly Changing Dimension Type 2 (SCD2) with `valid_from_ts`, `valid_to_ts`, and `is_current` flags.
     - `feat_ticker_technical_indicators`: Gold feature table adhering to rubric naming convention with `event_timestamp` and `created` columns.
 - **Serving Layer**:
-  - **ClickHouse OLAP Serving**: Serves both multi-year historical factor backtesting and sub-second 1-minute intraday candlestick bars for real-time dashboard analytics (M1-19).
+  - **ClickHouse OLAP Serving**: Serves both multi-year historical factor backtesting (`market_daily_ohlcv`) and sub-second 1-minute intraday candlestick bars (`market_intraday_bars`) for real-time dashboard analytics (M1-19).
+  - **Verified Consistency**: 100% Volume conservation, 100% Trade Count conservation, 100% High/Low bounds conservation between 1m bars and Daily bars (`evidence/phase2/tick_consistency_audit.json`).
 
 ---
 
 ## 5. Data Generator & Injected Anomalies (10% Test Mode Support)
 
-The generator supports flexible scaling via the unified Makefile:
+**Offline vs online:** daily Bronze OHLCV covers **3 years** (`2022-11-01` → `2025-10-31`). Streaming demos use a contiguous **1-year online tick corpus** (`2025-11-01` → `2026-11-10`) under `raw_market_ticks_online/`. `SCALE` controls **tick row budget / density only** — it does **not** multiply OHLCV trade `volume`.
+
 ```bash
 # Display all commands, options, and parameters
 make help
 
-# Rapid local verification and CI/CD testing (10% volume, ~10 GB)
+# Rapid local smoke (short daily window) — Bronze only under OUT_DIR/runs/{dataset_id}/
 make generate SCALE=0.1
 
-# Full benchmark execution (>= 100 GB)
-make generate SCALE=1.0
+# Offline 3y daily OHLCV Bronze (alias: generate-3y)
+make generate-offline SCALE=0.1
+
+# Online 1y tick corpus (disk/rows grow with SCALE)
+make generate-online-ticks SCALE=0.1
+
+# Canonical full gen: offline daily + online ticks
+make generate-data SCALE=0.1
+
+# Replay online corpus → streaming_ticks.jsonl (builds corpus if missing)
+make stream-test
+
+# Offline lakehouse sync: daily Bronze → Spark Silver → Flink (corpus replay) → DP3 Gold
+make lakehouse-offline SCALE=0.1
+# alias: make lakehouse-3y
 
 # Run complete Phase 1 pipeline (Data Gen + Streaming Ticks + Staging + Evidence)
 make phase1 SCALE=0.1
+
+# Scale benchmark evidence (latency / consistency / recovery)
+make benchmark-pipeline MODE=smoke SCALE=0.01
 
 # Benchmark Dockerfile Multi-Stage Optimization (Rubric M1-03 & M1-04)
 make benchmark-images
 ```
 
-### Injected Fault Matrix & Cardinality Characteristics (Rubric M1-05)
-1. **Volume Skew**: 80% of volume and news articles concentrated in 7 Mega-Cap tickers (AAPL, NVDA, MSFT, AMZN, GOOGL, META, TSLA).
-2. **Schema Evolution**: At partition boundary (`2024-06-01`), the source appends `vwap` (float), `trade_count` (int), and `sentiment_score` (float).
-3. **Offline Duplicates**: 2.0% duplicate price records injected with identical `trade_id` and slightly drifted timestamps.
-4. **Streaming Late Arrivals**: 5% of streaming ticks delayed by 5 to 10 minutes to simulate secondary OTC feeds.
-5. **Streaming Duplicates**: 1.5% duplicate Kafka messages injected via producer at-least-once simulation.
-6. **Data Drift**: Market regime transition from low-volatility Bull market to high-volatility Bear market.
-7. **Cardinality Profiling**:
-   - **High Cardinality ($\text{Ratio} \approx 0.98 - 1.0$)**: `trade_id` in `market_ohlcv`, `article_id` in `financial_news` (indexed with Parquet Bloom Filter).
+> **Immutable Bronze:** each generate mints a new `dataset_id` under `OUT_DIR/runs/{dataset_id}/`; `CURRENT_DATASET_ID` points at the active run (prior runs are never deleted). Smoke/CI may use `ENGINE=sim` but status is `PASSED_SIMULATED` / `execution_mode=SIMULATED`. `MODE=integration|full` fail-hards when MinIO/Airflow/ClickHouse/Gold/provenance are missing.
+>
+> Gold `feat_ticker_technical_indicators` is **not** written by the generator. It is produced from Silver (`stg_market_ohlcv`) via DP3 / `make lakehouse-offline` so Bronze → Silver → Gold stays synchronized with Spark/Kafka/Flink processing. Alpha seed/metrics and Feast continue to read daily Gold features only — never the tick corpus. ML signals/fills require `model_version`, `dataset_id`, `feature_source`.
+
+
+### Injected Fault Matrix & Cardinality Characteristics (Rubric M1-05 to M1-08)
+1. **Volume Skew (M1-06)**: 80% of tick size, tick count, and news articles concentrated in 7 Mega-Cap tickers (`AAPL, NVDA, MSFT, AMZN, GOOGL, META, TSLA`).
+2. **Schema Evolution (M1-07)**: At boundary `2024-06-01`, ticks introduce `quote_condition` (string), `bid_price` (float), and `ask_price` (float); resampled Gold bars add `vwap` (float) and `trade_count` (int).
+3. **Offline Duplicates (M1-08)**: 2.0% duplicate raw tick records injected with identical `trade_id` and broker ingestion delays.
+4. **Streaming Late Arrivals (M1-14)**: 5% of streaming ticks delayed by 5 to 10 minutes to test Flink event-time watermarking.
+5. **Streaming Duplicates (M1-15)**: 1.5% duplicate Kafka messages injected via producer at-least-once simulation.
+6. **Data Drift (M2-15)**: Market regime transition from low-volatility Bull market to high-volatility Bear market at `2024-08-01`.
+7. **Cardinality Profiling (M1-05)**:
+   - **High Cardinality ($\text{Ratio} \approx 0.98 - 1.0$)**: `trade_id` in `raw_market_ticks`, `article_id` in `financial_news` (indexed with Parquet Bloom Filter).
    - **Medium Cardinality ($\text{Ratio} \approx 0.06$)**: `trade_date` (218 trading days, used as Iceberg physical partition key).
    - **Low / Ultra-Low Cardinality ($\text{Ratio} < 0.005$)**: `ticker_symbol` (16–100 distinct tickers, compressed via ClickHouse `LowCardinality(String)` and Parquet Dictionary), `exchange` (2 distinct values: NASDAQ, NYSE).
-   - Complete profiling matrix generated automatically in `generation_stats.json`.
+   - Complete profiling matrix generated automatically in `evidence/phase1/data_generation_stats.json`.
 
 ---
 

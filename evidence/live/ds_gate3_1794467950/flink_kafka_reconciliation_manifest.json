@@ -1,0 +1,18 @@
+{
+  "dataset_id": "ds_gate3_1794467950",
+  "engine": "flink",
+  "flink_bars_count": 429,
+  "spark_bars_count": 429,
+  "matched_bars_count": 429,
+  "volume_mismatches": 0,
+  "trade_count_mismatches": 0,
+  "max_open_diff": 0.0,
+  "max_high_diff": 0.0,
+  "max_low_diff": 0.0,
+  "max_close_diff": 0.0,
+  "max_vwap_diff": 0.0,
+  "volume_conserved": true,
+  "trade_count_conserved": true,
+  "mathematical_consistency": "100.0%",
+  "status": "VERIFIED"
+}

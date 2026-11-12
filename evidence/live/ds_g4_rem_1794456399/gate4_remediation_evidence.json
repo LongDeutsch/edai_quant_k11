@@ -1,0 +1,54 @@
+{
+  "dataset_id": "ds_g4_rem_1794456399",
+  "consumer_group": "cg_rem_1794456399",
+  "timestamp": "2026-11-12T04:06:39Z",
+  "stages": {
+    "sync_metrics": {
+      "dataset_id": "ds_g4_rem_1794456399",
+      "topic": "market.bars.1m",
+      "table": "market_intraday_bars",
+      "messages_read": 5,
+      "messages_inserted": 5,
+      "batches_inserted": 1,
+      "corrections_observed": 0,
+      "stale_arrivals_observed": 0,
+      "tombstones_processed": 7,
+      "corrupt_tombstones_routed_to_dlq": 2,
+      "poison_messages_routed_to_dlq": 2,
+      "schema_errors_routed_to_dlq": 2,
+      "latest_offsets": {
+        "0": 445
+      },
+      "committed_offsets": {
+        "0": 446
+      },
+      "duration_sec": 3.481,
+      "status": "SUCCESS"
+    },
+    "clickhouse_results": {
+      "active_bars_count": 1,
+      "active_tickers": [
+        "NVDA"
+      ],
+      "deleted_bars_count": 3,
+      "soft_deleted_properly_hidden": true
+    },
+    "post_tombstone_recreation": {
+      "recreated_success": true,
+      "active_tickers_after_v2": [
+        "AAPL",
+        "NVDA"
+      ],
+      "recreated_version": 2
+    },
+    "dlq_routing": {
+      "captured_dlq_count": 50,
+      "reasons": [
+        "MALFORMED_JSON_PAYLOAD",
+        "CORRUPT_TOMBSTONE_KEY"
+      ],
+      "corrupt_tombstone_routed": true,
+      "poison_payload_routed": true
+    }
+  }
+}

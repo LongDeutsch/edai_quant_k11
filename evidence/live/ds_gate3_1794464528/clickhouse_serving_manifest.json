@@ -1,0 +1,11 @@
+{
+  "dataset_id": "ds_gate3_1794464528",
+  "engine": "clickhouse",
+  "table": "quant_dw.market_intraday_bars",
+  "replacing_merge_tree_versioned": true,
+  "logical_final_bars": 429,
+  "spark_gold_bars": 429,
+  "matched_bars": 429,
+  "total_final_volume": 87594,
+  "status": "VERIFIED"
+}

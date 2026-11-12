@@ -14,10 +14,10 @@ By dynamically adjusting factor weights based on real-time market volatility:
 
 | Strategy Configuration | Cumulative Return | Annualized Sharpe | Sortino Ratio | Max Drawdown | Calmar Ratio |
 |---|---|---|---|---|---|
-| **S&P 500 Benchmark (SPY)** | +10.05% | 0.51 | 0.69 | -16.02% | 0.74 |
-| **Fixed Weight Baseline (33/33/34)** | +270.57% | 8.78 | 20.70 | -9.72% | 37.15 |
-| **Regime-Adaptive Dynamic Weighting** | **+50.44%** | **2.71** | **4.19** | **-11.47%** | **5.32** |
-| *Variance / Improvement* | *-220.13%* | *-6.08* | *-16.51* | *-1.76%* | *-31.83* |
+| **S&P 500 Benchmark (SPY)** | +1.21% | -1.86 | -9.43 | -0.13% | 11.16 |
+| **Fixed Weight Baseline (33/33/34)** | -10.42% | -15.23 | -11.12 | -10.42% | -1.16 |
+| **Regime-Adaptive Dynamic Weighting** | **-10.06%** | **-16.34** | **-11.54** | **-10.06%** | **-1.16** |
+| *Variance / Improvement* | *+0.36%* | *-1.11* | *-0.42* | *+0.36%* | *-0.00* |
 
 ---
 
@@ -27,9 +27,9 @@ Equal-weighted portfolios allocate $1/N$ capital regardless of asset volatility,
 
 | Position Sizing Model | Cumulative Return | Annualized Sharpe | Sortino Ratio | Max Drawdown | Calmar Ratio |
 |---|---|---|---|---|---|
-| **Equal-Weight Allocation ($1/N$)** | +54.96% | 2.76 | 4.38 | -9.25% | 7.21 |
-| **Risk Parity Allocation ($1/\sigma_i$)** | **+50.44%** | **2.71** | **4.19** | **-11.47%** | **5.32** |
-| *Variance / Improvement* | *-4.52%* | *-0.06* | *-0.19* | *-2.22%* | *-1.89* |
+| **Equal-Weight Allocation ($1/N$)** | -10.06% | -16.34 | -11.54 | -10.06% | -1.16 |
+| **Risk Parity Allocation ($1/\sigma_i$)** | **-10.06%** | **-16.34** | **-11.54** | **-10.06%** | **-1.16** |
+| *Variance / Improvement* | *+0.00%* | *+0.00* | *+0.00* | *+0.00%* | *+0.00* |
 
 ---
 

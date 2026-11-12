@@ -1,0 +1,28 @@
+{
+  "status": "SUCCESS",
+  "pipeline": "lakehouse-offline",
+  "span_years": 3.0,
+  "start_date": "2022-11-01",
+  "end_date": "2025-10-31",
+  "scale_mode": "tick_budget",
+  "ohlcv_volume_scaled_by_scale": false,
+  "volume_skew_ratio": 0.8003,
+  "offline_duplicate_rate": 0.02,
+  "schema_evolution_boundary": "2024-06-01",
+  "regime_drift_boundary": "2024-08-01",
+  "online_tick_rows": 21680,
+  "online_start": "2025-11-01",
+  "online_end": "2026-11-10",
+  "bronze_rows": 64147,
+  "silver_rows": 12544,
+  "gold_feature_rows": 12544,
+  "gold_features_from_generator": false,
+  "paths": {
+    "bronze": "/tmp/lakehouse_source/raw_market_ohlcv",
+    "silver": "/tmp/lakehouse_source/stg_market_ohlcv",
+    "gold_features": "/tmp/lakehouse_source/gold_features/feat_ticker_technical_indicators.parquet",
+    "online_ticks": "/tmp/lakehouse_source/raw_market_ticks_online",
+    "streaming_ticks": "/tmp/lakehouse_source/streaming_ticks.jsonl",
+    "flink_output": "/tmp/lakehouse_source/flink_output"
+  }
+}

@@ -69,3 +69,15 @@ CREATE TABLE IF NOT EXISTS paper_portfolio_snapshots (
 );
 
 CREATE INDEX IF NOT EXISTS idx_paper_snapshots_time ON paper_portfolio_snapshots(recorded_at);
+
+-- Pick-5 alpha ensemble config (Page 4 / AlphaSignalServer filter)
+CREATE TABLE IF NOT EXISTS alpha_ensemble_config (
+    ensemble_id VARCHAR(64) NOT NULL,
+    horizon VARCHAR(16) NOT NULL,
+    selected_alpha_ids TEXT NOT NULL,
+    booksize NUMERIC(16, 2) NOT NULL DEFAULT 100000.0,
+    top_k_tickers INT NOT NULL DEFAULT 5,
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    updated_by VARCHAR(64),
+    PRIMARY KEY (ensemble_id, horizon)
+);

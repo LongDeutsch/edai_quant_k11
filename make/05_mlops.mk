@@ -61,4 +61,9 @@ test-drift: ## Test Kolmogorov-Smirnov & PSI drift detection API and retrain tri
 	@mkdir -p evidence/phase4
 	PYTHONPATH=src $(PYTHON) -m quant_edai.ml.drift_api --smoke-test
 
-.PHONY: feast-apply feast-materialize mlflow-up mlflow-down mlflow-status kfp-run kserve-deploy kserve-infer-test test-api test-drift
+ml-train-live: ## Run point-in-time ML model training on live Gold features with full provenance
+	@DR=$$($(RESOLVE_DATASET_ROOT)); echo "==> Running live ML training on dataset $$DR (MODE=$(MODE))..."; \
+	mkdir -p evidence/phase4 models; \
+	PYTHONPATH=src $(PYTHON) -m quant_edai.ml.trainer --out-file evidence/phase4/mlflow_model_summary.json
+
+.PHONY: feast-apply feast-materialize mlflow-up mlflow-down mlflow-status kfp-run kserve-deploy kserve-infer-test test-api test-drift ml-train-live

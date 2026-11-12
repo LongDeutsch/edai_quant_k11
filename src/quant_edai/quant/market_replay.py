@@ -8,6 +8,13 @@ Modes
   The trader process itself never opens Bronze/Parquet files.
 * ``replay`` — offline **synthetic** 1m bars for unit/smoke tests only
   (explicitly not a Parquet lakehouse reader).
+
+MODE=integration|full (P1.4):
+* only ``live`` (Flink ``market.bars.1m``) + ``--alpha-source store`` (ML signals) are allowed;
+  synthetic replay / inline gate raise instead of silently running.
+* bars from synthetic / bronze-expansion publishers are rejected.
+* every order & fill must carry model_version, dataset_id, feature_source (else FAIL).
+* EOD flatten is 15:55 America/New_York (``common.market_time``).
 """
 
 from __future__ import annotations
@@ -23,14 +30,21 @@ from typing import Any, Dict, Generator, Optional
 
 import numpy as np
 
+from quant_edai.common.execution_status import build_status, is_integration_mode, normalize_mode
+from quant_edai.common.kafka_env import resolve_kafka_bootstrap
+from quant_edai.common.market_time import MARKET_TZ, bar_timestamp_policy
+from quant_edai.common.ml_provenance import PROVENANCE_FIELDS, is_real_provenance_value
 from quant_edai.quant.paper_db import PaperDatabase
 from quant_edai.quant.paper_trading import MarketBar, PaperTradingEngine
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("MarketReplay")
 
-DEFAULT_BOOTSTRAP = os.environ.get("KAFKA_BOOTSTRAP", os.environ.get("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092"))
+DEFAULT_BOOTSTRAP = resolve_kafka_bootstrap()  # KAFKA_BOOTSTRAP or KAFKA_BOOTSTRAP_SERVERS
 DEFAULT_TOPIC = os.environ.get("PAPER_BARS_TOPIC", "market.bars.1m")
+
+# Bars from these producers are never valid input for integration|full trading.
+NON_PRODUCTION_SOURCE_LAYERS = frozenset({"synthetic", "synthetic_replay", "continuous_feeder", "bronze"})
 
 
 def kafka_message_to_bar(payload: Dict[str, Any]) -> Optional[MarketBar]:
@@ -42,8 +56,15 @@ def kafka_message_to_bar(payload: Dict[str, Any]) -> Optional[MarketBar]:
         payload.get("event_timestamp")
         or payload.get("timestamp")
         or payload.get("bar_timestamp")
+        or payload.get("window_start")  # PyFlink / Flink-sim tumbling window start
         or datetime.now(timezone.utc).isoformat()
     )
+    prov = {
+        "model_version": payload.get("model_version"),
+        "dataset_id": payload.get("dataset_id"),
+        "feature_source": payload.get("feature_source"),
+        "source_layer": payload.get("source_layer"),
+    }
     # Tick payload: price/size only → synthesize a 1-tick bar
     if "close_price" not in payload and "price" in payload:
         px = float(payload["price"])
@@ -57,6 +78,7 @@ def kafka_message_to_bar(payload: Dict[str, Any]) -> Optional[MarketBar]:
             volume=float(payload.get("size", payload.get("volume", 1.0))),
             vwap=px,
             p_ml=float(payload["p_ml"]) if payload.get("p_ml") is not None else None,
+            **prov,
         )
     close_px = float(payload.get("close_price", payload.get("close", 0.0)))
     if close_px <= 0:
@@ -69,8 +91,13 @@ def kafka_message_to_bar(payload: Dict[str, Any]) -> Optional[MarketBar]:
         low_price=float(payload.get("low_price", payload.get("low", close_px))),
         close_price=close_px,
         volume=float(payload.get("volume", 1000.0)),
-        vwap=float(payload["vwap"]) if payload.get("vwap") is not None else None,
+        vwap=(
+            float(payload["vwap"])
+            if payload.get("vwap") is not None
+            else (float(payload["vwap_1m"]) if payload.get("vwap_1m") is not None else None)
+        ),
         p_ml=float(payload["p_ml"]) if payload.get("p_ml") is not None else None,
+        **prov,
     )
 
 
@@ -85,19 +112,39 @@ class MarketReplayRunner:
         max_bars: int = 500,
         output_dir: str = "evidence/phase6",
         profile: str = "intraday",
+        alpha_source: str = "store",
+        sl_pct: Optional[float] = 0.05,
         kafka_bootstrap: Optional[str] = None,
         kafka_topic: str = DEFAULT_TOPIC,
         kafka_timeout_sec: float = 45.0,
         consumer_group: Optional[str] = None,
         db: Optional[PaperDatabase] = None,
+        model_version: Optional[str] = None,
+        dataset_id: Optional[str] = None,
+        feature_source: Optional[str] = None,
     ):
         self.mode = mode.lower()
+        self.run_mode = normalize_mode()
+        if is_integration_mode(self.run_mode):
+            # No synthetic default gate: Flink bars + ML (store) signals only.
+            if self.mode != "live":
+                raise RuntimeError(
+                    f"[MODE={self.run_mode}] trader requires --mode live (Flink market.bars.1m); "
+                    f"synthetic '{self.mode}' replay is smoke-only."
+                )
+            if str(alpha_source).lower() != "store":
+                raise RuntimeError(
+                    f"[MODE={self.run_mode}] trader requires --alpha-source store (ML signals); "
+                    f"'{alpha_source}' inline gate is smoke-only."
+                )
         self.speed = max(1.0, float(speed))
         self.reset_db = reset_db
         self.max_bars = max_bars
         self.output_dir = Path(output_dir)
         self.profile = profile
-        self.kafka_bootstrap = kafka_bootstrap or DEFAULT_BOOTSTRAP
+        self.alpha_source = alpha_source
+        self.sl_pct = sl_pct
+        self.kafka_bootstrap = resolve_kafka_bootstrap(kafka_bootstrap)
         self.kafka_topic = kafka_topic
         self.kafka_timeout_sec = kafka_timeout_sec
         self.consumer_group = consumer_group or f"paper-trader-{int(time.time())}"
@@ -114,7 +161,13 @@ class MarketReplayRunner:
             starting_cash=100_000.0,
             trade_notional=10_000.0,
             profile=self.profile,
+            alpha_source=self.alpha_source,
+            sl_pct=self.sl_pct,
+            model_version=model_version,
+            dataset_id=dataset_id,
+            feature_source=feature_source,
         )
+        self.rejected_non_production_bars = 0
 
     def synthetic_bar_stream(self) -> Generator[MarketBar, None, None]:
         """Offline smoke stream — synthetic only (no Parquet / no Kafka)."""
@@ -130,17 +183,17 @@ class MarketReplayRunner:
             "TSLA": 210.0,
             "JPM": 195.0,
         }
-        date_str = "2024-03-15"
         bar_count = 0
         minute = 0
-        while bar_count < self.max_bars:
+        while (self.max_bars <= 0) or (bar_count < self.max_bars):
             # Wrap within a trading-day-like clock for readability
             minute_of_session = (30 + minute) % (6 * 60)
             hour = 9 + minute_of_session // 60
             min_of_hour = minute_of_session % 60
-            ts_str = f"{date_str}T{hour:02d}:{min_of_hour:02d}:00Z"
+            # Exchange-local (America/New_York) with explicit offset: unambiguous EOD handling.
+            ts_str = datetime(2024, 3, 15, hour, min_of_hour, tzinfo=MARKET_TZ).isoformat()
             for t in tickers:
-                if bar_count >= self.max_bars:
+                if self.max_bars > 0 and bar_count >= self.max_bars:
                     return
                 volatility = 0.0015
                 drift = 0.0001 * np.sin(minute / 30.0)
@@ -159,6 +212,7 @@ class MarketReplayRunner:
                     volume=volume,
                     vwap=round(curr_price * 0.9999, 2),
                     p_ml=p_ml,
+                    source_layer="synthetic_replay",
                 )
                 bar_count += 1
             minute += 1
@@ -198,13 +252,22 @@ class MarketReplayRunner:
                 bar = kafka_message_to_bar(payload)
                 if bar is None:
                     continue
+                if is_integration_mode(self.run_mode) and bar.source_layer in NON_PRODUCTION_SOURCE_LAYERS:
+                    self.rejected_non_production_bars += 1
+                    continue
                 yield bar
                 yielded += 1
-                if yielded >= self.max_bars:
+                if self.max_bars > 0 and yielded >= self.max_bars:
                     break
         finally:
             consumer.close()
 
+        if yielded == 0 and self.rejected_non_production_bars:
+            raise RuntimeError(
+                f"[MODE={self.run_mode}] all {self.rejected_non_production_bars} bars on '{self.kafka_topic}' "
+                f"came from non-production sources {sorted(NON_PRODUCTION_SOURCE_LAYERS)}; "
+                "run the Flink job (make stream-flink) instead of synthetic/bronze publishers."
+            )
         if yielded == 0:
             raise RuntimeError(
                 f"No messages consumed from Kafka topic '{self.kafka_topic}'. "
@@ -270,9 +333,51 @@ class MarketReplayRunner:
         exited_trades = sum(1 for tr in trades if float(tr.get("realized_pnl", 0.0)) != 0.0)
         win_rate = (winning_trades / exited_trades) if exited_trades > 0 else 0.0
 
+        # Provenance evidence over this session's fills (orders carry the same columns)
+        session_fills = [tr for tr in trades if tr.get("session_id") in (None, self.engine.session_id)]
+        fills_missing = [
+            tr.get("trade_id")
+            for tr in session_fills
+            if not all(is_real_provenance_value(tr.get(f)) for f in PROVENANCE_FIELDS)
+        ]
+        provenance_evidence = {
+            "fills_checked": len(session_fills),
+            "fills_missing_provenance": len(fills_missing),
+            "missing_trade_ids": [str(t) for t in fills_missing[:20]],
+            "dataset_ids": sorted({str(tr.get("dataset_id")) for tr in session_fills if tr.get("dataset_id")}),
+            "model_versions": sorted({str(tr.get("model_version")) for tr in session_fills if tr.get("model_version")}),
+            "feature_sources": sorted(
+                {str(tr.get("feature_source")) for tr in session_fills if tr.get("feature_source")}
+            ),
+        }
+        run_ok = not (is_integration_mode(self.run_mode) and (fills_missing or processed_bars == 0))
+        status = build_status(
+            ok=run_ok,
+            mode=self.run_mode,
+            engine="kafka" if self.mode == "live" else "sim",
+            degraded_reason=(
+                f"{len(fills_missing)} fills missing ML provenance"
+                if fills_missing
+                else ("no bars processed" if processed_bars == 0 else None)
+            ),
+        ).as_dict()
+
         exec_summary = {
             "session_id": self.engine.session_id,
             "mode": self.mode,
+            "status": status["status"],
+            "execution_mode": status["execution_mode"],
+            "run_mode": self.run_mode,
+            "dataset_id": self.engine.provenance.get("dataset_id")
+            or (provenance_evidence["dataset_ids"][0] if provenance_evidence["dataset_ids"] else None),
+            "model_version": self.engine.provenance.get("model_version")
+            or (provenance_evidence["model_versions"][0] if provenance_evidence["model_versions"] else None),
+            "feature_source": self.engine.provenance.get("feature_source")
+            or (provenance_evidence["feature_sources"][0] if provenance_evidence["feature_sources"] else None),
+            "provenance": provenance_evidence,
+            "eod_flatten": {"timezone": "America/New_York", "cutoff": "15:55", "bar_ts_policy": bar_timestamp_policy(self.run_mode)},
+            "rejected_non_production_bars": self.rejected_non_production_bars,
+            "kafka_bootstrap_resolved": self.kafka_bootstrap if self.mode == "live" else None,
             "data_plane": "kafka" if self.mode == "live" else "synthetic_replay",
             "kafka_topic": self.kafka_topic if self.mode == "live" else None,
             "kafka_bootstrap": self.kafka_bootstrap if self.mode == "live" else None,
@@ -340,6 +445,11 @@ class MarketReplayRunner:
             json.dump(latency_report, f, indent=2)
         logger.info("Saved execution summary to %s", exec_path)
         logger.info("Saved latency report to %s", lat_path)
+        if status["status"] == "FAILED":
+            raise RuntimeError(
+                f"[MODE={self.run_mode}] paper trading FAILED: {status.get('detail')} "
+                f"(evidence: {exec_path})"
+            )
         return exec_summary
 
 
@@ -348,14 +458,22 @@ def main() -> None:
     parser.add_argument("--mode", type=str, default="replay", choices=["replay", "live"])
     parser.add_argument("--speed", type=float, default=50.0, help="Synthetic replay speed only")
     parser.add_argument("--reset-db", action="store_true")
-    parser.add_argument("--max-bars", type=int, default=300)
+    parser.add_argument("--max-bars", type=int, default=300, help="Max bars to process (0 = infinite continuous stream)")
     parser.add_argument("--output-dir", type=str, default="evidence/phase6")
-    parser.add_argument("--profile", type=str, default="intraday", choices=["intraday", "swing"])
-    parser.add_argument("--kafka-bootstrap", type=str, default=DEFAULT_BOOTSTRAP)
+    parser.add_argument("--profile", type=str, default="intraday", choices=["intraday", "daily", "swing"])
+    parser.add_argument("--alpha-source", type=str, default="store", choices=["store", "inline"])
+    parser.add_argument(
+        "--sl-pct",
+        type=float,
+        default=0.05,
+        help="Stop-loss as fraction of entry (default 0.05 = 5%%). Set <=0 to use profile bps.",
+    )
+    parser.add_argument("--kafka-bootstrap", type=str, default=None, help="Defaults to KAFKA_BOOTSTRAP / KAFKA_BOOTSTRAP_SERVERS")
     parser.add_argument("--kafka-topic", type=str, default=DEFAULT_TOPIC)
     parser.add_argument("--kafka-timeout-sec", type=float, default=45.0)
     args = parser.parse_args()
 
+    sl_pct = args.sl_pct if args.sl_pct and args.sl_pct > 0 else None
     runner = MarketReplayRunner(
         mode=args.mode,
         speed=args.speed,
@@ -363,6 +481,8 @@ def main() -> None:
         max_bars=args.max_bars,
         output_dir=args.output_dir,
         profile=args.profile,
+        alpha_source=args.alpha_source,
+        sl_pct=sl_pct,
         kafka_bootstrap=args.kafka_bootstrap,
         kafka_topic=args.kafka_topic,
         kafka_timeout_sec=args.kafka_timeout_sec,

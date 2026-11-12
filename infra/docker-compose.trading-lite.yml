@@ -1,0 +1,115 @@
+version: '3.8'
+services:
+  kafka:
+    image: confluentinc/cp-kafka:7.6.1
+    container_name: quant_kafka
+    restart: unless-stopped
+    ports:
+    - 9092:9092
+    - 29092:29092
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:29093
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:29092,CONTROLLER://0.0.0.0:29093,PLAINTEXT_HOST://0.0.0.0:9092
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - kafka-topics --bootstrap-server localhost:9092 --list
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    volumes:
+    - kafka_data:/var/lib/kafka/data
+  kafka-init:
+    image: confluentinc/cp-kafka:7.6.1
+    container_name: quant_kafka_init
+    depends_on:
+      kafka:
+        condition: service_healthy
+    entrypoint: '/bin/sh -c " set -e; echo ''Waiting for Kafka to be ready...''; kafka-topics
+      --bootstrap-server kafka:29092 --create --if-not-exists --topic market.ticks
+      --partitions 4 --replication-factor 1; kafka-topics --bootstrap-server kafka:29092
+      --create --if-not-exists --topic market.ticks.dlq --partitions 1 --replication-factor
+      1; kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic
+      market.bars.1m --partitions 4 --replication-factor 1; kafka-topics --bootstrap-server
+      kafka:29092 --create --if-not-exists --topic market.features.5m --partitions
+      4 --replication-factor 1; echo ''Kafka streaming topics provisioned:''; kafka-topics
+      --bootstrap-server kafka:29092 --list; "
+
+      '
+  postgres:
+    image: postgres:16-alpine
+    container_name: quant_postgres
+    restart: unless-stopped
+    ports:
+    - 5432:5432
+    environment:
+      POSTGRES_USER: quant
+      POSTGRES_PASSWORD: quant_password
+      POSTGRES_DB: quant_db
+    healthcheck:
+      test:
+      - CMD-SHELL
+      - pg_isready -U quant -d quant_db
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+    - postgres_data:/var/lib/postgresql/data
+  redis:
+    image: redis:7.2-alpine
+    container_name: quant_redis
+    restart: unless-stopped
+    ports:
+    - 6379:6379
+    command: redis-server --save "" --appendonly no
+    healthcheck:
+      test:
+      - CMD
+      - redis-cli
+      - ping
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+    - redis_data:/data
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.3-alpine
+    container_name: quant_clickhouse
+    restart: unless-stopped
+    ports:
+    - 8123:8123
+    - 9009:9000
+    environment:
+      CLICKHOUSE_USER: quant
+      CLICKHOUSE_PASSWORD: quant_password
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+    volumes:
+    - clickhouse_data:/var/lib/clickhouse
+    healthcheck:
+      test:
+      - CMD
+      - wget
+      - --spider
+      - -q
+      - http://localhost:8123/ping
+      interval: 5s
+      timeout: 5s
+      retries: 5
+volumes:
+  kafka_data: null
+  postgres_data: null
+  redis_data: null
+  clickhouse_data: null

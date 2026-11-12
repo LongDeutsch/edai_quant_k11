@@ -67,4 +67,24 @@ logs: ## Tail logs from infrastructure containers (e.g. make logs SERVICE=minio)
 	fi
 	@$(COMPOSE) logs -f $(SERVICE)
 
-.PHONY: up down status reset logs
+COMPOSE_TRADING_LITE := docker compose -f infra/docker-compose.trading-lite.yml
+
+trading-lite-up: ## Start lightweight trading & serving stack (Kafka, Postgres, Redis, ClickHouse)
+	@echo "==> Starting lightweight trading infrastructure..."
+	@if ! docker info >/dev/null 2>&1; then \
+		echo "Notice: Docker daemon is not active. Using local fallback adapters."; \
+		exit 0; \
+	fi
+	@$(COMPOSE_TRADING_LITE) up -d kafka postgres redis clickhouse
+	@$(COMPOSE_TRADING_LITE) up kafka-init
+	@echo "==> Trading Lite is active (Kafka: 9092, Postgres: 5432, Redis: 6379, ClickHouse: 8123)."
+
+trading-lite-down: ## Stop lightweight trading infrastructure
+	@echo "==> Stopping lightweight trading infrastructure..."
+	@if ! docker info >/dev/null 2>&1; then \
+		echo "Notice: Docker compose down skipped (daemon inactive)."; \
+		exit 0; \
+	fi
+	@$(COMPOSE_TRADING_LITE) down
+
+.PHONY: up down status reset logs trading-lite-up trading-lite-down

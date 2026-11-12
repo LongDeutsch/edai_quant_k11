@@ -5,12 +5,12 @@
     "table": "lakehouse.gold.fact_daily_ohlcv",
     "description": "Validation suite for curated Gold Fact and Dimension tables"
   },
-  "evaluated_rows": 41856,
+  "evaluated_rows": 3488,
   "total_expectations": 6,
   "successful_expectations": 6,
   "success_percent": 100.0,
   "status": "PASSED",
-  "evaluated_at": "2026-11-10T01:07:16.554139+00:00",
+  "evaluated_at": "2026-11-12T07:14:52.339382+00:00",
   "results": [
     {
       "expectation_type": "expect_column_to_exist",
@@ -54,8 +54,8 @@
       "success": true,
       "result": {
         "unexpected_count": 0,
-        "min_observed": 44.41,
-        "max_observed": 625.35
+        "min_observed": 67.9422,
+        "max_observed": 540.0663
       }
     },
     {
@@ -67,8 +67,8 @@
       "success": true,
       "result": {
         "unexpected_count": 0,
-        "min_observed": 307077.0,
-        "max_observed": 43155693.0
+        "min_observed": 10.0,
+        "max_observed": 8184.0
       }
     },
     {

@@ -1,0 +1,13 @@
+{
+  "dataset_id": "ds_gate2_alpha_1794417892",
+  "engine": "spark",
+  "silver_ticks_rows": 436,
+  "gold_1m_rows": 429,
+  "gold_daily_rows": 64,
+  "total_trade_count_1m": 436,
+  "total_trade_count_daily": 436,
+  "volume_conserved": true,
+  "latest_silver_snapshot": "5363874398425592806",
+  "latest_gold_1m_snapshot": "3346635970736563357",
+  "latest_gold_daily_snapshot": "1418779665647325924"
+}

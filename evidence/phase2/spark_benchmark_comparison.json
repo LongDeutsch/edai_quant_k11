@@ -1,8 +1,10 @@
 {
-  "baseline_max_task_duration": 681.958,
-  "optimized_max_task_duration": 1.994,
-  "baseline_latency": 12616.22,
-  "optimized_latency": 8.37,
-  "speedup": 1507.31,
-  "variance_reduction": "100.0%"
+  "baseline_max_task_duration": 0.208017,
+  "optimized_max_task_duration": 0.156381,
+  "baseline_wall_time": 1.790778,
+  "optimized_wall_time": 1.500312,
+  "speedup": 1.19,
+  "variance_reduction": "61.43%",
+  "engine": "spark",
+  "metrics_source": "spark_partition_wall_clock"
 }

@@ -34,7 +34,14 @@ class SkewOptimizedSparkJob:
         salt_factor: int = 16,
         mega_caps: Sequence[str] = ("AAPL", "NVDA", "MSFT", "AMZN", "GOOGL", "META", "TSLA"),
     ):
-        self.source_dir = Path(source_dir)
+        if not str(source_dir).startswith("s3"):
+            from quant_edai.common.dataset_paths import resolve_dataset_root
+            try:
+                self.source_dir = resolve_dataset_root(source_dir, allow_legacy=True)
+            except Exception:
+                self.source_dir = Path(source_dir)
+        else:
+            self.source_dir = source_dir
         self.num_partitions = num_partitions
         self.salt_factor = salt_factor
         self.mega_caps = set(mega_caps)
@@ -144,13 +151,18 @@ class SkewOptimizedSparkJob:
         return stats
 
     def run_spark(self) -> Dict[str, Any]:
-        """Runs the official PySpark DataFrame job with Salting, Broadcast Join, and AQE."""
+        """Runs PySpark optimized job and records real partition / job wall-clock metrics."""
         from quant_edai.processing.spark.spark_session import get_spark_session
+        from quant_edai.processing.spark.spark_metrics import (
+            measure_partition_metrics,
+            read_market_ohlcv,
+            summarize_task_metrics,
+            timed_action,
+        )
         import pyspark.sql.functions as F
         from pyspark.sql.functions import broadcast
 
         print(f"[PySpark Optimized] Initializing SparkSession (Salting K={self.salt_factor}, Broadcast=True)...")
-        start_time = time.time()
 
         spark = get_spark_session(app_name="quant_edai_skew_optimized_spark", master="local[*]")
         # Enable Adaptive Query Execution & Skew Join handling
@@ -164,7 +176,7 @@ class SkewOptimizedSparkJob:
             spark.stop()
             raise FileNotFoundError(f"Source datasets not found in {self.source_dir}. Run generator first.")
 
-        df_market = spark.read.parquet(str(market_path))
+        df_market = read_market_ohlcv(spark, market_path)
         df_dim = spark.read.parquet(str(dim_path)).filter("is_current = true")
 
         # 1. Key Salting on Mega-Caps
@@ -189,27 +201,14 @@ class SkewOptimizedSparkJob:
             .withColumn("salted_key", F.concat(F.col("ticker_symbol"), F.lit("_"), F.col("salt")))
         )
 
-        # Measure partition row distribution
-        partition_counts = (
-            df_market_salted
-            .groupBy(F.spark_partition_id().alias("partition_id"))
-            .count()
-            .collect()
+        # Real per-partition wall-clock while materializing salted partitions
+        task_metrics = measure_partition_metrics(
+            df_market_salted, num_partitions=self.num_partitions, volume_col="volume"
         )
-        row_counts_by_partition = {row["partition_id"]: row["count"] for row in partition_counts}
+        timing = summarize_task_metrics(task_metrics)
+        total_rows = sum(int(t["row_count"]) for t in task_metrics)
 
-        task_metrics = []
-        for p_id in range(self.num_partitions):
-            p_rows = row_counts_by_partition.get(p_id, 0)
-            t_exec = 0.05 + (p_rows / 100.0) * 0.03
-            task_metrics.append({
-                "partition_id": p_id,
-                "row_count": p_rows,
-                "duration_seconds": round(t_exec, 3),
-                "has_straggler": False,
-            })
-
-        # Broadcast Hash Join: eliminates shuffle exchange on replicated dim table
+        # Broadcast Hash Join + aggregation (timed action only)
         df_joined = df_market_salted.join(
             broadcast(df_dim_replicated),
             on="salted_key",
@@ -227,20 +226,15 @@ class SkewOptimizedSparkJob:
                 F.count("close_price").alias("row_count")
             )
         )
-        total_groups = agg_result.count()
-        total_wall_time = time.time() - start_time
-
-        durations = [t["duration_seconds"] for t in task_metrics]
-        max_task_duration = max(durations) if durations else 0.0
-        median_task_duration = float(np.median(durations)) if durations else 0.0
-        task_variance = float(np.var(durations)) if durations else 0.0
-        effective_stage_latency = round(max_task_duration * 4.2, 2)
+        total_groups, job_wall_time = timed_action(agg_result.count)
+        joined_rows, _ = timed_action(df_joined.count)
 
         spark.stop()
 
         stats = {
             "job_type": "SKEW_OPTIMIZED_PYSPARK",
-            "engine": "pyspark",
+            "engine": "spark",
+            "metrics_source": "spark_partition_wall_clock",
             "optimization_enabled": True,
             "techniques_applied": [
                 f"Key Salting (Factor K={self.salt_factor}) on Mega-Caps",
@@ -248,19 +242,22 @@ class SkewOptimizedSparkJob:
                 "Adaptive Query Execution (AQE) Skew Partition Coalescing",
             ],
             "num_partitions": self.num_partitions,
-            "total_rows_processed": sum(row_counts_by_partition.values()),
-            "joined_rows": sum(row_counts_by_partition.values()),
-            "aggregated_groups": total_groups,
-            "max_task_duration_seconds": max_task_duration,
-            "median_task_duration_seconds": median_task_duration,
-            "task_duration_variance": round(task_variance, 6),
-            "skew_straggler_ratio": round(max_task_duration / max(0.001, median_task_duration), 2),
-            "effective_stage_latency_seconds": effective_stage_latency,
-            "actual_wall_time_seconds": round(total_wall_time, 3),
+            "total_rows_processed": total_rows,
+            "joined_rows": int(joined_rows),
+            "aggregated_groups": int(total_groups),
+            "max_task_duration_seconds": timing["max_task_duration_seconds"],
+            "median_task_duration_seconds": timing["median_task_duration_seconds"],
+            "task_duration_variance": timing["task_duration_variance"],
+            "skew_straggler_ratio": timing["skew_straggler_ratio"],
+            "actual_wall_time_seconds": round(job_wall_time, 6),
             "task_metrics": task_metrics,
         }
 
-        print(f"[PySpark Optimized] Job complete. Max task duration: {max_task_duration}s, Median: {median_task_duration}s, Latency: {effective_stage_latency}s")
+        print(
+            f"[PySpark Optimized] Job complete. Max task: {timing['max_task_duration_seconds']}s, "
+            f"Median: {timing['median_task_duration_seconds']}s, "
+            f"Join/agg wall: {job_wall_time:.6f}s"
+        )
         return stats
 
     def run(self, engine: Optional[str] = None) -> Dict[str, Any]:
@@ -269,8 +266,8 @@ class SkewOptimizedSparkJob:
         if selected_engine == "spark":
             try:
                 return self.run_spark()
-            except Exception as e:
-                print(f"[Spark Optimized] PySpark run encountered ({e}), falling back to simulation.")
+            except ImportError as e:
+                print(f"[Spark Optimized] PySpark unavailable ({e}), falling back to simulation.")
                 return self.run_sim()
         return self.run_sim()
 

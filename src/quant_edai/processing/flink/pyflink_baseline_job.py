@@ -106,5 +106,5 @@ def run_pyflink_baseline(
 
 
 if __name__ == "__main__":
-    kafka_host = os.environ.get("KAFKA_BOOTSTRAP_SERVERS", "kafka:29092")
+    kafka_host = os.environ.get("KAFKA_BOOTSTRAP_SERVERS") or os.environ.get("KAFKA_BOOTSTRAP") or "kafka:29092"
     run_pyflink_baseline(kafka_bootstrap=kafka_host)

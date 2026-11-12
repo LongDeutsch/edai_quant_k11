@@ -1,0 +1,105 @@
+{
+  "dataset_id": "ds_test_canonical_4y",
+  "profile": "canonical_4y",
+  "created_at": "2026-11-12T17:21:09.916199+00:00",
+  "seed": 42,
+  "scale": 0.01,
+  "timeline": {
+    "start_date": "2022-11-01",
+    "end_date": "2026-10-31",
+    "total_calendar_days": 1461,
+    "total_trading_days": 1044
+  },
+  "splits": {
+    "IN_SAMPLE": {
+      "split_id": "IS",
+      "purpose": "Alpha Research, Backtesting, ML Training",
+      "start_date": "2022-11-01",
+      "end_date": "2025-04-30",
+      "boundary_mask_date": "2025-04-30",
+      "trading_days": 652,
+      "total_ticks": 53662,
+      "ticks_per_session_avg": 82.3,
+      "target_density_nominal": 8000
+    },
+    "OUT_OF_SAMPLE": {
+      "split_id": "OOS",
+      "purpose": "Independent Alpha Validation (Admin)",
+      "start_date": "2025-05-01",
+      "end_date": "2026-04-30",
+      "boundary_mask_date": "2026-04-30",
+      "trading_days": 261,
+      "total_ticks": 21244,
+      "ticks_per_session_avg": 81.39,
+      "target_density_nominal": 8000
+    },
+    "TRADING_REPLAY": {
+      "split_id": "TRADING",
+      "purpose": "Streaming Simulation, Alpha Serving, Paper Trading",
+      "start_date": "2026-05-01",
+      "end_date": "2026-10-31",
+      "boundary_mask_date": null,
+      "trading_days": 131,
+      "total_ticks": 6600,
+      "ticks_per_session_avg": 50.38,
+      "target_density_nominal": 5000
+    }
+  },
+  "tables": {
+    "raw_market_ticks": {
+      "path": "raw_market_ticks",
+      "format": "parquet",
+      "partition_by": [
+        "trade_date"
+      ],
+      "total_rows": 81506
+    },
+    "raw_market_ohlcv": {
+      "path": "raw_market_ohlcv",
+      "format": "parquet",
+      "partition_by": [
+        "trade_date"
+      ],
+      "total_rows": 16704
+    },
+    "label_ticker_daily_return": {
+      "path": "label_ticker_daily_return/labels.parquet",
+      "format": "parquet",
+      "total_rows": 16656,
+      "boundary_masked_dates": [
+        "2025-04-30",
+        "2026-04-30"
+      ]
+    },
+    "raw_financial_news": {
+      "path": "raw_financial_news",
+      "format": "parquet",
+      "partition_by": [
+        "publish_date"
+      ],
+      "total_rows": 5836
+    },
+    "dim_companies": {
+      "path": "dim_companies/dim_companies.parquet",
+      "format": "parquet",
+      "total_rows": 32
+    }
+  },
+  "engineering_faults": {
+    "volume_skew_ratio": 0.7995,
+    "mega_caps": [
+      "NVDA",
+      "MSFT",
+      "AMZN",
+      "AAPL",
+      "GOOGL",
+      "META",
+      "TSLA"
+    ],
+    "offline_duplicate_rate": 0.02,
+    "streaming_duplicate_rate_target": 0.015,
+    "schema_evolution_boundary": "2024-06-01",
+    "regime_drift_boundary": "2024-08-01",
+    "regime_drift_volatility_multiplier": 2.2
+  }
+}

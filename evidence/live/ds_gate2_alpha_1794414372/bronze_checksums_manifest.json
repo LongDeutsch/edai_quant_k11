@@ -1,0 +1,10 @@
+{
+  "dataset_id": "ds_gate2_alpha_1794414372",
+  "sha256_checksums": {
+    "trade_date=2024-01-05/6b0bd0983bfa4673a2439c75dd9b052d-0.parquet": "599d91a306d5e1dc6de92bf88210941ca32662a3f8cc40238eb8076f5c58090f",
+    "trade_date=2024-01-02/6b0bd0983bfa4673a2439c75dd9b052d-0.parquet": "827e97c6e14c3bc4bfc9af2328af71cf0acc06b3546ad8dc29baa83586c4eee1",
+    "trade_date=2024-01-03/6b0bd0983bfa4673a2439c75dd9b052d-0.parquet": "643a3cffc274f178b4617a76bcdba3b6e28e0c540fe7ac400dbb834b8200ae18",
+    "trade_date=2024-01-04/6b0bd0983bfa4673a2439c75dd9b052d-0.parquet": "f0117a482123a341f39c0e0fc1cf6a6c109da1d18e91ae80df8ce39b42b6204a"
+  },
+  "immutable": true
+}

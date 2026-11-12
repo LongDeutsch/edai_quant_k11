@@ -11,6 +11,7 @@ Configures SparkSession with:
 from __future__ import annotations
 
 import os
+import sys
 import urllib.request
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -51,6 +52,13 @@ def is_service_reachable(url: str, timeout: float = 1.0) -> bool:
         return False
 
 
+# Pinned packages for S3A + Iceberg (Spark 3.5 / Scala 2.12)
+ICEBERG_SPARK_RUNTIME = "org.apache.iceberg:iceberg-spark-runtime-3.5_2.12:1.5.2"
+HADOOP_AWS = "org.apache.hadoop:hadoop-aws:3.3.4"
+AWS_SDK_BUNDLE = "com.amazonaws:aws-java-sdk-bundle:1.12.262"
+DEFAULT_SPARK_PACKAGES = f"{ICEBERG_SPARK_RUNTIME},{HADOOP_AWS},{AWS_SDK_BUNDLE}"
+
+
 def get_spark_session(
     app_name: str = "quant_edai_lakehouse",
     master: str = "local[*]",
@@ -58,10 +66,12 @@ def get_spark_session(
     enable_ui: bool = True,
     enable_s3a: bool = True,
     enable_rest_catalog: bool = True,
+    require_s3a: Optional[bool] = None,
 ) -> Any:
     """
     Initializes and returns a configured PySpark SparkSession.
     Configures shared History Server event log volume and Iceberg REST Catalog.
+    When ENGINE=spark and MODE=integration|full, S3A/catalog health is required.
     """
     try:
         from pyspark.sql import SparkSession
@@ -71,11 +81,29 @@ def get_spark_session(
             "Install it via: uv pip install 'pyspark>=3.5.0,<4.0.0' or use ENGINE=sim for simulation."
         ) from e
 
+    from quant_edai.common.execution_status import is_integration_mode
+
+    # Keep driver/worker on the same interpreter (uv/.venv vs system python mismatch).
+    os.environ["PYSPARK_PYTHON"] = sys.executable
+    os.environ["PYSPARK_DRIVER_PYTHON"] = sys.executable
+    os.environ.setdefault("SPARK_LOCAL_IP", "127.0.0.1")
+
     cfg = load_spark_config(config_path)
     spark_master = master or cfg.get("master", "local[*]")
     app_title = app_name or cfg.get("app_name", "quant_edai_spark")
+    engine = os.environ.get("ENGINE", "sim").lower()
+    must_s3a = require_s3a if require_s3a is not None else (
+        engine == "spark" and is_integration_mode()
+    )
 
-    builder = SparkSession.builder.master(spark_master).appName(app_title)
+    packages = os.environ.get("SPARK_PACKAGES", DEFAULT_SPARK_PACKAGES)
+    builder = (
+        SparkSession.builder.master(spark_master)
+        .appName(app_title)
+        .config("spark.jars.packages", packages)
+        .config("spark.driver.host", "127.0.0.1")
+        .config("spark.driver.bindAddress", "127.0.0.1")
+    )
 
     # Core performance & shuffle tuning
     builder = (
@@ -83,6 +111,7 @@ def get_spark_session(
         .config("spark.driver.memory", cfg.get("driver_memory", "2g"))
         .config("spark.executor.memory", cfg.get("executor_memory", "2g"))
         .config("spark.sql.shuffle.partitions", "16")
+        .config("spark.sql.session.timeZone", "UTC")
     )
 
     # Adaptive Query Execution (AQE) & Skew Join (Rubric M1-10)
@@ -97,15 +126,23 @@ def get_spark_session(
     )
 
     # S3A MinIO Object Store Integration
+    default_s3 = "http://minio:9000" if is_service_reachable("http://minio:9000/minio/health/live") else "http://localhost:9000"
+    s3_endpoint = os.environ.get("MINIO_ENDPOINT") or cfg.get("s3a", {}).get("endpoint") or default_s3
+
     if enable_s3a:
         s3_cfg = cfg.get("s3a", {})
+        s3_access = s3_cfg.get("access_key", "minioadmin")
+        s3_secret = s3_cfg.get("secret_key", "minioadmin")
+        s3_impl = s3_cfg.get("impl", "org.apache.hadoop.fs.s3a.S3AFileSystem")
         builder = (
             builder
-            .config("spark.hadoop.fs.s3a.endpoint", s3_cfg.get("endpoint", "http://localhost:9000"))
-            .config("spark.hadoop.fs.s3a.access.key", s3_cfg.get("access_key", "minioadmin"))
-            .config("spark.hadoop.fs.s3a.secret.key", s3_cfg.get("secret_key", "minioadmin"))
-            .config("spark.hadoop.fs.s3a.path.style.access", str(s3_cfg.get("path_style_access", True)).lower())
-            .config("spark.hadoop.fs.s3a.impl", s3_cfg.get("impl", "org.apache.hadoop.fs.s3a.S3AFileSystem"))
+            .config("spark.hadoop.fs.s3a.endpoint", s3_endpoint)
+            .config("spark.hadoop.fs.s3a.access.key", s3_access)
+            .config("spark.hadoop.fs.s3a.secret.key", s3_secret)
+            .config("spark.hadoop.fs.s3a.path.style.access", "true")
+            .config("spark.hadoop.fs.s3a.connection.ssl.enabled", "false")
+            .config("spark.hadoop.fs.s3a.impl", s3_impl)
+            .config("spark.hadoop.fs.s3.impl", s3_impl)
         )
 
     # Spark Web UI & Event Logging to Shared History Server Volume
@@ -132,9 +169,21 @@ def get_spark_session(
     else:
         builder = builder.config("spark.ui.enabled", "false")
 
-    # Iceberg REST Catalog (if reachable at :8181)
-    rest_catalog_url = "http://localhost:8181"
-    if enable_rest_catalog and is_service_reachable(f"{rest_catalog_url}/v1/config"):
+    # Iceberg REST Catalog
+    default_rest = "http://iceberg-rest:8181" if is_service_reachable("http://iceberg-rest:8181/v1/config") else "http://localhost:8181"
+    rest_catalog_url = os.environ.get("ICEBERG_REST_URL") or default_rest
+    catalog_ok = enable_rest_catalog and is_service_reachable(f"{rest_catalog_url.rstrip('/')}/v1/config")
+    minio_ok = is_service_reachable(f"{s3_endpoint.rstrip('/')}/minio/health/live")
+    if must_s3a and not minio_ok:
+        raise RuntimeError(
+            f"ENGINE=spark under MODE=integration|full requires reachable MinIO/S3A endpoint at {s3_endpoint}."
+        )
+    if must_s3a and enable_rest_catalog and not catalog_ok:
+        raise RuntimeError(
+            f"ENGINE=spark under MODE=integration|full requires Iceberg REST catalog at {rest_catalog_url}."
+        )
+
+    if catalog_ok:
         print(f"[PySpark] Iceberg REST Catalog detected at {rest_catalog_url}. Enabling REST catalog...")
         builder = (
             builder
@@ -143,13 +192,15 @@ def get_spark_session(
             .config("spark.sql.catalog.lakehouse.type", "rest")
             .config("spark.sql.catalog.lakehouse.uri", rest_catalog_url)
             .config("spark.sql.catalog.lakehouse.warehouse", "s3a://lakehouse/")
-            .config("spark.sql.catalog.lakehouse.s3.endpoint", "http://localhost:9000")
+            .config("spark.sql.catalog.lakehouse.io-impl", "org.apache.iceberg.hadoop.HadoopFileIO")
+            .config("spark.sql.catalog.lakehouse.s3.endpoint", s3_endpoint)
             .config("spark.sql.catalog.lakehouse.s3.path-style-access", "true")
         )
     else:
-        # Local warehouse fallback
+        # Local warehouse fallback (smoke only)
         builder = builder.config("spark.sql.warehouse.dir", "/tmp/spark-warehouse")
 
     spark = builder.getOrCreate()
     spark.sparkContext.setLogLevel("WARN")
+    spark.conf.set("quant.dataset_id", os.environ.get("DATASET_ID", ""))
     return spark

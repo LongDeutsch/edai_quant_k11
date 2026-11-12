@@ -171,6 +171,7 @@ def test_quant_trainer_and_mlflow_run(tmp_path: Path):
 
 def test_kserve_v2_canary_routing():
     """Verify KServe v2 mock server 80/20 canary routing and endpoints (M2-13)."""
+    pytest.importorskip("httpx")
     from fastapi.testclient import TestClient
 
     app = create_kserve_app(champion_weight=0.8)
@@ -208,6 +209,7 @@ def test_kserve_v2_canary_routing():
 
 def test_feature_fetch_api_endpoints():
     """Verify FastAPI Feature Fetch API endpoints and latency (M2-14)."""
+    pytest.importorskip("httpx")
     from fastapi.testclient import TestClient
 
     client = TestClient(feature_fetch_app)

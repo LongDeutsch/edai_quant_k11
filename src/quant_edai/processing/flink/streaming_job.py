@@ -31,6 +31,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 import pandas as pd
 
+from quant_edai.common.bar_schema import BAR_SCHEMA_VERSION
 from quant_edai.processing.flink.streaming_dedup import RocksDBStateDeduplicator
 
 
@@ -51,7 +52,9 @@ class FlinkStreamingJob:
         self.allowed_lateness_seconds = allowed_lateness_seconds
         self.enable_dedup = enable_dedup
         self.deduplicator = RocksDBStateDeduplicator(ttl_seconds=3600)
-        self.kafka_bootstrap = kafka_bootstrap or os.environ.get("KAFKA_BOOTSTRAP_SERVERS")
+        self.kafka_bootstrap = kafka_bootstrap or (
+            os.environ.get("KAFKA_BOOTSTRAP") or os.environ.get("KAFKA_BOOTSTRAP_SERVERS")
+        )
         self.source_topic = source_topic
         self.dlq_topic = dlq_topic
         self.bars_topic = bars_topic
@@ -65,19 +68,19 @@ class FlinkStreamingJob:
         dlq_reasons = []
 
         for idx, row in df_ticks.iterrows():
-            ticker = str(row.get("ticker_symbol", "")).strip()
+            ticker_val = row.get("ticker_symbol")
             price = row.get("price")
             size = row.get("size")
             ts = row.get("event_timestamp")
 
             reason = None
-            if not ticker or pd.isna(ticker):
+            if ticker_val is None or pd.isna(ticker_val) or str(ticker_val).strip() in {"", "None", "nan", "null"}:
                 reason = "INVALID_SCHEMA: Missing or empty ticker_symbol"
             elif price is None or pd.isna(price) or not (isinstance(price, (int, float)) and price > 0):
                 reason = f"INVALID_VALUE: Non-positive price ({price})"
             elif size is None or pd.isna(size) or not (isinstance(size, (int, float)) and size > 0):
                 reason = f"INVALID_VALUE: Non-positive size ({size})"
-            elif ts is None or pd.isna(ts) or not str(ts).strip() or str(ts).lower() == "nan":
+            elif ts is None or pd.isna(ts) or not str(ts).strip() or str(ts).strip() in {"", "None", "nan", "null"}:
                 reason = "INVALID_SCHEMA: Missing event_timestamp"
 
             if reason:
@@ -131,15 +134,27 @@ class FlinkStreamingJob:
             dedup_stats = {}
 
         df = df_dedup.copy()
-        df["event_dt"] = pd.to_datetime(df["event_timestamp"])
+        try:
+            df["event_dt"] = pd.to_datetime(df["event_timestamp"], utc=True, format="ISO8601")
+        except Exception:
+            df["event_dt"] = pd.to_datetime(df["event_timestamp"], utc=True, format="mixed")
 
-        # 3. Watermark progression tracking
+        # 3. Watermark progression tracking (per-record, arrival order).
+        # Flink's BoundedOutOfOrderness watermark = running max(event_ts seen so far) - delay.
+        # Using the corpus-wide max would DLQ everything but the tail of the stream.
+        if "published_timestamp" in df.columns:
+            # Late arrivals keep their event_timestamp but arrive later: order by arrival.
+            arrival = pd.to_datetime(df["published_timestamp"], utc=True, format="mixed")
+            df = df.assign(_arrival=arrival).sort_values("_arrival", kind="stable").drop(columns="_arrival")
+            df = df.reset_index(drop=True)
+        delay = pd.to_timedelta(float(self.watermark_delay_seconds), unit="s")
+        lateness = pd.to_timedelta(float(self.allowed_lateness_seconds), unit="s")
+        prior_watermark = df["event_dt"].cummax().shift(1) - delay  # watermark when each record arrives
+        window_end = df["event_dt"].dt.floor("1min") + pd.to_timedelta(1, unit="m")
+        # A record is dropped only when its window was already purged: window_end + lateness <= watermark
+        is_expired_late = ((window_end + lateness) <= prior_watermark).fillna(False)
         max_event_dt = df["event_dt"].max() if not df.empty else pd.Timestamp.now(tz="UTC")
-        watermark = max_event_dt - pd.Timedelta(seconds=self.watermark_delay_seconds)
-        lateness_threshold = watermark - pd.Timedelta(seconds=self.allowed_lateness_seconds)
-
-        # Identify late data beyond allowed lateness -> Route to DLQ Side Output
-        is_expired_late = df["event_dt"] < lateness_threshold
+        watermark = max_event_dt - delay
         df_expired_dlq = df[is_expired_late].copy()
         if not df_expired_dlq.empty:
             df_expired_dlq["dlq_reason"] = "LATE_BEYOND_ALLOWED_LATENESS: Expired past watermark and allowed lateness"
@@ -163,16 +178,20 @@ class FlinkStreamingJob:
 
             vwap = float((group["price"] * group["size"]).sum() / max(1, tot_vol))
 
+            window_iso = w_start.isoformat()
             bars_1m.append({
                 "ticker_symbol": ticker,
-                "window_start": w_start.isoformat(),
+                "event_timestamp": window_iso,  # unified bar schema (market_replay.kafka_message_to_bar)
+                "window_start": window_iso,
                 "open_price": round(p_open, 2),
                 "high_price": round(p_high, 2),
                 "low_price": round(p_low, 2),
                 "close_price": round(p_close, 2),
                 "volume": tot_vol,
+                "vwap": round(vwap, 2),
                 "vwap_1m": round(vwap, 2),
                 "trade_count": len(group),
+                "bar_schema_version": BAR_SCHEMA_VERSION,
                 "watermark_strategy": f"BoundedOutOfOrderness({self.watermark_delay_seconds}s)",
                 "allowed_lateness_seconds": self.allowed_lateness_seconds,
             })
@@ -182,6 +201,7 @@ class FlinkStreamingJob:
         summary = {
             "mode": "EVENT_TIME_WATERMARK",
             "watermark_enabled": True,
+            "watermark_mode": "PER_RECORD_RUNNING_MAX",
             "watermark_delay_seconds": self.watermark_delay_seconds,
             "allowed_lateness_seconds": self.allowed_lateness_seconds,
             "total_input_ticks": len(df_ticks),
@@ -212,7 +232,10 @@ class FlinkStreamingJob:
             return pd.DataFrame()
 
         df = df_bars_1m.copy()
-        df["dt"] = pd.to_datetime(df["window_start"])
+        try:
+            df["dt"] = pd.to_datetime(df["window_start"], utc=True, format="ISO8601")
+        except Exception:
+            df["dt"] = pd.to_datetime(df["window_start"], utc=True, format="mixed")
         df = df.sort_values(by=["ticker_symbol", "dt"])
 
         sliding_metrics = []

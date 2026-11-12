@@ -22,6 +22,8 @@ def test_engine():
         sl_bps=12.0,  # -12 bps = -0.12%
         slippage_bps=5.0,
         commission_bps=1.0,
+        alpha_source="inline",  # CI smoke: local buffer thresholds
+        sl_pct=None,            # use explicit sl_bps above, not 5% override
     )
     return engine
 

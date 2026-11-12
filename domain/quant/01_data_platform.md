@@ -12,16 +12,19 @@ The system handles two continuous data archetypes:
 
 ## 2. Offline Data
 
-These tables represent historical and reference data. They are generated in bulk and stored as Parquet files.
+These tables represent historical and reference data. Under the **Tick-First Architecture**, the raw generation layer generates atomic market ticks (`raw_market_ticks`), which are deduplicated in Silver (`stg_market_ticks`) and resampled in Gold into intraday 1-minute bars (`gold_market_bars_1m`) and daily bars (`fact_daily_ohlcv` / `market_ohlcv`).
 
-| Table | Grain | Key Columns |
-|---|---|---|
-| `market_ohlcv` | one row per ticker per trading day | trade_id, ticker_symbol, trade_date, open_price, high_price, low_price, close_price, volume, exchange, ingestion_timestamp, vwap, trade_count |
-| `financial_news` | one row per news article | article_id, ticker_symbol, publish_date, published_ts, headline, summary, sentiment_score, source_outlet |
-| `dim_companies` | one row per company version (SCD2) | company_key, ticker_symbol, company_name, sector, industry, market_cap_category, valid_from_ts, valid_to_ts, is_current |
-| `labels` | one row per ticker per trading day | ticker_symbol, label_date, close_price, next_day_close, daily_return_fwd, direction_label |
+| Table | Layer | Grain | Key Columns |
+|---|---|---|---|
+| `raw_market_ticks` | Bronze | One row per executed trade tick | trade_id, ticker_symbol, trade_date, price, size, event_timestamp, ingestion_timestamp, exchange |
+| `stg_market_ticks` | Silver | Deduplicated & normalized tick | trade_id, ticker_symbol, trade_date, price, size, event_timestamp, quote_condition, bid_price, ask_price |
+| `gold_market_bars_1m` | Gold | 1-minute tumbling candlestick | ticker_symbol, window_start, window_end, open, high, low, close, volume, vwap, trade_count |
+| `market_ohlcv` / `fact_daily_ohlcv` | Gold | One row per ticker per trading day | trade_id, ticker_symbol, trade_date, open_price, high_price, low_price, close_price, volume, exchange, vwap, trade_count |
+| `financial_news` | Bronze/Gold | One row per news article | article_id, ticker_symbol, publish_date, published_ts, headline, summary, sentiment_score, source_outlet |
+| `dim_companies` | Gold | One row per company version (SCD2) | company_key, ticker_symbol, company_name, sector, industry, market_cap_category, valid_from_ts, valid_to_ts, is_current |
+| `labels` | Gold | One row per ticker per trading day | ticker_symbol, label_date, close_price, next_day_close, daily_return_fwd, direction_label |
 
-Target volume: >= 100GB across all tables combined (with `--scale 0.1` generating ~10GB for fast testing).
+Disk/row growth is driven by the **online tick corpus** (`SCALE` tick budget), not by multiplying daily OHLCV trade volume. Offline = 3y daily OHLCV; online = contiguous 1y ticks. See `docs/DATA_PROBLEMS_AND_SKEW.md`.
 
 ### Field Descriptions (Offline Data)
 
@@ -133,12 +136,13 @@ flowchart TD
 
 | Zone | Table Name | Format / Engine | Grain | Primary / Partition Keys | Description |
 |---|---|---|---|---|---|
-| **Bronze** | `raw_market_ohlcv` | Parquet (MinIO) | One row per bar/tick per ticker | `partition by (date)` | Raw ingested market data from source feed |
+| **Bronze** | `raw_market_ticks` | Parquet (MinIO) | One row per executed trade tick | `partition by (trade_date)` | Raw ingested atomic tick trades from market feed |
 | **Bronze** | `raw_financial_news` | JSON / Parquet (MinIO) | One row per article | `partition by (publish_date)` | Raw external news articles & filings |
-| **Silver** | `stg_market_ohlcv` | Apache Iceberg | One row per ticker per timestamp | `ticker_symbol, timestamp` | Deduplicated, schema-standardized, validated prices |
+| **Silver** | `stg_market_ticks` | Apache Iceberg / Parquet | One row per unique trade tick | `trade_id` | Deduplicated by trade_id, normalized schema post-2024-06-01 |
 | **Silver** | `stg_financial_news` | Apache Iceberg | One row per article | `article_id, ticker_symbol` | Cleaned text, extracted metadata, deduplicated |
+| **Gold** | `gold_market_bars_1m` | Apache Iceberg / Parquet | 1-minute tumbling candlestick | `ticker_symbol, window_start` | Resampled OHLCV + VWAP from Silver ticks |
+| **Gold** | `gold_market_bars_daily` / `fact_daily_ohlcv` | Apache Iceberg / Parquet | One row per ticker per trading day | `ticker_symbol, trade_date` | Daily summary of prices, volume, VWAP, trade count |
 | **Gold** | `dim_companies` | Apache Iceberg (SCD2) | One row per company version | `ticker_symbol, valid_from_ts` | SCD Type 2 tracking sector, market cap, listing status |
-| **Gold** | `fact_daily_ohlcv` | Apache Iceberg | One row per ticker per trading day | `ticker_symbol, trade_date` | Daily summary of prices, volume, VWAP |
 | **Gold** | `fact_market_news` | Apache Iceberg | One row per news article | `article_id, published_ts` | Structured news with sentiment & relevance scores |
 | **Gold** | `feat_ticker_technical_indicators` | Apache Iceberg | One row per ticker per calculation snapshot | `ticker_symbol, event_timestamp` | Gold features with `event_timestamp` & `created` columns |
 | **Serving** | `quant_analytics_ohlcv` | ClickHouse | Columnar time-series | `ORDER BY (ticker_symbol, trade_date)` | OLAP warehouse for high-speed Quant backtesting |
@@ -148,22 +152,18 @@ flowchart TD
 
 ## 5. Data Generator & Injected Anomalies (Rubric Compliance)
 
-The data generator (`data_generator.py`) implements a **Hybrid Seed + Synthetic Multi-Worker** engine. It loads historical seeds for US Equities (via yfinance/Polygon) and scales them up using Geometric Brownian Motion (GBM) with volatility clustering.
-
-### Dual-Scale Execution
-- `--scale 0.1` (10% test mode, ~10 GB): Fast generation for local testing, CI/CD verification, and rapid pipeline iterations.
-- `--scale 1.0` (Full mode, >= 100 GB): Benchmark scale for testing Spark skew handling, Flink streaming state, and Lakehouse compaction.
+The data generator (`data_generator.py`) implements a **Tick-First Synthetic Engine**. It generates atomic market ticks directly, applying realistic microstructure pricing, volume skew, and fault injection. Synthetic OHLCV bars are never directly generated.
 
 ### Injected Data Problems
 
 | Problem Type | Target Table / Stream | Description & Injected Ratio | Engineering Impact & Solution |
 |---|---|---|---|
-| **Volume Skew** | `raw_market_ohlcv`, `dim_companies` | 80% of total volume & news concentrated in 7 Mega-cap tickers (AAPL, NVDA, MSFT, AMZN, GOOGL, META, TSLA). | Spark joins and aggregations create severe executor stragglers. Solved via **Key Salting** and **Adaptive Query Execution (AQE)**. |
-| **Schema Evolution** | `raw_market_ohlcv` | Mid-dataset (at partition `2024-06-01`), feeds add `vwap` (float) and `trade_count` (int); news adds `sentiment_score`. | Earlier files lack these fields. Handled via **Apache Iceberg native schema evolution** without rewriting historical data. |
-| **Offline Duplicates** | `raw_market_ohlcv` | ~2.0% duplicate records injected due to upstream exchange connection retries. | Leads to inflated volume and incorrect metrics. Solved in PySpark via `row_number() over (partition by ticker, timestamp order by ingestion_ts desc)` or Iceberg MERGE. |
-| **Streaming Late Arrivals** | `kafka://market_ticks` | 5-10 minute delay injected into 5% of OTC/secondary venue streaming ticks. | 1-minute streaming windows miss trades without proper handling. Solved in Apache Flink using **Event-time Watermarks** (`BoundedOutOfOrderness(10m)`). |
+| **Volume Skew** | `raw_market_ticks` | 80% of total tick volume concentrated in 7 Mega-cap tickers (AAPL, NVDA, MSFT, AMZN, GOOGL, META, TSLA). | Spark joins and aggregations create severe executor stragglers. Solved via **Key Salting** and **Adaptive Query Execution (AQE)**. |
+| **Schema Evolution** | `raw_market_ticks` | Mid-dataset (at partition `2024-06-01`), tick feeds add `quote_condition`, `bid_price`, and `ask_price`; news adds `sentiment_score`. | Earlier files lack these fields. Handled via **Apache Iceberg native schema evolution** without rewriting historical data. |
+| **Offline Duplicates** | `raw_market_ticks` | ~2.0% duplicate records injected due to upstream exchange connection retries. | Leads to inflated volume and incorrect metrics. Solved in PySpark via `row_number() over (partition by trade_id order by ingestion_timestamp asc) = 1`. |
+| **Streaming Late Arrivals** | `kafka://market_ticks` | 5-10 minute delay injected into 5% of streaming ticks. | 1-minute streaming windows miss trades without proper handling. Solved in Apache Flink using **Event-time Watermarks** (`BoundedOutOfOrderness(10m)`). |
 | **Streaming Duplicates** | `kafka://market_ticks` | ~1.5% duplicate messages emitted by the Kafka producer (at-least-once retries). | Inflates real-time price candles. Handled in Apache Flink using **RocksDB State Backend** with TTL deduplication filter. |
-| **Data Drift** | `feat_ticker_technical_indicators` | Market regime shift from Bull market (low vol, high RSI) to High-Volatility Bear market. | Causes model prediction degradation. Monitored via KS-statistic / PSI drift tests pushing alerts to Prometheus and triggering Kubeflow retrain. |
+| **Data Drift** | `feat_ticker_technical_indicators` | Market regime shift from Bull market (low vol, high RSI) to High-Volatility Bear market. | Causes model prediction degradation. Monitored via KS-statistic / PSI drift tests pushing alerts to Prometheus and triggering retrain. |
 
 ---
 

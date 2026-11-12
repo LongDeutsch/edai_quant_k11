@@ -25,17 +25,32 @@ from typing import Any, Dict, Iterable, List, Optional
 
 import pandas as pd
 
+from quant_edai.common.dataset_paths import resolve_dataset_root
+from quant_edai.common.execution_status import is_integration_mode, normalize_mode
+from quant_edai.common.kafka_env import resolve_kafka_bootstrap
+from quant_edai.common.market_time import MARKET_TZ
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("BronzeKafkaPublisher")
 
-DEFAULT_BOOTSTRAP = os.environ.get("KAFKA_BOOTSTRAP", os.environ.get("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092"))
+DEFAULT_BOOTSTRAP = resolve_kafka_bootstrap()  # KAFKA_BOOTSTRAP or KAFKA_BOOTSTRAP_SERVERS
 BARS_TOPIC = "market.bars.1m"
 TICKS_TOPIC = "market.ticks"
 
 
+def _dataset_root() -> Optional[Path]:
+    """OUT_DIR/runs/{dataset_id} (CURRENT_DATASET pointer) when a generator run exists."""
+    try:
+        return resolve_dataset_root(os.getenv("OUT_DIR", "/tmp/lakehouse_source"))
+    except FileNotFoundError:
+        return None
+
+
 def resolve_bronze_path(explicit: Optional[str] = None) -> Path:
+    ds_root = _dataset_root()
     candidates = [
         explicit,
+        os.path.join(str(ds_root), "raw_market_ohlcv") if ds_root else None,
         os.path.join(os.getenv("OUT_DIR", "/tmp/lakehouse_source"), "raw_market_ohlcv"),
         os.path.join(os.getenv("OUT_DIR", "/tmp/lakehouse_source"), "bronze", "raw_market_ohlcv"),
         "evidence/phase3/feat_ticker_technical_indicators.parquet",  # last-resort feature close as proxy
@@ -98,13 +113,15 @@ def load_bronze_frame(source: Path, max_rows: int = 500) -> pd.DataFrame:
     return df.reset_index(drop=True)
 
 
-def bronze_rows_to_bars(df: pd.DataFrame, bars_per_row: int = 5) -> List[Dict[str, Any]]:
+def bronze_rows_to_bars(
+    df: pd.DataFrame, bars_per_row: int = 5, dataset_id: Optional[str] = None
+) -> List[Dict[str, Any]]:
     """Expand each Bronze OHLCV row into a few 1m bar events for Kafka."""
     messages: List[Dict[str, Any]] = []
     for _, row in df.iterrows():
-        base_ts = pd.Timestamp(row["event_timestamp"]).to_pydatetime()
-        if base_ts.tzinfo is None:
-            base_ts = base_ts.replace(tzinfo=timezone.utc)
+        # Anchor each daily row at the 09:30 America/New_York open (explicit offset, no Z ambiguity)
+        session_date = pd.Timestamp(row["event_timestamp"]).date()
+        base_ts = datetime(session_date.year, session_date.month, session_date.day, 9, 30, tzinfo=MARKET_TZ)
         o = float(row["open_price"])
         h = float(row["high_price"])
         l = float(row["low_price"])
@@ -123,7 +140,7 @@ def bronze_rows_to_bars(df: pd.DataFrame, bars_per_row: int = 5) -> List[Dict[st
             messages.append(
                 {
                     "ticker_symbol": ticker,
-                    "event_timestamp": ts.isoformat().replace("+00:00", "Z"),
+                    "event_timestamp": ts.isoformat(),
                     "open_price": round(px * 0.9999, 4),
                     "high_price": round(hi, 4),
                     "low_price": round(lo, 4),
@@ -132,6 +149,7 @@ def bronze_rows_to_bars(df: pd.DataFrame, bars_per_row: int = 5) -> List[Dict[st
                     "vwap": round(px, 4),
                     "source_layer": "bronze",
                     "source_table": "raw_market_ohlcv",
+                    **({"dataset_id": dataset_id} if dataset_id else {}),
                 }
             )
     return messages
@@ -192,13 +210,21 @@ def publish_messages(bootstrap: str, topic: str, messages: List[Dict[str, Any]])
 
 def run_publish(
     bronze_path: Optional[str] = None,
-    bootstrap: str = DEFAULT_BOOTSTRAP,
+    bootstrap: Optional[str] = None,
     max_rows: int = 400,
     bars_per_row: int = 5,
 ) -> Dict[str, Any]:
+    if is_integration_mode():
+        raise RuntimeError(
+            f"[MODE={normalize_mode()}] Bronze→Kafka bar expansion is a smoke-only demo path; "
+            "integration|full must consume Flink-aggregated market.bars.1m (make stream-flink)."
+        )
+    bootstrap = resolve_kafka_bootstrap(bootstrap)
     source = resolve_bronze_path(bronze_path)
+    ds_root = _dataset_root()
+    dataset_id = ds_root.name if ds_root is not None and ds_root.parent.name == "runs" else os.environ.get("DATASET_ID")
     df = load_bronze_frame(source, max_rows=max_rows)
-    bars = bronze_rows_to_bars(df, bars_per_row=bars_per_row)
+    bars = bronze_rows_to_bars(df, bars_per_row=bars_per_row, dataset_id=dataset_id)
     ticks = bars_to_ticks(bars)
 
     ensure_topics(bootstrap, [BARS_TOPIC, TICKS_TOPIC])
@@ -206,7 +232,9 @@ def run_publish(
     n_ticks = publish_messages(bootstrap, TICKS_TOPIC, ticks)
 
     summary = {
-        "status": "PUBLISHED",
+        "status": "PUBLISHED_SIMULATED_FEED",
+        "execution_mode": "SIMULATED",
+        "dataset_id": dataset_id,
         "bronze_source": str(source),
         "kafka_bootstrap": bootstrap,
         "rows_loaded": int(len(df)),
@@ -233,7 +261,7 @@ def run_publish(
 def main() -> None:
     parser = argparse.ArgumentParser(description="Publish Bronze market data to Kafka for paper trading")
     parser.add_argument("--bronze-path", default=None, help="Path to bronze parquet file or directory")
-    parser.add_argument("--kafka-bootstrap", default=DEFAULT_BOOTSTRAP)
+    parser.add_argument("--kafka-bootstrap", default=None, help="Defaults to KAFKA_BOOTSTRAP / KAFKA_BOOTSTRAP_SERVERS")
     parser.add_argument("--max-rows", type=int, default=400)
     parser.add_argument("--bars-per-row", type=int, default=5)
     args = parser.parse_args()

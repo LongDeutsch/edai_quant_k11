@@ -20,6 +20,13 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
+from quant_edai.common.dataset_paths import resolve_dataset_root
+from quant_edai.common.execution_status import assert_integration_ready, is_integration_mode, normalize_mode
+from quant_edai.common.ml_provenance import (
+    ProvenanceError,
+    dataset_id_from_path,
+    resolve_provenance,
+)
 from quant_edai.quant.alpha_synthesis import (
     FIXED_BASELINE_WEIGHTS,
     MarketRegime,
@@ -84,23 +91,39 @@ class QuantAlphaBacktester:
         self.model = None
         self.scaler = None
         self.model_features = self.FEATURE_COLS
+        self.synthetic_data = False
+        self.p_ml_proxy = False
+        self.run_mode = normalize_mode()
         self._load_ml_model()
+        self.provenance: Dict[str, Optional[str]] = {}
+
+    @staticmethod
+    def _dataset_root() -> Path:
+        out_dir = os.getenv("OUT_DIR", "/tmp/lakehouse_source")
+        try:
+            return resolve_dataset_root(out_dir)  # OUT_DIR/runs/{dataset_id}
+        except FileNotFoundError:
+            return Path(out_dir)
 
     def _resolve_features_path(self) -> str:
-        candidates = [
-            "/tmp/lakehouse_source/gold_features/feat_ticker_technical_indicators.parquet",
-            "evidence/phase3/feat_ticker_technical_indicators.parquet",
-        ]
+        candidates = [str(self._dataset_root() / "gold_features" / "feat_ticker_technical_indicators.parquet")]
+        if not is_integration_mode():
+            candidates += [
+                "/tmp/lakehouse_source/gold_features/feat_ticker_technical_indicators.parquet",
+                "evidence/phase3/feat_ticker_technical_indicators.parquet",
+            ]
         for c in candidates:
             if os.path.exists(c):
                 return c
         return candidates[0]
 
     def _resolve_labels_path(self) -> str:
-        candidates = [
-            "/tmp/lakehouse_source/label_ticker_daily_return/labels.parquet",
-            "evidence/phase3/labels.parquet",
-        ]
+        candidates = [str(self._dataset_root() / "label_ticker_daily_return" / "labels.parquet")]
+        if not is_integration_mode():
+            candidates += [
+                "/tmp/lakehouse_source/label_ticker_daily_return/labels.parquet",
+                "evidence/phase3/labels.parquet",
+            ]
         for c in candidates:
             if os.path.exists(c):
                 return c
@@ -123,11 +146,14 @@ class QuantAlphaBacktester:
 
     def load_data(self) -> pd.DataFrame:
         """Load and clean panel data for walk-forward backtest."""
+        row_dataset_id: Optional[str] = None
         if os.path.exists(self.features_path) and os.path.exists(self.labels_path):
             logger.info(f"Loading features from {self.features_path}")
             df_feat = pd.read_parquet(self.features_path)
             logger.info(f"Loading labels from {self.labels_path}")
             df_lbl = pd.read_parquet(self.labels_path)
+            if "dataset_id" in df_feat.columns and df_feat["dataset_id"].dropna().nunique() == 1:
+                row_dataset_id = str(df_feat["dataset_id"].dropna().iloc[0])  # lineage stamped by feature_calculator
 
             df_feat["date"] = pd.to_datetime(df_feat["event_timestamp"]).dt.strftime("%Y-%m-%d")
             df_lbl["date"] = pd.to_datetime(df_lbl["label_date"]).dt.strftime("%Y-%m-%d")
@@ -148,8 +174,25 @@ class QuantAlphaBacktester:
                 how="inner",
             )
         else:
+            assert_integration_ready(
+                condition=False,
+                message=f"Gold features ({self.features_path}) and/or labels ({self.labels_path}) missing; "
+                "synthetic backtest data is smoke-only.",
+            )
             logger.info("Real Lakehouse files not found; generating deterministic synthetic market data for backtest.")
             merged = self._generate_synthetic_backtest_data()
+            self.synthetic_data = True
+
+        assert_integration_ready(
+            condition=self.model is not None,
+            message=f"Champion model not found at {self.model_path}; integration|full requires a trained ML model "
+            "(technical-score p_ml proxy is smoke-only).",
+        )
+        self.provenance = resolve_provenance(
+            model_path=self.model_path,
+            dataset_id=dataset_id_from_path(self.features_path) or row_dataset_id,
+            feature_source=None if self.synthetic_data else str(self.features_path),
+        )
 
         # Compute ML direction prediction P_ML if model loaded
         if self.model is not None:
@@ -161,13 +204,21 @@ class QuantAlphaBacktester:
                         X = self.scaler.transform(X)
                     merged["p_ml"] = self.model.predict_proba(X)[:, 1]
                 else:
+                    assert_integration_ready(
+                        condition=False,
+                        message=f"Model features {self.model_features} not all present in Gold features.",
+                    )
                     merged["p_ml"] = 0.5
+                    self.p_ml_proxy = True
             except Exception as e:
+                assert_integration_ready(condition=False, message=f"ML model scoring failed: {e}")
                 logger.warning(f"Error evaluating ML model: {e}; falling back to technical score.")
                 merged["p_ml"] = 0.5
+                self.p_ml_proxy = True
         else:
             # Baseline proxy: positive momentum has slight positive edge
             merged["p_ml"] = (0.50 + 0.10 * np.sign(merged.get("intraday_return_1d", 0.0))).clip(0.0, 1.0)
+            self.p_ml_proxy = True
 
         # Sort chronologically
         merged.sort_values(["date", "ticker_symbol"], inplace=True)
@@ -303,6 +354,8 @@ class QuantAlphaBacktester:
                 "date": dt,
                 "regime": regime.value,
                 "selected_tickers": top_tickers,
+                "ticker_scores": {t: float(s) for t, s in zip(top_equities["ticker_symbol"], top_equities["alpha_regime"])},
+                "target_weights": {t: float(w) for t, w in rp_weights.items()},
                 "strategy_return": net_strat_ret,
                 "spy_return": spy_fwd_ret,
                 "turnover": turnover,
@@ -378,7 +431,14 @@ class QuantAlphaBacktester:
             for r in ic_records
         ]
 
+        simulated = self.synthetic_data or self.model is None or self.p_ml_proxy
         summary_payload = {
+            "status": "PASSED_SIMULATED" if simulated else "SUCCESS",
+            "execution_mode": "SIMULATED" if simulated else ("LIVE" if is_integration_mode() else "LOCAL_GOLD"),
+            "synthetic_data": self.synthetic_data,
+            "model_version": self.provenance.get("model_version"),
+            "dataset_id": self.provenance.get("dataset_id"),
+            "feature_source": self.provenance.get("feature_source"),
             "strategy_name": "Quant Alpha Walk-Forward Strategy (M1-37)",
             "benchmark_name": "S&P 500 ETF (SPY)",
             "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -446,7 +506,97 @@ class QuantAlphaBacktester:
         # Optional MLflow Tracking
         self._log_to_mlflow(summary_payload)
 
+        # Register Candidate in Alpha Registry & Store Daily Signals (Production Quant Lifecycle)
+        try:
+            self._register_candidate_and_publish_daily_signals(summary_payload, daily_results)
+        except ProvenanceError:
+            raise  # integration|full: signals/registry rows without provenance must FAIL
+        except Exception as e:
+            logger.warning(f"Could not publish candidate alpha or daily signals: {e}")
+
         return summary_payload
+
+    def _register_candidate_and_publish_daily_signals(
+        self,
+        summary: Dict[str, Any],
+        daily_results: List[Dict[str, Any]],
+    ) -> None:
+        """Register candidate alpha in AlphaRegistry and publish daily signals to PostgreSQL/SQLite."""
+        try:
+            from quant_edai.quant.alpha_registry import AlphaRegistry, AlphaStatus
+            from quant_edai.quant.paper_db import PaperDatabase
+
+            db = PaperDatabase()
+            metrics = summary.get("metrics", {})
+            alpha_id = "alpha_composite_wf_m137"
+            version = "v1.0.0"
+
+            # Register as candidate
+            candidate_record = {
+                "alpha_id": alpha_id,
+                "version": version,
+                "author": "quant_researcher",
+                "horizon": "DAILY",
+                "alpha_type": "COMPOSITE",
+                "status": AlphaStatus.CANDIDATE.value,
+                "train_start_date": summary.get("date_range", {}).get("start_date", ""),
+                "train_end_date": summary.get("date_range", {}).get("end_date", ""),
+                "test_start_date": summary.get("date_range", {}).get("start_date", ""),
+                "test_end_date": summary.get("date_range", {}).get("end_date", ""),
+                "in_sample_metrics": metrics,
+                "out_of_sample_metrics": metrics,
+                "config_json": {
+                    "top_k": self.top_k,
+                    "friction_bps": TRANSACTION_COST_BPS,
+                    "model_path": str(self.model_path),
+                },
+                **{k: v for k, v in self.provenance.items() if v},
+            }
+            db.upsert_alpha(candidate_record)
+            logger.info(f"Registered candidate alpha {alpha_id}:{version} in Alpha Registry.")
+
+            # Publish daily signals for the next trading day (T -> T+1)
+            if daily_results:
+                latest = daily_results[-1]
+                asof_date = latest["date"]
+                try:
+                    next_bday = pd.to_datetime(asof_date) + pd.tseries.offsets.BDay(1)
+                    effective_date = next_bday.strftime("%Y-%m-%d")
+                except Exception:
+                    effective_date = asof_date
+
+                regime = latest.get("regime", "NORMAL")
+                top_tickers = latest.get("selected_tickers", [])
+                ticker_scores = latest.get("ticker_scores", {})
+                target_weights = latest.get("target_weights", {})
+
+                signals_to_record = []
+                for ticker in top_tickers:
+                    raw_score = float(ticker_scores.get(ticker, 1.0))
+                    tgt_weight = float(target_weights.get(ticker, round(1.0 / len(top_tickers), 4) if top_tickers else 0.0))
+                    sig = {
+                        "signal_id": f"sig_daily_{alpha_id}_{effective_date}_{ticker}",
+                        "alpha_id": alpha_id,
+                        "version": version,
+                        "ticker_symbol": ticker,
+                        "asof_date": asof_date,
+                        "effective_date": effective_date,
+                        "raw_score": raw_score,
+                        "target_weight": tgt_weight,
+                        "confidence": 0.85,
+                        "regime_detected": regime,
+                        "published_at": datetime.now(timezone.utc).isoformat(),
+                        **{k: v for k, v in self.provenance.items() if v},
+                    }
+                    signals_to_record.append(sig)
+
+                if signals_to_record:
+                    db.record_daily_signals(signals_to_record)
+                    logger.info(f"Published {len(signals_to_record)} daily signals to database for {effective_date} (as of {asof_date})")
+        except ProvenanceError:
+            raise
+        except Exception as e:
+            logger.warning(f"Failed to register candidate or publish daily signals: {e}")
 
     def _plot_cumulative_returns(
         self,

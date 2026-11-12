@@ -24,9 +24,15 @@ def test_streaming_tick_batch():
 def test_streaming_to_disk(tmp_path):
     out_file = tmp_path / "stream.jsonl"
     producer = StreamingTickProducer(seed=99)
-    stats = producer.stream_to_kafka_or_disk(num_batches=3, batch_size=100, out_file=str(out_file))
+    stats = producer.stream_to_kafka_or_disk(
+        num_batches=3,
+        batch_size=100,
+        out_file=str(out_file),
+        synthetic_batch=True,
+    )
 
     assert out_file.exists()
+    assert stats["mode"] == "synthetic_batch"
     assert stats["total_streaming_ticks"] > 300
     assert stats["late_arrival_count"] > 0
     assert stats["duplicate_count"] > 0

@@ -1,5 +1,5 @@
 {
-  "benchmark_timestamp": "2026-11-07T07:09:12Z",
+  "benchmark_timestamp": "2026-11-11T03:44:36Z",
   "baseline_single_stage": {
     "dockerfile": "/Users/nguyenbuihoanglong/Desktop/FSDS/edai_11/quant_edai/infra/docker/Dockerfile.generator.base",
     "base_image": "python:3.11 (Full Debian Bookworm)",

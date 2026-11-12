@@ -28,4 +28,4 @@ tests/unit/test_backtester.py::test_backtester_synthetic_run_and_contract
     sqlalchemy.orm.configure_mappers()
 
 -- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
-======================== 14 passed, 1 warning in 6.71s =========================
+======================== 14 passed, 1 warning in 5.61s =========================

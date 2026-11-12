@@ -1,0 +1,12 @@
+{
+  "job_type": "SPARK_RESAMPLE_TICKS",
+  "engine": "sim",
+  "source_ticks_dir": "/tmp/lakehouse_source/stg_market_ticks",
+  "gold_1m_dir": "/tmp/lakehouse_source/gold_market_bars_1m",
+  "gold_daily_dir": "/tmp/lakehouse_source/gold_market_bars_daily",
+  "total_ticks_processed": 6976,
+  "bars_1m_generated": 3481,
+  "bars_daily_generated": 1874,
+  "tickers_count": 16,
+  "trading_days": 218
+}

@@ -18,6 +18,10 @@ from typing import Any, Dict, List, Optional
 
 import pandas as pd
 
+from quant_edai.common.dataset_paths import resolve_dataset_root
+from quant_edai.common.execution_status import assert_integration_ready, is_integration_mode
+from quant_edai.common.ml_provenance import dataset_id_from_path, resolve_dataset_id
+
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("FeastManager")
 
@@ -27,6 +31,7 @@ class FeastFeatureStoreManager:
 
     FEATURE_COLUMNS = [
         "close_price",
+        "volume",
         "sma_20",
         "sma_50",
         "sma_ratio_20_50",
@@ -52,7 +57,10 @@ class FeastFeatureStoreManager:
         self.source_parquet = source_parquet or features_path or self._find_source_parquet()
         self._redis_client = None
         self._local_cache: Dict[str, Dict[str, Any]] = {}
-        self._seed_local_cache()
+        self.dataset_id = dataset_id_from_path(self.source_parquet) or resolve_dataset_id()
+        if not is_integration_mode():
+            # Hard-coded demo features are smoke-only; integration|full serves only materialized Gold rows.
+            self._seed_local_cache()
 
     def _seed_local_cache(self) -> None:
         """Seed simulation cache with default features for offline/isolated tests."""
@@ -77,11 +85,20 @@ class FeastFeatureStoreManager:
             self._local_cache[k] = data
 
     def _find_source_parquet(self) -> str:
+        out_dir = os.getenv("OUT_DIR", "/tmp/lakehouse_source")
+        try:
+            ds_root = str(resolve_dataset_root(out_dir))  # OUT_DIR/runs/{dataset_id}
+        except FileNotFoundError:
+            ds_root = out_dir
         candidates = [
-            os.path.join(os.getenv("OUT_DIR", "/tmp/lakehouse_source"), "gold_features", "feat_ticker_technical_indicators.parquet"),
-            "evidence/phase3/feat_ticker_technical_indicators.parquet",
-            os.path.join(os.getenv("OUT_DIR", "/tmp/lakehouse_source"), "raw_market_ohlcv"),
+            os.path.join(ds_root, "gold_features", "feat_ticker_technical_indicators.parquet"),
+            os.path.join(out_dir, "gold_features", "feat_ticker_technical_indicators.parquet"),
         ]
+        if not is_integration_mode():
+            candidates += [
+                "evidence/phase3/feat_ticker_technical_indicators.parquet",
+                os.path.join(ds_root, "raw_market_ohlcv"),
+            ]
         for c in candidates:
             if os.path.exists(c):
                 return c
@@ -150,8 +167,14 @@ class FeastFeatureStoreManager:
         Key pattern: 'fv_ticker_technical_indicators:{ticker_symbol}'
         """
         p_path = Path(self.source_parquet)
+        synthesized = False
+        assert_integration_ready(
+            condition=p_path.exists(),
+            message=f"Gold feature parquet {p_path} missing; Feast materialization requires real Gold features.",
+        )
         if not p_path.exists():
-            # If not yet generated, synthesize sample data for smoke testing
+            synthesized = True
+            # If not yet generated, synthesize sample data for smoke testing (SIMULATED)
             logger.warning(f"Parquet source {p_path} not found. Synthesizing initial feature rows...")
             df = pd.DataFrame({
                 "ticker_symbol": ["AAPL", "NVDA", "MSFT", "AMZN", "GOOGL"],
@@ -181,6 +204,11 @@ class FeastFeatureStoreManager:
             df = df.sort_values(by=["ticker_symbol", "event_timestamp"]).groupby("ticker_symbol").last().reset_index()
 
         redis_client = self.get_redis_client()
+        assert_integration_ready(
+            condition=redis_client is not None,
+            message=f"Redis online store {self.redis_host}:{self.redis_port} unreachable; "
+            "local simulation cache is smoke-only.",
+        )
         materialized_tickers = []
         t0 = time.perf_counter()
 
@@ -193,13 +221,22 @@ class FeastFeatureStoreManager:
             }
             feature_data["ticker_symbol"] = ticker
             feature_data["last_updated"] = datetime.now(timezone.utc).isoformat()
+            # Lineage travels with the online record so served signals can cite it
+            feature_data["dataset_id"] = "synthetic" if synthesized else str(self.dataset_id or "")
+            feature_data["feature_source"] = "synthetic_panel" if synthesized else str(p_path)
 
             key = f"fv_ticker_technical_indicators:{ticker}"
+            mapping_dict = {k: str(v) for k, v in feature_data.items()}
             if redis_client:
-                # Store as Redis Hash
-                redis_client.hset(key, mapping={k: str(v) for k, v in feature_data.items()})
+                # Store as Redis Hash for general ticker key and dataset-isolated key
+                redis_client.hset(key, mapping=mapping_dict)
+                if self.dataset_id:
+                    ds_key = f"fv_ticker_technical_indicators:{self.dataset_id}:{ticker}"
+                    redis_client.hset(ds_key, mapping=mapping_dict)
             else:
                 self._local_cache[key] = feature_data
+                if self.dataset_id:
+                    self._local_cache[f"fv_ticker_technical_indicators:{self.dataset_id}:{ticker}"] = feature_data
 
             materialized_tickers.append(ticker)
 
@@ -214,7 +251,10 @@ class FeastFeatureStoreManager:
                 f.write(f"fv_ticker_technical_indicators:{t}\n")
 
         stats = {
-            "status": "SUCCESS",
+            "status": "PASSED_SIMULATED" if synthesized else "SUCCESS",
+            "execution_mode": "LIVE" if redis_client and not synthesized else "SIMULATED",
+            "dataset_id": None if synthesized else self.dataset_id,
+            "feature_source": "synthetic_panel" if synthesized else str(p_path),
             "mode": "REDIS_ONLINE" if redis_client else "LOCAL_SIMULATION",
             "materialized_tickers_count": len(materialized_tickers),
             "tickers": materialized_tickers[:20],
@@ -231,7 +271,7 @@ class FeastFeatureStoreManager:
 
         return stats
 
-    def get_online_features(self, entity_keys: Any) -> Dict[str, Any]:
+    def get_online_features(self, entity_keys: Any, dataset_id: Optional[str] = None) -> Dict[str, Any]:
         """
         Retrieve online features for a batch of tickers with latency measurement.
         Satisfies sub-10ms retrieval requirement.
@@ -249,16 +289,28 @@ class FeastFeatureStoreManager:
             ticker = entity.get("ticker_symbol")
             if not ticker:
                 continue
-            key = f"fv_ticker_technical_indicators:{ticker}"
+            ent_ds = entity.get("dataset_id") or dataset_id or self.dataset_id
+            ds_key = f"fv_ticker_technical_indicators:{ent_ds}:{ticker}" if ent_ds else None
+            gen_key = f"fv_ticker_technical_indicators:{ticker}"
+
+            data = None
             if redis_client:
-                data = redis_client.hgetall(key)
+                if ds_key and redis_client.exists(ds_key):
+                    data = redis_client.hgetall(ds_key)
+                if not data:
+                    data = redis_client.hgetall(gen_key)
+
                 if data:
                     parsed = {k: float(v) if k in self.FEATURE_COLUMNS else v for k, v in data.items()}
                     records.append(parsed)
                 else:
                     records.append({"ticker_symbol": ticker, "status": "NOT_FOUND"})
             else:
-                records.append(self._local_cache.get(key, {"ticker_symbol": ticker, "status": "NOT_FOUND"}))
+                cached = (self._local_cache.get(ds_key) if ds_key else None) or self._local_cache.get(gen_key)
+                if cached:
+                    records.append(cached)
+                else:
+                    records.append({"ticker_symbol": ticker, "status": "NOT_FOUND"})
 
         retrieval_latency_ms = (time.perf_counter() - t0) * 1000.0
 

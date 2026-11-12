@@ -1,0 +1,54 @@
+{
+  "dataset_id": "ds_live_gate2_alpha",
+  "engine": "spark",
+  "silver_ticks_rows": 363,
+  "gold_1m_rows": 352,
+  "gold_daily_rows": 48,
+  "volume_conserved": true,
+  "silver_snapshots": [
+    {
+      "snapshot_id": "1312901090212302167",
+      "committed_at": "2026-11-11 18:47:48.105000"
+    },
+    {
+      "snapshot_id": "2219157868999328382",
+      "committed_at": "2026-11-11 18:47:48.467000"
+    },
+    {
+      "snapshot_id": "770845712019629308",
+      "committed_at": "2026-11-11 18:47:50.585000"
+    },
+    {
+      "snapshot_id": "1997190477432058105",
+      "committed_at": "2026-11-11 18:57:27.407000"
+    }
+  ],
+  "gold_1m_snapshots": [
+    {
+      "snapshot_id": "5451080724532586793",
+      "committed_at": "2026-11-11 18:55:20.099000"
+    },
+    {
+      "snapshot_id": "390707847531545733",
+      "committed_at": "2026-11-11 18:55:24.284000"
+    },
+    {
+      "snapshot_id": "3522412471944891856",
+      "committed_at": "2026-11-11 18:57:30.009000"
+    }
+  ],
+  "gold_daily_snapshots": [
+    {
+      "snapshot_id": "8422198911381269458",
+      "committed_at": "2026-11-11 18:55:21.005000"
+    },
+    {
+      "snapshot_id": "3354231610037380647",
+      "committed_at": "2026-11-11 18:55:25.156000"
+    },
+    {
+      "snapshot_id": "3226352532328062196",
+      "committed_at": "2026-11-11 18:57:31.132000"
+    }
+  ]
+}

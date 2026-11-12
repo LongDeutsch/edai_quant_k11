@@ -1,0 +1,45 @@
+{
+  "schema_version": "consistency_evidence.v1",
+  "check": "spark_flink_ohlcv",
+  "dataset_id": "20261112T043007Z_smoke_s0p001_seed7_87aa5fb4",
+  "status": "PASSED_SIMULATED",
+  "execution_mode": "SIMULATED",
+  "mode": "smoke",
+  "engines": {
+    "spark": "pandas_equivalent_resample",
+    "flink": "flink_sim"
+  },
+  "tolerance": {
+    "price_abs": 0.01,
+    "volume_abs": 0,
+    "trade_count_abs": 0
+  },
+  "input": {
+    "seed": 7,
+    "ticks_total": 203,
+    "ticks_late": 10,
+    "ticks_duplicate": 3,
+    "flink_dlq_records": 0,
+    "flink_watermark_mode": "PER_RECORD_RUNNING_MAX"
+  },
+  "metrics": {
+    "bars_spark": 6,
+    "bars_flink": 6,
+    "bars_matched": 6,
+    "bars_value_mismatch": 0,
+    "bars_missing_in_flink": 0,
+    "bars_missing_in_spark": 0,
+    "max_abs_diff": {
+      "open_price": 0.0,
+      "high_price": 0.0,
+      "low_price": 0.0,
+      "close_price": 0.0,
+      "vwap": 0.004886561954634772,
+      "volume": 0.0,
+      "trade_count": 0.0
+    },
+    "passed": true
+  },
+  "mismatches": [],
+  "generated_at": "2026-11-12T04:30:08.089283+00:00"
+}

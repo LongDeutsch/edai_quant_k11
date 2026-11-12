@@ -22,9 +22,9 @@ flowchart TD
     end
 
     subgraph StorageLayer["2. Medallion Lakehouse Storage (MinIO S3)"]
-        BronzeZone["Bronze Zone (Parquet/JSON)<br>raw_market_ohlcv, raw_financial_news"]
-        SilverZone["Silver Zone (Apache Iceberg)<br>stg_market_ohlcv, stg_financial_news"]
-        GoldZone["Gold Zone (Apache Iceberg Star Schema)<br>dim_companies (SCD2), fact_daily_ohlcv,<br>fact_market_news, feat_ticker_technical_indicators"]
+        BronzeZone["Bronze Zone (Parquet/JSON)<br>raw_market_ticks, raw_financial_news"]
+        SilverZone["Silver Zone (Apache Iceberg)<br>stg_market_ticks (trade_id dedup), stg_financial_news"]
+        GoldZone["Gold Zone (Resampled Bars & Star Schema)<br>gold_market_bars_1m (1m OHLCV + VWAP), gold_market_bars_daily,<br>dim_companies (SCD2), fact_market_news, feat_ticker_technical_indicators"]
     end
 
     subgraph ProcessingLayer["3. Processing Layer"]
@@ -103,24 +103,28 @@ flowchart TD
 
 ---
 
-## 3. Storage Layer & Medallion Schema Design
+## 3. Storage Layer & Medallion Schema Design (Tick-First Architecture)
 
 ### Bronze Zone (MinIO S3)
-- Stores immutable, append-only raw ingested files.
-- Prefixes: `lakehouse-bronze/raw_market_ohlcv/date=YYYY-MM-DD/*.parquet` and `lakehouse-bronze/raw_financial_news/date=YYYY-MM-DD/*.json`.
+- Stores immutable, append-only raw ingested atomic tick and news files.
+- Prefixes: `lakehouse-bronze/raw_market_ticks/trade_date=YYYY-MM-DD/*.parquet` and `lakehouse-bronze/raw_financial_news/date=YYYY-MM-DD/*.json`.
+- Schema (`raw_market_ticks`): `trade_id`, `ticker_symbol`, `trade_date`, `price`, `size`, `event_timestamp`, `ingestion_timestamp`, `exchange`. No synthetic OHLCV directly generated.
 
-### Silver Zone (Apache Iceberg)
-- Tables: `lakehouse.silver.stg_market_ohlcv` and `lakehouse.silver.stg_financial_news`.
-- Standardizes column types, parses ISO timestamps, eliminates duplicates via primary composite key, and dynamically adopts evolving schemas.
+### Silver Zone (Apache Iceberg / Parquet)
+- Tables: `lakehouse.silver.stg_market_ticks` and `lakehouse.silver.stg_financial_news`.
+- Deduplication: `ROW_NUMBER() OVER (PARTITION BY trade_id ORDER BY ingestion_timestamp ASC) = 1` removes 2% offline duplicates.
+- Schema Evolution: Dynamically unifies post-`2024-06-01` schema additions (`quote_condition`, `bid_price`, `ask_price`).
 
-### Gold Zone (Apache Iceberg Star Schema)
+### Gold Zone (Resampled Bars & Star Schema)
+- `gold_market_bars_1m` (Intraday Candlesticks):
+  - 1-minute tumbling window resampled from Silver ticks via Spark Resampler (`resample_job.py`) and Flink Streaming (`streaming_job.py`).
+  - Measures: `open`, `high`, `low`, `close`, `volume`, `vwap`, `trade_count`, `window_start`, `window_end`.
+- `gold_market_bars_daily` / `fact_daily_ohlcv`:
+  - Daily aggregated OHLCV bars mathematically conserving Volume, Trade Count, and High/Low bounds from 1m bars.
 - `dim_companies` (Slowly Changing Dimension Type 2):
   - Primary Key: `company_key` (surrogate), `ticker_symbol`.
   - Temporal Tracking: `valid_from_ts`, `valid_to_ts`, `is_current` (boolean).
   - Attributes: `company_name`, `sector`, `industry`, `market_cap_tier`, `exchange`.
-- `fact_daily_ohlcv`:
-  - Grain: One row per ticker per trading day.
-  - Measures: `open_price`, `high_price`, `low_price`, `close_price`, `volume`, `vwap`, `trade_count`.
 - `fact_market_news`:
   - Grain: One row per published article.
   - Measures: `sentiment_score` ($-1.0$ to $+1.0$), `relevance_score`, `article_tokens`.
@@ -132,7 +136,7 @@ flowchart TD
 
 ## 4. Analytical Serving (ClickHouse OLAP - M1-19)
 
-- **Source**: Synced in micro-batches from Gold Iceberg (`market_daily_ohlcv`, `feat_technical_indicators`) and Lakehouse Parquet/Kafka (`market_intraday_bars`).
+- **Source**: Synced in micro-batches from Gold 1m bars (`quant_dw.market_intraday_bars`), Gold daily bars (`quant_dw.market_daily_ohlcv`), and technical features (`quant_dw.feat_technical_indicators`).
 - **Purpose**: Multi-year historical factor backtesting and sub-second analytical queries (<30ms) for real-time 1m/5m candlestick dashboard visualization.
 - **Engine**: `ReplacingMergeTree` with `ORDER BY (ticker_symbol, event_timestamp)` and primary key indexing (satisfies Rubric **M1-19**).
 
@@ -142,15 +146,15 @@ flowchart TD
 
 ### Airflow DAG Flow
 ```
-[External MinIO]
+[External MinIO / Tick Generator]
        │
-       ▼ (DP1: Ingestion to Bronze)
-[Bronze Zone: raw_market_ohlcv, raw_news] ──> [Great Expectations Checkpoint]
+       ▼ (DP1: Raw Tick Ingestion to Bronze)
+[Bronze Zone: raw_market_ticks, raw_news] ──> [Great Expectations Checkpoint]
        │
-       ▼ (DP2: Iceberg Clean & Transform)
-[Silver Zone] ──> [Gold Zone: SCD2 Dim & Fact Tables] ──> [ClickHouse Sync]
+       ▼ (DP2: Silver Dedup & Gold Resampling)
+[Silver Zone: stg_market_ticks] ──> [Gold Resampler: 1m & Daily Bars] ──> [ClickHouse Sync]
        │
-       ▼ (DP3: Feature Generation)
+       ▼ (DP3: Feature Generation from Daily Bars)
 [Gold Zone: feat_ticker_technical_indicators] ──> [Feast Offline Catalog]
        │
        ▼ (Daily Materialize)

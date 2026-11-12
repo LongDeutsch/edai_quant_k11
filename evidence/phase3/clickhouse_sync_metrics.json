@@ -1,23 +1,132 @@
 {
   "engine": "clickhouse_live",
+  "mode": "smoke",
+  "dataset_id": "ds_canonical_4y_pilot",
+  "source_root": "/tmp/lakehouse_source/runs/ds_canonical_4y_pilot",
   "host": "localhost",
   "port": 8123,
+  "hosts_probed": [
+    "localhost:8123"
+  ],
+  "tables_requested": null,
+  "smoke_cap": {
+    "active": false,
+    "rows": null
+  },
   "synced_tables": {
     "dim_companies": {
-      "rows": 160,
-      "status": "SYNCED"
+      "rows": 32,
+      "rows_read": 32,
+      "unique_keys": 32,
+      "source": "/tmp/lakehouse_source/runs/ds_canonical_4y_pilot/gold_dim_companies/dim_companies.parquet",
+      "source_zone": "gold",
+      "schema_alignment": {
+        "filled": [],
+        "dropped": [],
+        "missing_required": [],
+        "rows_dropped_invalid": 0
+      },
+      "status": "SYNCED",
+      "rows_inserted": 32,
+      "queryback": {
+        "table_rows_before": 321,
+        "table_rows_after": 353,
+        "dataset_rows_final": 32,
+        "expected_unique_keys": 32,
+        "reconciled": true
+      }
     },
     "market_daily_ohlcv": {
-      "rows": 1952,
-      "status": "SYNCED"
+      "rows": 16704,
+      "rows_read": 16704,
+      "unique_keys": 16704,
+      "source": "/tmp/lakehouse_source/runs/ds_canonical_4y_pilot/gold_market_bars_daily",
+      "source_zone": "gold",
+      "schema_alignment": {
+        "filled": [
+          "daily_return(computed)",
+          "created=now",
+          "version=1"
+        ],
+        "dropped": [
+          "dataset_id",
+          "exchange",
+          "ingestion_timestamp",
+          "market_regime",
+          "trade_id"
+        ],
+        "missing_required": [],
+        "rows_dropped_invalid": 0
+      },
+      "status": "SYNCED",
+      "rows_inserted": 16704,
+      "queryback": {
+        "table_rows_before": 72592,
+        "table_rows_after": 89296,
+        "dataset_rows_final": 16704,
+        "expected_unique_keys": 16704,
+        "reconciled": true
+      }
     },
     "feat_technical_indicators": {
-      "rows": 3488,
-      "status": "SYNCED"
+      "rows": 16704,
+      "rows_read": 16704,
+      "unique_keys": 16704,
+      "source": "/tmp/lakehouse_source/runs/ds_canonical_4y_pilot/gold_features/feat_ticker_technical_indicators.parquet",
+      "source_zone": "gold",
+      "schema_alignment": {
+        "filled": [],
+        "dropped": [
+          "dataset_id",
+          "feature_source",
+          "p_ml",
+          "volume"
+        ],
+        "missing_required": [],
+        "rows_dropped_invalid": 0
+      },
+      "status": "SYNCED",
+      "rows_inserted": 16704,
+      "queryback": {
+        "table_rows_before": 48804,
+        "table_rows_after": 65508,
+        "dataset_rows_final": 16704,
+        "expected_unique_keys": 16704,
+        "reconciled": true
+      }
     },
     "market_intraday_bars": {
-      "rows": 832,
-      "status": "SYNCED"
+      "rows": 79301,
+      "rows_read": 79301,
+      "unique_keys": 79301,
+      "source": "/tmp/lakehouse_source/runs/ds_canonical_4y_pilot/gold_market_bars_1m",
+      "source_zone": "gold",
+      "schema_alignment": {
+        "filled": [
+          "created=now",
+          "version=1"
+        ],
+        "dropped": [
+          "bar_id",
+          "bar_timestamp",
+          "dataset_id",
+          "trade_date"
+        ],
+        "missing_required": [],
+        "rows_dropped_invalid": 0
+      },
+      "status": "SYNCED",
+      "rows_inserted": 79301,
+      "queryback": {
+        "table_rows_before": 84860,
+        "table_rows_after": 164161,
+        "dataset_rows_final": 79301,
+        "expected_unique_keys": 79301,
+        "reconciled": true
+      }
     }
-  }
+  },
+  "generated_at": "2026-11-12T17:18:24.301298+00:00",
+  "status": "SUCCESS",
+  "execution_mode": "LIVE"
 }

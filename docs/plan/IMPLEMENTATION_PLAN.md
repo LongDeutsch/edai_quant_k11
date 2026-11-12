@@ -67,9 +67,10 @@ flowchart TD
 ### Core Implementation Principles
 1. **No Premature Optimization / Over-Engineering**: Avoid unwieldy tooling; implement cleanly in standard Python (`python 3.11+`) using `uv` for lightning-fast, reproducible dependency management.
 2. **Local-First Containerization**: Everything runs out-of-the-box on Docker Compose. Kind/Helm are utilized strictly for Kubernetes-specific rubric deliverables (KServe, Helm atomic upgrades, KEDA).
-3. **Dual-Scale Execution Strategy**:
-   - `SCALE=0.1` (default smoke/dev mode): Fast deterministic generation for local review (current Phase 1 runs produce on the order of **tens of MB** of partitioned Parquet/JSON under `/tmp/lakehouse_source`, not a literal 10 GB footprint). Intended as a proportional smoke stand-in while iterating pipelines.
-   - `SCALE=1.0` (rubric benchmark target $\ge 100$ GB): Full dataset for Spark skew, Iceberg compaction, and Flink streaming state benchmarks. Volume wording in docs/rubric refers to this target mode; smoke evidence uses `SCALE=0.1` unless otherwise noted.
+3. **Dual-Scale Execution Strategy** (`SCALE` = tick row budget only):
+   - Offline: 3y daily Bronze OHLCV (`2022-11-01`→`2025-10-31`); `SCALE` does **not** multiply OHLCV trade volume.
+   - Online: contiguous 1y tick corpus (`2025-11-01`→`2026-11-10`) under `raw_market_ticks_online/`; density ≈ `50 * n_tickers * n_sessions * SCALE`.
+   - `SCALE=0.1` (default smoke/dev): small local footprint. `SCALE=1.0`: ~10× tick rows for Spark/Flink density benches. Use `make generate-data` for offline daily + online ticks; `make stream-test` replays the corpus.
 4. **Mock / Fallback Fallbacks for Smooth Review**:
    - LLM: Provides a zero-GPU CPU fallback (LiteLLM proxy with mock OpenAI-compatible server or HuggingFace quantized CPU runner) alongside instructions for vLLM.
    - K8s/Cloud: Provides local docker adapters for services so the entire system can be evaluated without requiring paid cloud infrastructure.
@@ -201,7 +202,9 @@ The `Makefile` serves as the **single source of truth and entry point** for all 
 
 ### Global Parameters
 - `MODE`: `smoke` (default, fast verification), `test` (thorough tests), `full` (production scale).
-- `SCALE`: `0.1` (default smoke/dev; small local footprint) or `1.0` (rubric benchmark target $\ge 100$ GB).
+- `SCALE`: `0.1` (smoke tick budget) or `1.0` (~10× online tick rows); does **not** scale OHLCV volume.
+- `OFFLINE_START` / `OFFLINE_END`: default `2022-11-01` / `2025-10-31` (daily OHLCV).
+- `ONLINE_START` / `ONLINE_END`: default `2025-11-01` / `2026-11-10` (tick corpus).
 - `SEED`: `42` (ensures 100% deterministic, reproducible outputs).
 
 ### Core Make Command Interface
@@ -214,8 +217,14 @@ The `Makefile` serves as the **single source of truth and entry point** for all 
 | `make down` | Stop containers without wiping data volumes | N/A | Graceful shutdown confirmation |
 | `make reset` | Tear down containers and reset volumes | N/A | Clean local slate |
 | `make status` | Check health & endpoints of all active services | N/A | Compose `ps` table |
-| `make generate` | Generate offline synthetic market data & inject offline faults | `SCALE=0.1 SEED=42` | Parquet/JSON under `/tmp/lakehouse_source` + `generation_stats.json` |
-| `make stream-test` | Generate streaming ticks with late arrivals & duplicates | `SEED=42` | `/tmp/lakehouse_source/streaming_ticks.jsonl` (`is_late`, `is_duplicate`) |
+| `make generate` | Tick-First Bronze generation (`generate-ticks` alias) | `SCALE=0.1 SEED=42` | `raw_market_ticks/` + `data_generation_stats.json` |
+| `make generate-ticks` | Pure atomic raw tick generation | `SCALE=0.1 SEED=42` | `raw_market_ticks/` (no synthetic OHLCV) |
+| `make resample` | Resample Silver ticks to Gold 1m & daily bars | `ENGINE=sim|spark` | `gold_market_bars_1m/` & `gold_market_bars_daily/` |
+| `make generate-offline` | 3y offline tick corpus | `OFFLINE_* SCALE=0.1` | 3y `raw_market_ticks/` |
+| `make generate-online-ticks` | Materialize online 1y tick corpus | `ONLINE_* SCALE=0.1` | `raw_market_ticks_online/` + manifest |
+| `make generate-data` | Canonical full gen: offline ticks + online ticks | `SCALE=0.1` | raw ticks + online tick corpus |
+| `make stream-test` | Replay online tick corpus (builds corpus if missing) | `SEED=42` | `streaming_ticks.jsonl` (`is_late`, `is_duplicate`) |
+| `make lakehouse-offline` | Offline daily → Silver → Flink replay → DP3 Gold (`lakehouse-3y` alias) | `SCALE=0.1 ENGINE=sim` | `evidence/phase3/lakehouse_offline_sync.json` |
 | `make benchmark-images` | Print multi-stage Dockerfile optimization analysis | N/A | Console summary; see `evidence/phase1/docker_image_size.txt` / `docs/DOCKER_OPTIMIZATION.md` |
 | `make phase1` | Phase 1 E2E: `generate` + `stream-test` + MinIO upload + evidence copy | `SCALE=0.1` | Objects in MinIO bucket `external-source`; `evidence/phase1/data_generation_stats.json` |
 | `make phase2` | Run Phase 2: Spark Skew Optimization & Flink Stream | `SCALE=0.1` | Iceberg tables populated; Spark UI logs in `evidence/phase2/` |
@@ -277,13 +286,13 @@ Establish the containerized infrastructure baseline and implement the reproducib
    - **`minio-init`** (`amazon/aws-cli`) to provision buckets `external-source` and `lakehouse`.
    - **Kafka in KRaft mode** (no Zookeeper).
    - PostgreSQL and Redis for later metadata / online-store use.
-3. **Gen-01**: Implement `src/quant_edai/generator/data_generator.py` with `--scale` / `--seed`. Default smoke is `SCALE=0.1` (small local footprint for review). Rubric full-volume target remains `SCALE=1.0` ($\ge 100$ GB).
-4. **Gen-02**: Implement `src/quant_edai/generator/faults_injector.py` + streaming producer faults:
+3. **Gen-01**: Implement `src/quant_edai/generator/data_generator.py` with `--scale` / `--seed`. `SCALE` is recorded as `scale_mode=tick_budget` and does **not** multiply OHLCV volume. Offline 3y window via `make generate-offline`.
+4. **Gen-02**: Implement `src/quant_edai/generator/faults_injector.py` + `tick_corpus.py` + streaming corpus replay:
    - Volume skew: ~80% volume in 7 Mega-Caps (AAPL, NVDA, MSFT, AMZN, GOOGL, META, TSLA) — measured e.g. `volume_skew_ratio ≈ 0.8009`.
    - Schema evolution: from partition `2024-06-01`, `vwap` / `trade_count` populated (earlier partitions null).
    - Offline duplicates: ~2.0% (`offline_duplicate_rate ≈ 0.0198`).
-   - Streaming late arrivals: ~5.0% ticks delayed 5–10 minutes (`is_late`, delay 300–600s) via `make stream-test`.
-   - Streaming duplicates: ~1.5% at-least-once retries — field `is_duplicate`; measured `duplicate_ratio ≈ 0.0148` in `make stream-test` / Phase 1 logs. Documented in `docs/DATA_PROBLEMS_AND_SKEW.md`.
+   - Online tick corpus: `make generate-online-ticks` writes `raw_market_ticks_online/` with late ≈5% and streaming dups ≈1.5% at materialize time; mega-cap tick row share ≈80%.
+   - `make stream-test` / `stream-kafka` **replay** that corpus (legacy `--synthetic-batch` for injector unit tests only).
    - Regime drift: Bull → Bear volatility shift (column `market_regime`).
    - Cardinality profile emitted into `generation_stats.json` / `evidence/phase1/data_generation_stats.json`.
 5. **Gen-03**: Implement `src/quant_edai/ingestion/s3_uploader.py` to upload staged files into bucket `external-source` (requires reachable Silo/MinIO + Python `minio` package). Local fallback only if upload fails.
@@ -300,14 +309,15 @@ Establish the containerized infrastructure baseline and implement the reproducib
 - `configs/seeds/tickers.json`
 - `src/quant_edai/generator/data_generator.py`
 - `src/quant_edai/generator/faults_injector.py`
+- `src/quant_edai/generator/tick_corpus.py`
 - `src/quant_edai/generator/streaming_producer.py`
 - `src/quant_edai/ingestion/s3_uploader.py`
 
 #### Acceptance Criteria
 - `make setup` syncs project `.venv` (Make targets use `.venv/bin/python`).
 - `make up` launches Silo/MinIO-compatible, Kafka, Redis, and Postgres in healthy state (`make status`).
-- `make generate SCALE=0.1` writes partitioned Parquet/JSON under `/tmp/lakehouse_source` with stats including skew, duplicates, schema-evolved counts, and `cardinality_profile`.
-- `make stream-test` writes `streaming_ticks.jsonl` with `is_late` / `is_duplicate`; late ≈ 5.0% ± 0.5%, streaming dups ≈ 1.5% ± 0.2% (e.g. `duplicate_ratio ≈ 0.0148`).
+- `make generate SCALE=0.1` writes partitioned Parquet/JSON under `/tmp/lakehouse_source` with stats including skew, duplicates, schema-evolved counts, `scale_mode=tick_budget`, and `cardinality_profile`.
+- `make generate-online-ticks` / `make stream-test` materialize then replay `raw_market_ticks_online/` → `streaming_ticks.jsonl` with `is_late` / `is_duplicate`; late ≈ 5.0% ± 1%, streaming dups ≈ 1.5% ± 0.5%.
 - `make phase1` uploads to MinIO `external-source` (`status: SUCCESS`, `mode: MINIO_S3`) and copies stats into `evidence/phase1/`.
 - Verified offline ratios: Mega-Cap volume $= 80\% \pm 2\%$, offline duplicate rate $= 2.0\% \pm 0.2\%$.
 - Dockerfile optimization documented; multi-stage target image size $< 250$ MB when built.
@@ -477,7 +487,7 @@ Automate end-to-end data pipeline orchestration using Apache Airflow; integrate 
 #### Acceptance Criteria
 - All 3 Airflow DAGs (DP1, DP2, DP3) execute end-to-end with green status.
 - Great Expectations Data Docs generate HTML reports validating 100% test assertions pass.
-- DataHub catalog displays full lineage: `external-source` $\to$ `raw_market_ohlcv` $\to$ `stg_market_ohlcv` $\to$ `fact_daily_ohlcv` $\to$ `feat_ticker_technical_indicators`.
+- DataHub catalog displays full lineage: `external-source` $\to$ `raw_market_ticks` $\to$ `stg_market_ticks` $\to$ `gold_market_bars_1m` / `gold_market_bars_daily` $\to$ `feat_ticker_technical_indicators`.
 - ClickHouse OLAP answers 1-year historical aggregation queries in $<50$ ms and serves live intraday bar queries in $<20$ ms.
 
 #### Commands to Run

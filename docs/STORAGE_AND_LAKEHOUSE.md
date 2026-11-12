@@ -9,15 +9,16 @@ The platform uses a hybrid storage topology optimized for distinct analytical ac
 
 ```mermaid
 flowchart TD
-    subgraph Lakehouse["Apache Iceberg Lakehouse on MinIO"]
-        BronzeFiles["Bronze: Raw Parquet/JSON"] -->|"Spark Batch Cleaner"| SilverIceberg["Silver: Cleaned Iceberg Tables"]
-        SilverIceberg -->|"Transform & Star Schema"| GoldIceberg["Gold: Iceberg Data Marts"]
-        GoldIceberg -->|"Feature Engineering"| FeatIceberg["Feature: feat_ticker_technical_indicators"]
+    subgraph Lakehouse["Medallion Lakehouse on MinIO"]
+        BronzeTicks["Bronze: raw_market_ticks<br>(Atomic trades, trade_date partition)"] -->|"Spark Dedup (trade_id)"| SilverTicks["Silver: stg_market_ticks<br>(Normalized schema & deduplicated)"]
+        SilverTicks -->|"Spark Resampler & Flink"| Gold1m["Gold: gold_market_bars_1m<br>(1m Tumbling OHLCV + VWAP)"]
+        SilverTicks -->|"Spark Resampler"| GoldDaily["Gold: gold_market_bars_daily<br>(fact_daily_ohlcv)"]
+        GoldDaily -->|"Feature Engineering"| FeatIceberg["Feature: feat_ticker_technical_indicators"]
     end
 
     subgraph AnalyticalStores["Serving Layer Stores"]
-        GoldIceberg -->|"Periodic Sync"| ClickHouse["ClickHouse OLAP Warehouse<br>(quant_dw - M1-19)"]
-        KafkaTicks["Kafka: market_ticks"] -->|"Flink / Sync"| ClickHouse
+        Gold1m -->|"Sync 1m Bars"| ClickHouseIntra["ClickHouse: market_intraday_bars<br>(ReplacingMergeTree - M1-19)"]
+        GoldDaily -->|"Sync Daily Bars"| ClickHouseDaily["ClickHouse: market_daily_ohlcv"]
         FeatIceberg -->|"Daily Feast Sync"| Redis["Redis Online Feature Store"]
     end
 ```

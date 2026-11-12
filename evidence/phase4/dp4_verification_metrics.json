@@ -1,0 +1,24 @@
+{
+  "dataset_id": "ds_g5_master_1794467581",
+  "mode": "integration",
+  "tables": {
+    "dim_companies": {
+      "rows_final": 32,
+      "rows_raw": 32,
+      "has_data": true
+    },
+    "market_daily_ohlcv": {
+      "rows_final": 3488,
+      "rows_raw": 3488,
+      "has_data": true
+    },
+    "feat_technical_indicators": {
+      "rows_final": 3488,
+      "rows_raw": 3488,
+      "has_data": true
+    }
+  },
+  "isolation_verified": true,
+  "timestamp": "2026-11-12T07:15:04.070122",
+  "status": "SUCCESS"
+}

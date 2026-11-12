@@ -28,7 +28,21 @@ class SCD2DimensionBuilder:
         source_file: str = "/tmp/lakehouse_source/dim_companies/dim_companies.parquet",
         target_dir: str = "/tmp/lakehouse_source/gold_dim_companies",
     ):
-        self.source_file = Path(source_file)
+        p = Path(source_file)
+        if not p.exists():
+            from quant_edai.common.dataset_paths import resolve_dataset_root
+            try:
+                resolved_root = resolve_dataset_root(p.parent.parent, allow_legacy=True)
+                cand = resolved_root / p.parent.name / p.name
+                if cand.exists():
+                    p = cand
+                else:
+                    cand2 = resolved_root / p.name
+                    if cand2.exists():
+                        p = cand2
+            except Exception:
+                pass
+        self.source_file = p
         self.target_dir = Path(target_dir)
 
     def build_or_update(
@@ -120,30 +134,33 @@ class SCD2DimensionBuilder:
 
     def run(self, engine: Optional[str] = None) -> Dict[str, Any]:
         """Runs SCD2 builder and returns verification stats."""
-        selected_engine = engine or os.environ.get("ENGINE", "sim").lower()
-        if selected_engine == "spark":
-            try:
-                return self.build_or_update_spark()
-            except Exception as e:
-                print(f"[SCD2 Builder] PySpark run encountered ({e}), falling back to simulation.")
+        from quant_edai.common.engine_guard import run_with_engine
 
-        df = self.build_or_update_sim()
-        total_versions = len(df)
-        active_versions = int(df["is_current"].sum())
-        historical_versions = total_versions - active_versions
+        def _sim() -> Dict[str, Any]:
+            df = self.build_or_update_sim()
+            total_versions = len(df)
+            active_versions = int(df["is_current"].sum())
+            historical_versions = total_versions - active_versions
+            return {
+                "job_type": "SCD2_DIMENSION_BUILDER",
+                "engine": "sim",
+                "table": "lakehouse.gold.dim_companies",
+                "total_records": total_versions,
+                "active_records": active_versions,
+                "historical_records": historical_versions,
+                "scd2_columns_verified": ["valid_from_ts", "valid_to_ts", "is_current"],
+                "point_in_time_query_support": True,
+                "status": "PASSED_SIMULATED",
+                "execution_mode": "SIMULATED",
+            }
 
-        stats = {
-            "job_type": "SCD2_DIMENSION_BUILDER",
-            "engine": "sim",
-            "table": "lakehouse.gold.dim_companies",
-            "total_records": total_versions,
-            "active_records": active_versions,
-            "historical_records": historical_versions,
-            "scd2_columns_verified": ["valid_from_ts", "valid_to_ts", "is_current"],
-            "point_in_time_query_support": True,
-            "status": "PASSED",
-        }
-        return stats
+        return run_with_engine(
+            engine=engine,
+            run_sim=_sim,
+            run_live=self.build_or_update_spark,
+            live_token="spark",
+            job_name="SCD2 Builder",
+        )
 
 
 def main():

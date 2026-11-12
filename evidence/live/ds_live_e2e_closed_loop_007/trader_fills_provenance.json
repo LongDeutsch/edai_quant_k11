@@ -1,0 +1,49 @@
+{
+  "status": "SUCCESS",
+  "dataset_id": "ds_live_e2e_closed_loop_007",
+  "model_version": "lgbm-20261111T120000Z-ds_closed_loop",
+  "feature_source": "s3a://lakehouse/gold/runs/ds_live_e2e_closed_loop_007/gold_features/feat_ticker_technical_indicators.parquet",
+  "total_trades": 2,
+  "ending_cash": 100187.78611696513,
+  "open_positions": [],
+  "trades": [
+    {
+      "trade_id": "trd_790fa8de6daf",
+      "order_id": "ord_f6d43717b534",
+      "session_id": "sim_573bafc9",
+      "ticker_symbol": "AAPL",
+      "direction": "BUY",
+      "fill_price": 175.08749999999998,
+      "fill_quantity": 57.1143,
+      "slippage_bps": 5.0,
+      "commission": 1.0,
+      "realized_pnl": 0.0,
+      "executed_at": "2024-03-15T14:30:00Z",
+      "model_version": "lgbm-20261111T120000Z-ds_closed_loop",
+      "dataset_id": "ds_live_e2e_closed_loop_007",
+      "feature_source": "s3a://lakehouse/gold/runs/ds_live_e2e_closed_loop_007/gold_features/feat_ticker_technical_indicators.parquet",
+      "order_type": "MARKET",
+      "requested_price": 175.0,
+      "bar_timestamp": "2024-03-15T14:30:00Z"
+    },
+    {
+      "trade_id": "trd_a1be82ead29a",
+      "order_id": "ord_f1494f5576be",
+      "session_id": "sim_573bafc9",
+      "ticker_symbol": "AAPL",
+      "direction": "SELL",
+      "fill_price": 178.41075,
+      "fill_quantity": 57.1143,
+      "slippage_bps": 5.0,
+      "commission": 1.0189805098725,
+      "realized_pnl": 188.7861169651292,
+      "executed_at": "2024-03-15T14:35:00Z",
+      "model_version": "lgbm-20261111T120000Z-ds_closed_loop",
+      "dataset_id": "ds_live_e2e_closed_loop_007",
+      "feature_source": "s3a://lakehouse/gold/runs/ds_live_e2e_closed_loop_007/gold_features/feat_ticker_technical_indicators.parquet",
+      "order_type": "TAKE_PROFIT",
+      "requested_price": 178.5,
+      "bar_timestamp": "2024-03-15T14:35:00Z"
+    }
+  ]
+}

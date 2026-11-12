@@ -1,0 +1,66 @@
+{
+  "dataset_id": "ds_live_gate2_beta",
+  "seed": 99,
+  "mode": "smoke",
+  "scale": 0.002,
+  "created_at": "2026-11-11T11:57:12.375757+00:00",
+  "total_files": 11,
+  "total_bytes": 97898,
+  "files": [
+    {
+      "path": "dim_companies/dim_companies.parquet",
+      "size_bytes": 6908,
+      "sha256": "23fb8fec97bd80009d56c64c85275720c231afc962f0367e6f4e683f5e5e10f2"
+    },
+    {
+      "path": "label_ticker_daily_return/labels.parquet",
+      "size_bytes": 5029,
+      "sha256": "1980ecdbae1c73e4a8c01ba317d3e30aa11862e7013371506f8c6de234910a59"
+    },
+    {
+      "path": "raw_financial_news/publish_date=2024-01-02/c2e633c51ff6473f9f59a0cba663bae5-0.parquet",
+      "size_bytes": 6009,
+      "sha256": "84adfc4978c919e35c9fb70f612ba8427829d8861fd85f395a459958ae9c54d4"
+    },
+    {
+      "path": "raw_financial_news/publish_date=2024-01-03/c2e633c51ff6473f9f59a0cba663bae5-0.parquet",
+      "size_bytes": 6213,
+      "sha256": "d7f5f97c81dc46e1802ad083c111de114253fb145baaeca8623a89387fe7e6b4"
+    },
+    {
+      "path": "raw_financial_news/publish_date=2024-01-04/c2e633c51ff6473f9f59a0cba663bae5-0.parquet",
+      "size_bytes": 6584,
+      "sha256": "36889f5baab09d14d748f2d9e4e208a8966ec38657901d239fd2ae8365625384"
+    },
+    {
+      "path": "raw_market_ohlcv/trade_date=2024-01-02/ed5a1db63dc04f69b1f302580cfaacfa-0.parquet",
+      "size_bytes": 9094,
+      "sha256": "dd9eea77da54f770f614fa79981c15fbb47d2bf9d486deb8dc75ae595b37ced2"
+    },
+    {
+      "path": "raw_market_ohlcv/trade_date=2024-01-03/ed5a1db63dc04f69b1f302580cfaacfa-0.parquet",
+      "size_bytes": 9104,
+      "sha256": "7e541bbb90e2e2a6f9670ddcd49fbfbec889e476228288d2422ee74591f48dcd"
+    },
+    {
+      "path": "raw_market_ohlcv/trade_date=2024-01-04/ed5a1db63dc04f69b1f302580cfaacfa-0.parquet",
+      "size_bytes": 9120,
+      "sha256": "64f76ddefa21b707cf0f9d41fef875cef3c6a10eafbfe10e39b63504e4a1212a"
+    },
+    {
+      "path": "raw_market_ticks/trade_date=2024-01-02/c212231ea28c433cacb61da584c83703-0.parquet",
+      "size_bytes": 13200,
+      "sha256": "404bf2e7a35aa94548d145bf84b815a8375015d117de91eab128c8d6f05f88fb"
+    },
+    {
+      "path": "raw_market_ticks/trade_date=2024-01-03/c212231ea28c433cacb61da584c83703-0.parquet",
+      "size_bytes": 13950,
+      "sha256": "8ac0e6033ae3780906e4236f4d9ca04ad30962d6c5c399db2175a07648059adb"
+    },
+    {
+      "path": "raw_market_ticks/trade_date=2024-01-04/c212231ea28c433cacb61da584c83703-0.parquet",
+      "size_bytes": 12687,
+      "sha256": "7d7b42419dd28e10d9f67efb6f15b14fcdc7d57fc539b5615235c0e9221a74fb"
+    }
+  ]
+}

@@ -65,6 +65,63 @@ class FaultsInjector:
 
         return df
 
+    def inject_tick_skew(
+        self,
+        df: pd.DataFrame,
+        mega_caps: Sequence[str] = ("AAPL", "NVDA", "MSFT", "AMZN", "GOOGL", "META", "TSLA"),
+        target_ratio: float = 0.80,
+    ) -> pd.DataFrame:
+        """Concentrates target_ratio (e.g. 80%) of total tick volume and row counts in Mega-Cap tickers."""
+        df = df.copy()
+        if "size" not in df.columns or "ticker_symbol" not in df.columns or df.empty:
+            return df
+
+        is_mega = df["ticker_symbol"].isin(mega_caps)
+        num_mega = is_mega.sum()
+        num_others = (~is_mega).sum()
+        if num_mega == 0 or num_others == 0:
+            return df
+
+        current_other_size = df.loc[~is_mega, "size"].sum()
+        if current_other_size <= 0:
+            return df
+
+        target_mega_size = current_other_size * (target_ratio / (1.0 - target_ratio))
+        current_mega_size = df.loc[is_mega, "size"].sum()
+        if current_mega_size > 0:
+            scale_factor = target_mega_size / current_mega_size
+            df.loc[is_mega, "size"] = np.maximum(1, np.round(df.loc[is_mega, "size"] * scale_factor).astype(np.int64))
+
+        return df
+
+    def inject_tick_schema_evolution(
+        self,
+        df: pd.DataFrame,
+        boundary_date: str = "2024-06-01",
+        date_col: str = "trade_date",
+    ) -> pd.DataFrame:
+        """Injects tick schema evolution:
+        - Dates < boundary_date: quote_condition, bid_price, ask_price are NaN/None
+        - Dates >= boundary_date: quote_condition, bid_price, ask_price are populated
+        """
+        df = df.copy()
+        if date_col not in df.columns or df.empty:
+            return df
+
+        boundary_ts = pd.to_datetime(boundary_date)
+        trade_dates = pd.to_datetime(df[date_col])
+        post_boundary = trade_dates >= boundary_ts
+
+        px = df["price"]
+        bid_series = np.round(px * 0.9998, 4)
+        ask_series = np.round(px * 1.0002, 4)
+        conditions = self.rng.choice(["@", "F", "T", "I"], size=len(df), p=[0.70, 0.15, 0.10, 0.05])
+
+        df["quote_condition"] = np.where(post_boundary, conditions, None)
+        df["bid_price"] = np.where(post_boundary, bid_series, np.nan)
+        df["ask_price"] = np.where(post_boundary, ask_series, np.nan)
+        return df
+
     def inject_schema_evolution(
         self,
         df: pd.DataFrame,
@@ -145,9 +202,9 @@ class FaultsInjector:
         late_indices = self.rng.choice(n_rows, size=num_late, replace=False)
         delays = self.rng.integers(min_delay_seconds, max_delay_seconds + 1, size=num_late)
 
-        published_ts = pd.to_datetime(df_ticks["event_timestamp"]).copy()
+        published_ts = pd.to_datetime(df_ticks["event_timestamp"], utc=True, format="ISO8601").copy()
         for idx, delay in zip(late_indices, delays):
-            published_ts.iloc[idx] = published_ts.iloc[idx] + pd.Timedelta(seconds=int(delay))
+            published_ts.iloc[idx] = published_ts.iloc[idx] + pd.Timedelta(int(delay), unit="s")
 
         df_ticks["published_timestamp"] = published_ts
         df_ticks["is_late"] = False
