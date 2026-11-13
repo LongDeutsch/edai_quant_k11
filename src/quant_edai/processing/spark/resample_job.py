@@ -40,6 +40,9 @@ class SparkResampleJob:
         self.iceberg_1m_table = iceberg_1m_table
         self.iceberg_daily_table = iceberg_daily_table
         self.dataset_id = dataset_id or os.environ.get("DATASET_ID")
+        if not self.dataset_id:
+            from quant_edai.common.ml_provenance import dataset_id_from_path
+            self.dataset_id = dataset_id_from_path(str(self.source_ticks_dir))
 
     def _resolve_source_path(self) -> Path:
         """Finds valid source ticks directory (stg_market_ticks or raw_market_ticks fallback)."""
@@ -244,6 +247,21 @@ class SparkResampleJob:
         else:
             df_raw = df_raw.withColumn("dataset_id", F.coalesce(F.col("dataset_id"), F.lit(ds_id)))
 
+        if "split_id" not in df_raw.columns:
+            df_raw = df_raw.withColumn(
+                "split_id",
+                F.when(F.col("trade_date") <= "2025-04-30", F.lit("IS"))
+                .when(F.col("trade_date") <= "2026-04-30", F.lit("OOS"))
+                .otherwise(F.lit("TRADING"))
+            )
+        else:
+            df_raw = df_raw.withColumn("split_id", F.coalesce(F.col("split_id"), F.lit("IS")))
+
+        if "market_regime" not in df_raw.columns:
+            df_raw = df_raw.withColumn("market_regime", F.lit("BULL_LOW_VOL"))
+        else:
+            df_raw = df_raw.withColumn("market_regime", F.coalesce(F.col("market_regime"), F.lit("BULL_LOW_VOL")))
+
         # Parse event timestamp in UTC
         df_ticks = (
             df_raw
@@ -276,6 +294,7 @@ class SparkResampleJob:
                 F.round(F.sum("price_x_size") / F.greatest(F.lit(1), F.sum("size")), 4).alias("vwap"),
                 F.count("*").alias("trade_count"),
                 F.first("exchange").alias("exchange"),
+                F.first("split_id").alias("split_id"),
             )
             .withColumn("bar_timestamp", F.date_format("bar_1m_ts", "yyyy-MM-dd'T'HH:mm:ss'Z'"))
             .withColumn("window_start", F.date_format("bar_1m_ts", "yyyy-MM-dd'T'HH:mm:ss'Z'"))
@@ -315,6 +334,8 @@ class SparkResampleJob:
                 F.round(F.sum("price_x_size") / F.greatest(F.lit(1), F.sum("size")), 4).alias("vwap"),
                 F.count("*").alias("trade_count"),
                 F.first("exchange").alias("exchange"),
+                F.first("market_regime").alias("market_regime"),
+                F.first("split_id").alias("split_id"),
             )
             .withColumn(
                 "trade_id",
@@ -327,6 +348,10 @@ class SparkResampleJob:
             )
             .withColumn("created_at", F.current_timestamp())
         )
+
+        # Repartition by partition keys to ensure bounded memory and avoid OOM / too many open files
+        df_1m_partitioned = df_1m.repartition(32, "dataset_id", "trade_date")
+        df_daily_partitioned = df_daily.repartition(8, "dataset_id", "trade_date")
 
         count_1m = df_1m.count()
         count_daily = df_daily.count()
@@ -354,13 +379,19 @@ class SparkResampleJob:
                     trade_count BIGINT,
                     exchange STRING,
                     dataset_id STRING,
+                    split_id STRING,
                     created_at TIMESTAMP
                 )
                 USING iceberg
                 PARTITIONED BY (dataset_id, trade_date)
-                TBLPROPERTIES ('format-version'='2')
+                TBLPROPERTIES ('format-version'='2', 'write.distribution-mode'='hash')
             """)
-            df_1m.createOrReplaceTempView("gold_1m_batch")
+            try:
+                spark.sql(f"ALTER TABLE {self.iceberg_1m_table} ADD COLUMN IF NOT EXISTS split_id STRING")
+                spark.sql(f"ALTER TABLE {self.iceberg_1m_table} SET TBLPROPERTIES ('write.distribution-mode'='hash')")
+            except Exception:
+                pass
+            df_1m_partitioned.createOrReplaceTempView("gold_1m_batch")
             spark.sql(f"""
                 MERGE INTO {self.iceberg_1m_table} t
                 USING gold_1m_batch s
@@ -386,14 +417,22 @@ class SparkResampleJob:
                     vwap DOUBLE,
                     trade_count BIGINT,
                     exchange STRING,
+                    market_regime STRING,
                     dataset_id STRING,
+                    split_id STRING,
                     created_at TIMESTAMP
                 )
                 USING iceberg
                 PARTITIONED BY (dataset_id, trade_date)
-                TBLPROPERTIES ('format-version'='2')
+                TBLPROPERTIES ('format-version'='2', 'write.distribution-mode'='hash')
             """)
-            df_daily.createOrReplaceTempView("gold_daily_batch")
+            try:
+                spark.sql(f"ALTER TABLE {self.iceberg_daily_table} ADD COLUMN IF NOT EXISTS split_id STRING")
+                spark.sql(f"ALTER TABLE {self.iceberg_daily_table} ADD COLUMN IF NOT EXISTS market_regime STRING")
+                spark.sql(f"ALTER TABLE {self.iceberg_daily_table} SET TBLPROPERTIES ('write.distribution-mode'='hash')")
+            except Exception:
+                pass
+            df_daily_partitioned.createOrReplaceTempView("gold_daily_batch")
             spark.sql(f"""
                 MERGE INTO {self.iceberg_daily_table} t
                 USING gold_daily_batch s
@@ -410,9 +449,9 @@ class SparkResampleJob:
         # Local/S3 Parquet persistence
         if not is_s3:
             Path(self.gold_1m_dir).mkdir(parents=True, exist_ok=True)
-            df_1m.write.mode("overwrite").partitionBy("trade_date").parquet(str(self.gold_1m_dir))
+            df_1m_partitioned.write.mode("overwrite").partitionBy("trade_date").parquet(str(self.gold_1m_dir))
             Path(self.gold_daily_dir).mkdir(parents=True, exist_ok=True)
-            df_daily.write.mode("overwrite").partitionBy("trade_date").parquet(str(self.gold_daily_dir))
+            df_daily_partitioned.write.mode("overwrite").partitionBy("trade_date").parquet(str(self.gold_daily_dir))
 
         # Mathematical volume conservation assertion
         sum_vol_1m = df_1m.agg(F.sum("volume")).collect()[0][0] or 0
@@ -455,6 +494,7 @@ def main():
     parser.add_argument("--source-dir", type=str, default="/tmp/lakehouse_source/stg_market_ticks")
     parser.add_argument("--gold-1m-dir", type=str, default="/tmp/lakehouse_source/gold_market_bars_1m")
     parser.add_argument("--gold-daily-dir", type=str, default="/tmp/lakehouse_source/gold_market_bars_daily")
+    parser.add_argument("--dataset-id", type=str, default=None, help="Dataset ID to process and filter")
     parser.add_argument("--engine", type=str, default=None, choices=["sim", "spark"])
     parser.add_argument("--out-file", type=str, default=None, help="Optional output JSON file")
 
@@ -463,6 +503,7 @@ def main():
         source_ticks_dir=args.source_dir,
         gold_1m_dir=args.gold_1m_dir,
         gold_daily_dir=args.gold_daily_dir,
+        dataset_id=args.dataset_id,
     )
     stats = job.run(engine=args.engine)
 

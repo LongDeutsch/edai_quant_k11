@@ -1,28 +1,33 @@
 {
   "pipeline": "ML_TRAINING_AND_EVALUATION",
-  "dataset_rows": 42480,
-  "train_rows": 33924,
-  "val_rows": 4272,
-  "test_rows": 4284,
+  "dataset_rows": 16656,
+  "train_rows": 8320,
+  "val_rows": 2096,
+  "test_rows": 4160,
   "results": {
     "baseline": {
       "model_name": "LogisticRegression_Baseline",
-      "auc_roc": 0.4448,
-      "log_loss": 0.706,
-      "accuracy": 0.4524,
-      "f1_score": 0.4227
+      "auc_roc": 0.508,
+      "log_loss": 0.6909,
+      "accuracy": 0.5339,
+      "f1_score": 0.0935
     },
     "champion": {
       "model_name": "LightGBM_Classifier_Champion",
-      "auc_roc": 0.4454,
-      "log_loss": 0.7442,
-      "accuracy": 0.4435,
-      "f1_score": 0.3693
+      "auc_roc": 0.4984,
+      "log_loss": 0.7019,
+      "accuracy": 0.5127,
+      "f1_score": 0.348,
+      "is_val_auc": 0.506,
+      "is_val_accuracy": 0.4967,
+      "oos_auc": 0.4984,
+      "oos_accuracy": 0.5127,
+      "degradation_pct": 1.5
     },
     "mlflow": {
       "status": "LOGGED",
       "tracking_uri": "sqlite:///mlflow.db",
-      "run_id": "8c40dfd063ad4484a955286e5f500e7c",
+      "run_id": "2fa064165ea24455a4e0b77942a6ba57",
       "tags": {
         "stage": "production",
         "candidate_role": "champion"
@@ -31,10 +36,19 @@
     "artifacts": {
       "baseline_path": "models/baseline_model.joblib",
       "champion_path": "models/champion_model.joblib",
-      "scaler_path": "models/scaler.joblib"
+      "scaler_path": "models/scaler.joblib",
+      "model_card_path": "models/champion_model.meta.json"
     },
-    "test_sample_size": 4284
+    "provenance": {
+      "model_version": "lgbm-20261113T025254Z-ds_canonical_4y_eval_s05",
+      "dataset_id": "ds_canonical_4y_eval_s05",
+      "feature_source": "/tmp/lakehouse_source/runs/ds_canonical_4y_eval_s05/gold_features/feat_ticker_technical_indicators.parquet"
+    },
+    "test_sample_size": 4160
   },
   "status": "COMPLETED",
-  "timestamp": "2026-11-09T01:36:34.195650+00:00"
+  "model_version": "lgbm-20261113T025254Z-ds_canonical_4y_eval_s05",
+  "dataset_id": "ds_canonical_4y_eval_s05",
+  "feature_source": "/tmp/lakehouse_source/runs/ds_canonical_4y_eval_s05/gold_features/feat_ticker_technical_indicators.parquet",
+  "timestamp": "2026-11-13T02:52:56.106821+00:00"
 }

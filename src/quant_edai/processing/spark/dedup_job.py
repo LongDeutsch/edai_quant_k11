@@ -35,6 +35,9 @@ class DeduplicationAndSchemaEvolutionJob:
         dataset_id: Optional[str] = None,
     ):
         self.dataset_id = dataset_id or os.environ.get("DATASET_ID")
+        if not self.dataset_id and not str(source_dir).startswith("s3"):
+            from quant_edai.common.ml_provenance import dataset_id_from_path
+            self.dataset_id = dataset_id_from_path(str(source_dir))
         if not str(source_dir).startswith("s3"):
             from quant_edai.common.dataset_paths import resolve_dataset_root
             try:
@@ -420,6 +423,7 @@ def main():
         default=os.getenv("DATASET_ROOT") or os.getenv("OUT_DIR", "/tmp/lakehouse_source"),
     )
     parser.add_argument("--target-dir", type=str, default=None)
+    parser.add_argument("--dataset-id", type=str, default=None, help="Dataset ID")
     parser.add_argument("--engine", type=str, default=None, choices=["sim", "spark"])
     parser.add_argument("--out-file", type=str, default=None, help="Optional output JSON file")
 
@@ -429,11 +433,11 @@ def main():
     try:
         from quant_edai.common.dataset_paths import resolve_dataset_root
 
-        source = str(resolve_dataset_root(source, os.getenv("DATASET_ID"), allow_legacy=True))
+        source = str(resolve_dataset_root(source, args.dataset_id or os.getenv("DATASET_ID"), allow_legacy=True))
     except Exception:
         pass
     target = args.target_dir or str(Path(source) / "stg_market_ohlcv")
-    job = DeduplicationAndSchemaEvolutionJob(source_dir=source, target_dir=target)
+    job = DeduplicationAndSchemaEvolutionJob(source_dir=source, target_dir=target, dataset_id=args.dataset_id)
     stats = job.run(engine=args.engine)
 
     if args.out_file:

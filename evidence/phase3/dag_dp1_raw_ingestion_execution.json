@@ -5,12 +5,12 @@
   "dataset_id": null,
   "airflow_trigger": {
     "status": "OFFLINE_FALLBACK",
-    "error": "Connection refused to :8080"
+    "error": "connection refused"
   },
   "dag_run_id": null,
   "terminal_state": null,
   "task_results": {
-    "task_1": {
+    "ingest": {
       "status": "PASSED_SIMULATED"
     }
   },

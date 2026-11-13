@@ -29,6 +29,7 @@ class AlphaStatus(str, Enum):
     CANDIDATE = "CANDIDATE"
     PAPER_TRIAL = "PAPER_TRIAL"
     PROMOTED_ACTIVE = "PROMOTED_ACTIVE"
+    APPROVED_FROZEN = "APPROVED_FROZEN"
     RETIRED = "RETIRED"
 
 
@@ -273,18 +274,63 @@ class AlphaRegistry:
         - Exactly max 1 version per alpha_id is returned.
         """
         all_alphas = self.db.list_alphas(alpha_type=horizon.upper())
-        allowed_statuses = [AlphaStatus.PAPER_TRIAL.value, AlphaStatus.PROMOTED_ACTIVE.value] if mode == "paper" else [AlphaStatus.PROMOTED_ACTIVE.value]
+        allowed_statuses = [
+            AlphaStatus.PAPER_TRIAL.value,
+            AlphaStatus.PROMOTED_ACTIVE.value,
+            AlphaStatus.APPROVED_FROZEN.value,
+        ] if mode == "paper" else [
+            AlphaStatus.PROMOTED_ACTIVE.value,
+            AlphaStatus.APPROVED_FROZEN.value,
+        ]
 
         active_map: Dict[str, Dict[str, Any]] = {}
         for a in all_alphas:
             if a["status"] in allowed_statuses:
                 alpha_id = a["alpha_id"]
-                # If multiple exist somehow, prefer PROMOTED_ACTIVE or latest promoted_at
+                # If multiple exist somehow, prefer APPROVED_FROZEN > PROMOTED_ACTIVE > PAPER_TRIAL
                 if alpha_id not in active_map:
                     active_map[alpha_id] = a
                 else:
                     curr = active_map[alpha_id]
-                    if a["status"] == AlphaStatus.PROMOTED_ACTIVE.value and curr["status"] != AlphaStatus.PROMOTED_ACTIVE.value:
+                    if a["status"] == AlphaStatus.APPROVED_FROZEN.value:
+                        active_map[alpha_id] = a
+                    elif a["status"] == AlphaStatus.PROMOTED_ACTIVE.value and curr["status"] != AlphaStatus.APPROVED_FROZEN.value:
                         active_map[alpha_id] = a
 
         return list(active_map.values())
+
+    def approve_and_freeze_ensemble(
+        self,
+        alpha_ids: List[str],
+        version: str = "v1.0.0",
+        horizon: str = "INTRADAY",
+        dataset_id: Optional[str] = None,
+        model_version: Optional[str] = None,
+        pm_user: str = "ADMIN",
+        reason: str = "Admin OOS validation approval",
+    ) -> bool:
+        """Approve and freeze Top-5 ensemble based on Out-of-Sample validation."""
+        for alpha_id in alpha_ids:
+            self.db.update_alpha_status(alpha_id, version, AlphaStatus.APPROVED_FROZEN.value, promoted_by=pm_user)
+            self.db.record_pm_audit({
+                "action_type": "APPROVE_AND_FREEZE",
+                "alpha_id": alpha_id,
+                "version": version,
+                "executed_by": pm_user,
+                "reason": reason,
+                "details": json.dumps({"dataset_id": dataset_id, "model_version": model_version}),
+            })
+        weights = [1.0 / len(alpha_ids)] * len(alpha_ids) if alpha_ids else []
+        self.db.upsert_ensemble_config({
+            "ensemble_id": "default",
+            "horizon": horizon.upper(),
+            "selected_alpha_ids": alpha_ids,
+            "weights": weights,
+            "dataset_id": dataset_id,
+            "model_version": model_version,
+            "approval_status": AlphaStatus.APPROVED_FROZEN.value,
+            "approved_by": pm_user,
+            "updated_by": pm_user,
+        })
+        logger.info(f"Approved and frozen ensemble {alpha_ids} by {pm_user}")
+        return True

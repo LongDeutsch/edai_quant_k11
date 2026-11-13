@@ -45,13 +45,14 @@ state = ReplayController.get_state()
 c_sess, c_ds, c_spd, c_act = st.columns([2, 3, 1.5, 3.5])
 
 with c_sess:
-    sess_id = st.text_input("Session ID", value=state["session_id"] or "sess_live_01")
+    sess_id = st.text_input("Session ID", value=state["session_id"] or "sess_canonical_trading_01")
 with c_ds:
     adv_mode = st.checkbox("⚙️ Advanced Mode", value=False, help="Show raw ClickHouse test/idempotency datasets.")
     ds_options = MarketDataService.get_catalog_options(advanced_mode=adv_mode)
-    selected_preset = st.selectbox("Market Dataset Preset", ds_options, index=0)
+    trading_default_idx = 2 if len(ds_options) >= 3 else 0
+    selected_preset = st.selectbox("Market Dataset Context", ds_options, index=trading_default_idx)
     selected_ds = MarketDataService.resolve_dataset_id(selected_preset)
-    st.caption(f"Resolved Dataset: `{selected_ds}`")
+    st.caption(f"Resolved Dataset: `{selected_ds}` (TRADING Split)")
 with c_spd:
     speed = st.selectbox("Replay Speed", [1, 5, 10, 25, 50], index=2)
 with c_act:
@@ -60,7 +61,7 @@ with c_act:
     with btn_c1:
         if not state["is_running"]:
             if st.button("▶ Start", type="primary", use_container_width=True):
-                saved_alphas = AlphaResearchService.get_latest_top5_ensemble() or ["composite_eq"]
+                saved_alphas = AlphaResearchService.get_latest_top5_ensemble(horizon="INTRADAY") or ["alpha_sma_cross_intraday", "alpha_ml_prob_intraday", "alpha_mom_z_intraday", "alpha_vol_break_intraday", "alpha_macd_z_intraday"]
                 ReplayController.start_replay(
                     session_id=sess_id,
                     dataset_id=selected_ds,
@@ -84,6 +85,8 @@ with c_act:
     with btn_c3:
         if st.button("🔄 Refresh", use_container_width=True):
             st.rerun()
+
+st.info("⚡ **Direct Bar Replay (TRADING Split: 2026-05 to 2026-10)**: Streaming simulation feeds unseen held-out trading bars directly to the Paper Trading Engine. In-Sample and Out-of-Sample data are protected from look-ahead leakage.")
 
 # Replay Progress Status Strip
 status_color = "🟢 RUNNING" if state["is_running"] and not state["is_paused"] else ("🟡 PAUSED" if state["is_paused"] else "⚪ IDLE")

@@ -1,0 +1,176 @@
+{
+  "status": "SUCCESS",
+  "execution_mode": "LOCAL_GOLD",
+  "dataset_id": "ds_canonical_4y_eval_s05",
+  "feature_source": "/tmp/lakehouse_source/runs/ds_canonical_4y_eval_s05/gold_features/feat_ticker_technical_indicators.parquet",
+  "source": "/tmp/lakehouse_source/runs/ds_canonical_4y_eval_s05/gold_features/feat_ticker_technical_indicators.parquet",
+  "booksize": 100000.0,
+  "window": {
+    "window_start": "2022-11-01",
+    "window_end": "2025-04-30",
+    "window_used": "canonical_split_IS"
+  },
+  "alphas_updated": 20,
+  "results": [
+    {
+      "alpha_id": "alpha_mom_z_intraday",
+      "version": "v1.0.0",
+      "horizon": "INTRADAY",
+      "sharpe": -0.273,
+      "pnl": 7788.47,
+      "window_used": "canonical_split_IS"
+    },
+    {
+      "alpha_id": "alpha_mom_z_daily",
+      "version": "v1.0.0",
+      "horizon": "DAILY",
+      "sharpe": -0.273,
+      "pnl": 7788.47,
+      "window_used": "canonical_split_IS"
+    },
+    {
+      "alpha_id": "alpha_vwap_z_intraday",
+      "version": "v1.0.0",
+      "horizon": "INTRADAY",
+      "sharpe": -2.9385,
+      "pnl": -17763.26,
+      "window_used": "canonical_split_IS"
+    },
+    {
+      "alpha_id": "alpha_vwap_z_daily",
+      "version": "v1.0.0",
+      "horizon": "DAILY",
+      "sharpe": -2.9385,
+      "pnl": -17763.26,
+      "window_used": "canonical_split_IS"
+    },
+    {
+      "alpha_id": "alpha_rsi_mr_intraday",
+      "version": "v1.0.0",
+      "horizon": "INTRADAY",
+      "sharpe": -4.3059,
+      "pnl": -32490.36,
+      "window_used": "canonical_split_IS"
+    },
+    {
+      "alpha_id": "alpha_rsi_mr_daily",
+      "version": "v1.0.0",
+      "horizon": "DAILY",
+      "sharpe": -4.3059,
+      "pnl": -32490.36,
+      "window_used": "canonical_split_IS"
+    },
+    {
+      "alpha_id": "alpha_macd_z_intraday",
+      "version": "v1.0.0",
+      "horizon": "INTRADAY",
+      "sharpe": -2.1076,
+      "pnl": -10273.35,
+      "window_used": "canonical_split_IS"
+    },
+    {
+      "alpha_id": "alpha_macd_z_daily",
+      "version": "v1.0.0",
+      "horizon": "DAILY",
+      "sharpe": -2.1076,
+      "pnl": -10273.35,
+      "window_used": "canonical_split_IS"
+    },
+    {
+      "alpha_id": "alpha_sma_cross_intraday",
+      "version": "v1.0.0",
+      "horizon": "INTRADAY",
+      "sharpe": 3.8419,
+      "pnl": 48834.12,
+      "window_used": "canonical_split_IS"
+    },
+    {
+      "alpha_id": "alpha_sma_cross_daily",
+      "version": "v1.0.0",
+      "horizon": "DAILY",
+      "sharpe": 3.8419,
+      "pnl": 48834.12,
+      "window_used": "canonical_split_IS"
+    },
+    {
+      "alpha_id": "alpha_vol_break_intraday",
+      "version": "v1.0.0",
+      "horizon": "INTRADAY",
+      "sharpe": -1.4237,
+      "pnl": -3506.76,
+      "window_used": "canonical_split_IS"
+    },
+    {
+      "alpha_id": "alpha_vol_break_daily",
+      "version": "v1.0.0",
+      "horizon": "DAILY",
+      "sharpe": -1.4237,
+      "pnl": -3506.76,
+      "window_used": "canonical_split_IS"
+    },
+    {
+      "alpha_id": "alpha_volume_z_intraday",
+      "version": "v1.0.0",
+      "horizon": "INTRADAY",
+      "sharpe": -2.4051,
+      "pnl": -16831.89,
+      "window_used": "canonical_split_IS"
+    },
+    {
+      "alpha_id": "alpha_volume_z_daily",
+      "version": "v1.0.0",
+      "horizon": "DAILY",
+      "sharpe": -2.4051,
+      "pnl": -16831.89,
+      "window_used": "canonical_split_IS"
+    },
+    {
+      "alpha_id": "alpha_ml_prob_intraday",
+      "version": "v1.0.0",
+      "horizon": "INTRADAY",
+      "sharpe": 0.0,
+      "pnl": 0.0,
+      "window_used": "canonical_split_IS"
+    },
+    {
+      "alpha_id": "alpha_ml_prob_daily",
+      "version": "v1.0.0",
+      "horizon": "DAILY",
+      "sharpe": 0.0,
+      "pnl": 0.0,
+      "window_used": "canonical_split_IS"
+    },
+    {
+      "alpha_id": "alpha_composite_eq_intraday",
+      "version": "v1.0.0",
+      "horizon": "INTRADAY",
+      "sharpe": -3.2151,
+      "pnl": -9490.95,
+      "window_used": "canonical_split_IS"
+    },
+    {
+      "alpha_id": "alpha_composite_eq_daily",
+      "version": "v1.0.0",
+      "horizon": "DAILY",
+      "sharpe": -3.2151,
+      "pnl": -9490.95,
+      "window_used": "canonical_split_IS"
+    },
+    {
+      "alpha_id": "alpha_regime_adapt_intraday",
+      "version": "v1.0.0",
+      "horizon": "INTRADAY",
+      "sharpe": -3.1264,
+      "pnl": -19900.92,
+      "window_used": "canonical_split_IS"
+    },
+    {
+      "alpha_id": "alpha_regime_adapt_daily",
+      "version": "v1.0.0",
+      "horizon": "DAILY",
+      "sharpe": -3.1264,
+      "pnl": -19900.92,
+      "window_used": "canonical_split_IS"
+    }
+  ]
+}

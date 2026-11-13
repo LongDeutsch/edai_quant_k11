@@ -90,20 +90,26 @@ def get_postgres_connection():
 # 1. Market Data & Candlestick Service (Page 1)
 # ==============================================================================
 DATASET_CATALOG: Dict[str, Dict[str, Any]] = {
-    "⚡ Dense Intraday Demo (1m/5m)": {
-        "dataset_id": "20261111T101352Z_integration_s0p005_seed42_cdda26b5",
-        "description": "5,108 dense 1m intraday bars across 16 tickers for streaming replay and real-time execution.",
-        "default_timeframe": "1m",
-    },
-    "📊 Daily Factor Research (3Y Gold)": {
-        "dataset_id": "ds_g5_live_1794464907",
-        "description": "3 Years of daily OHLCV and factor indicators across 16 tickers for walk-forward backtesting.",
+    "🔬 1. In-Sample Research (2022-11 to 2025-04)": {
+        "dataset_id": "ds_canonical_4y_eval_s05",
+        "split_id": "IS",
+        "description": "2.5 Years In-Sample Canonical Data (10,432 daily bars, 302,076 intraday bars) for Alpha Research & Model Training.",
         "default_timeframe": "Daily",
+        "date_range": ("2022-11-01", "2025-04-30"),
     },
-    "🚀 Latest Validated Lakehouse Run": {
-        "dataset_id": None,
-        "description": "Dataset produced by the most recent Airflow Master DAG pipeline run.",
+    "🛡️ 2. Out-of-Sample Validation [Admin] (2025-05 to 2026-04)": {
+        "dataset_id": "ds_canonical_4y_eval_s05",
+        "split_id": "OOS",
+        "description": "1.0 Year Out-of-Sample Canonical Data (4,176 daily bars, 121,100 intraday bars) for Independent Alpha Validation & Top-5 Approval.",
         "default_timeframe": "Daily",
+        "date_range": ("2025-05-01", "2026-04-30"),
+    },
+    "⚡ 3. Trading Replay (2026-05 to 2026-10)": {
+        "dataset_id": "ds_canonical_4y_eval_s05",
+        "split_id": "TRADING",
+        "description": "0.5 Year Trading Replay Canonical Data (2,096 daily bars, 39,438 intraday bars) for Streaming Simulation & Paper Trading Replay.",
+        "default_timeframe": "5m",
+        "date_range": ("2026-05-01", "2026-10-31"),
     },
 }
 
@@ -132,15 +138,17 @@ class MarketDataService:
             ds_id = preset.get("dataset_id")
             if ds_id:
                 return ds_id
-            current_file = Path(LAKEHOUSE_ROOT) / "CURRENT_DATASET_ID"
-            if current_file.exists():
-                txt = current_file.read_text().strip()
-                if txt:
-                    return txt
-            return "ds_g5_live_1794464907"
+            return "ds_canonical_4y_eval_s05"
         if selected_option.startswith("---"):
-            return "20261111T101352Z_integration_s0p005_seed42_cdda26b5"
+            return "ds_canonical_4y_eval_s05"
         return selected_option
+
+    @classmethod
+    def resolve_split_id(cls, selected_option: str) -> Optional[str]:
+        """Resolve preset display title to canonical split_id ('IS', 'OOS', 'TRADING')."""
+        if selected_option in DATASET_CATALOG:
+            return DATASET_CATALOG[selected_option].get("split_id")
+        return None
 
     @staticmethod
     def discover_dataset_capabilities(dataset_id: str) -> Dict[str, Any]:
@@ -273,6 +281,7 @@ class MarketDataService:
         limit: int = 500,
         start_date: Optional[str] = None,
         end_date: Optional[str] = None,
+        split_id: Optional[str] = None,
     ) -> pd.DataFrame:
         """
         Fetch candlesticks aggregated to specified timeframe.
@@ -281,6 +290,7 @@ class MarketDataService:
         Queries the latest N bars within date window and returns them in strictly ascending chronological order.
         """
         timeframe = timeframe.lower()
+        split_filter = f" AND split_id = '{split_id}'" if split_id else ""
         if timeframe in ["1d", "daily"]:
             date_filter = ""
             if start_date:
@@ -298,7 +308,7 @@ class MarketDataService:
                         toFloat64(close_price) AS close,
                         toFloat64(volume) AS volume
                     FROM quant_dw.market_daily_ohlcv FINAL
-                    WHERE dataset_id = '{dataset_id}' AND ticker_symbol = '{ticker}'{date_filter}
+                    WHERE dataset_id = '{dataset_id}' AND ticker_symbol = '{ticker}'{split_filter}{date_filter}
                     ORDER BY trade_date DESC
                     LIMIT {limit}
                 ) AS sub_daily
@@ -351,7 +361,7 @@ class MarketDataService:
                         sum(volume) AS total_volume,
                         if(sum(volume) > 0, sum(vwap * toFloat64(volume)) / toFloat64(sum(volume)), argMax(close_price, window_start)) AS vwap
                     FROM quant_dw.market_intraday_bars FINAL
-                    WHERE dataset_id = '{dataset_id}' AND ticker_symbol = '{ticker}' AND is_deleted = 0 AND close_price > 0{date_filter}
+                    WHERE dataset_id = '{dataset_id}' AND ticker_symbol = '{ticker}'{split_filter} AND is_deleted = 0 AND close_price > 0{date_filter}
                     GROUP BY bar_time
                 )
                 ORDER BY bar_time DESC
@@ -506,6 +516,42 @@ class AlphaResearchService:
             return pd.DataFrame()
 
     @staticmethod
+    def get_alpha_validation_comparison(horizon: Optional[str] = None) -> pd.DataFrame:
+        """Fetch Alphas with In-Sample (IS) vs Out-of-Sample (OOS) validation metrics and degradation."""
+        try:
+            conn = get_postgres_connection()
+            query = "SELECT alpha_id, version, alpha_type, status, metrics_snapshot, out_of_sample_metrics FROM alpha_registry"
+            params = []
+            if horizon:
+                query += " WHERE alpha_type = %s"
+                params.append(horizon.upper())
+            query += " ORDER BY alpha_id ASC"
+            df = pd.read_sql(query, conn, params=params)
+            conn.close()
+            rows = []
+            for _, r in df.iterrows():
+                is_m = json.loads(r["metrics_snapshot"]) if isinstance(r["metrics_snapshot"], str) else (r["metrics_snapshot"] or {})
+                oos_m = json.loads(r["out_of_sample_metrics"]) if isinstance(r["out_of_sample_metrics"], str) else (r["out_of_sample_metrics"] or {})
+                is_sh = float(is_m.get("sharpe", 0.0))
+                oos_sh = float(oos_m.get("sharpe", 0.0))
+                deg = float(oos_m.get("degradation_pct", round(((is_sh - oos_sh) / max(0.1, is_sh)) * 100.0, 1)))
+                rows.append({
+                    "alpha_id": r["alpha_id"],
+                    "horizon": r["alpha_type"],
+                    "status": r["status"],
+                    "is_sharpe": round(is_sh, 2),
+                    "oos_sharpe": round(oos_sh, 2),
+                    "is_mdd": round(float(is_m.get("max_drawdown", 0.0)) * 100.0, 1),
+                    "oos_mdd": round(float(oos_m.get("max_drawdown", 0.0)) * 100.0, 1),
+                    "degradation_pct": deg,
+                    "oos_win_rate": round(float(oos_m.get("win_rate", 0.0)) * 100.0, 1),
+                })
+            return pd.DataFrame(rows)
+        except Exception as e:
+            logger.warning(f"Could not load alpha validation comparison: {e}")
+            return pd.DataFrame()
+
+    @staticmethod
     def run_historical_backtest(
         alpha_id: str,
         ticker: str,
@@ -515,11 +561,23 @@ class AlphaResearchService:
         slippage_bps: float = 5.0,
         commission_bps: float = 1.0,
         dataset_id: Optional[str] = None,
+        split_id: Optional[str] = "IS",
     ) -> Dict[str, Any]:
         """
         Execute dynamic historical backtest across Gold Lakehouse features/OHLCV.
-        Supports dataset-aware lineage, bidirectional Long/Short positions, and zero look-ahead bias.
+        Supports dataset-aware lineage, bidirectional Long/Short positions, zero look-ahead bias,
+        intraday mega-cap eligibility enforcement, and canonical split isolation.
         """
+        # 0. Intraday eligibility enforcement: Non-mega-caps have sparse intraday coverage (~8 bars/day)
+        MEGA_CAPS = {"AAPL", "AMZN", "GOOGL", "META", "MSFT", "NVDA", "TSLA"}
+        if timeframe.upper() in ["1M", "5M", "10M", "15M", "INTRADAY"] and ticker != "ALL" and ticker not in MEGA_CAPS:
+            return {
+                "status": "INELIGIBLE",
+                "message": f"Ticker {ticker} is non-mega-cap with sparse intraday coverage (~8 bars/day). Intraday alpha strategies require dense continuous ticks (Mega-Caps only: AAPL, AMZN, GOOGL, META, MSFT, NVDA, TSLA). Please select a Mega-Cap ticker or switch to Daily timeframe.",
+                "metrics": {},
+                "equity_curve": [],
+            }
+
         # Resolve dataset-aware Gold Parquet path
         gold_path = None
         if dataset_id:
@@ -539,6 +597,9 @@ class AlphaResearchService:
             }
 
         df = pd.read_parquet(gold_path)
+        if "split_id" in df.columns and split_id:
+            df = df[df["split_id"] == split_id]
+
         if "event_timestamp" in df.columns:
             df["event_timestamp"] = pd.to_datetime(df["event_timestamp"])
             df = df.sort_values(by="event_timestamp")
@@ -713,15 +774,15 @@ class AlphaResearchService:
                 INSERT INTO alpha_backtest_results (
                     run_id, alpha_id, alpha_version, dataset_id, ticker_symbol, timeframe,
                     period_start, period_end, total_trades, win_rate, sharpe_ratio,
-                    max_drawdown, total_return_pct, net_pnl, slippage_bps, commission_bps, metrics_json
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    max_drawdown, total_return_pct, net_pnl, slippage_bps, commission_bps, metrics_json, split_id
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (run_id) DO NOTHING;
             """, (
-                run_id, alpha_id, "v1.0.0", "gold_lakehouse", ticker, timeframe,
+                run_id, alpha_id, "v1.0.0", dataset_id or "gold_lakehouse", ticker, timeframe,
                 dt_min.date(), dt_max.date(),
                 trade_count, round(win_rate, 4), round(sharpe, 4), round(mdd, 4),
                 round(total_return, 4), round(total_return * 1000.0, 2),
-                slippage_bps, commission_bps, json.dumps(metrics)
+                slippage_bps, commission_bps, json.dumps(metrics), split_id or "IS"
             ))
             conn.commit()
             conn.close()
@@ -779,11 +840,31 @@ class AlphaResearchService:
             return pd.DataFrame()
 
     @staticmethod
-    def save_top5_ensemble(alpha_ids: List[str], horizon: str = "INTRADAY", dataset_id: str = "default") -> bool:
-        """Persist user-selected Top-5 Alphas into PostgreSQL alpha_ensemble_config and alpha_ensemble_configs."""
+    def save_top5_ensemble(
+        alpha_ids: List[str],
+        horizon: str = "INTRADAY",
+        dataset_id: str = "ds_canonical_4y_eval_s05",
+        approved_by: str = "ADMIN",
+        freeze: bool = True,
+    ) -> bool:
+        """Persist user-selected Top-5 Alphas into PostgreSQL alpha_ensemble_config, updating status to APPROVED_FROZEN."""
         if len(alpha_ids) != 5:
             return False
         try:
+            from quant_edai.quant.alpha_registry import AlphaRegistry
+            from quant_edai.quant.paper_db import PaperDatabase
+            db = PaperDatabase()
+            reg = AlphaRegistry(db=db)
+            if freeze:
+                reg.approve_and_freeze_ensemble(
+                    alpha_ids=alpha_ids,
+                    horizon=horizon,
+                    dataset_id=dataset_id,
+                    model_version="champion-2fa06416",
+                    pm_user=approved_by,
+                    reason=f"Admin Top-5 {horizon} Approval",
+                )
+
             conn = get_postgres_connection()
             cur = conn.cursor()
             ensemble_id = f"ens_{horizon.lower()}_{uuid.uuid4().hex[:8]}"
@@ -794,23 +875,35 @@ class AlphaResearchService:
             # 1. Primary write to alpha_ensemble_config (singular) for AlphaSignalServer and PaperDatabase
             cur.execute("""
                 INSERT INTO alpha_ensemble_config (
-                    ensemble_id, horizon, selected_alpha_ids, booksize, top_k_tickers, updated_at, updated_by
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    ensemble_id, horizon, selected_alpha_ids, booksize, top_k_tickers, updated_at, updated_by,
+                    approval_status, dataset_id, model_version, approved_by, approved_at
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (ensemble_id, horizon) DO UPDATE SET
                     selected_alpha_ids = EXCLUDED.selected_alpha_ids,
                     updated_at = EXCLUDED.updated_at,
-                    updated_by = EXCLUDED.updated_by;
-            """, ("default", horizon.upper(), raw_ids, 100000.0, 5, now_ts, "dashboard_user"))
+                    updated_by = EXCLUDED.updated_by,
+                    approval_status = EXCLUDED.approval_status,
+                    dataset_id = EXCLUDED.dataset_id,
+                    model_version = EXCLUDED.model_version,
+                    approved_by = EXCLUDED.approved_by,
+                    approved_at = EXCLUDED.approved_at;
+            """, ("default", horizon.upper(), raw_ids, 100000.0, 5, now_ts, approved_by, "APPROVED_FROZEN", dataset_id, "champion-2fa06416", approved_by, now_ts))
 
             cur.execute("""
                 INSERT INTO alpha_ensemble_config (
-                    ensemble_id, horizon, selected_alpha_ids, booksize, top_k_tickers, updated_at, updated_by
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s)
+                    ensemble_id, horizon, selected_alpha_ids, booksize, top_k_tickers, updated_at, updated_by,
+                    approval_status, dataset_id, model_version, approved_by, approved_at
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (ensemble_id, horizon) DO UPDATE SET
                     selected_alpha_ids = EXCLUDED.selected_alpha_ids,
                     updated_at = EXCLUDED.updated_at,
-                    updated_by = EXCLUDED.updated_by;
-            """, (ensemble_id, horizon.upper(), raw_ids, 100000.0, 5, now_ts, "dashboard_user"))
+                    updated_by = EXCLUDED.updated_by,
+                    approval_status = EXCLUDED.approval_status,
+                    dataset_id = EXCLUDED.dataset_id,
+                    model_version = EXCLUDED.model_version,
+                    approved_by = EXCLUDED.approved_by,
+                    approved_at = EXCLUDED.approved_at;
+            """, (ensemble_id, horizon.upper(), raw_ids, 100000.0, 5, now_ts, approved_by, "APPROVED_FROZEN", dataset_id, "champion-2fa06416", approved_by, now_ts))
 
             # 2. Secondary write to alpha_ensemble_configs (plural) for backward compatibility
             try:
@@ -972,7 +1065,7 @@ class ReplayController:
         tickers = _GLOBAL_REPLAY_STATE.active_tickers
         ticker_list_sql = ", ".join(f"'{t}'" for t in tickers)
 
-        # Load dense bars for ALL selected tickers chronologically
+        # Load dense bars for ALL selected tickers in TRADING split chronologically
         bars_df = run_clickhouse_query(f"""
             SELECT 
                 window_start AS bar_time, 
@@ -985,6 +1078,7 @@ class ReplayController:
                 toFloat64(vwap) AS vwap
             FROM quant_dw.market_intraday_bars FINAL
             WHERE dataset_id = '{_GLOBAL_REPLAY_STATE.dataset_id}'
+              AND split_id = 'TRADING'
               AND ticker_symbol IN ({ticker_list_sql})
               AND is_deleted = 0 AND close_price > 0
             ORDER BY window_start ASC, ticker_symbol ASC
@@ -992,7 +1086,27 @@ class ReplayController:
         """)
 
         if bars_df.empty:
-            # Fallback to Daily OHLCV bars if no 1m bars found for this dataset
+            # Fallback: without split_id constraint if dataset has no split tags
+            bars_df = run_clickhouse_query(f"""
+                SELECT 
+                    window_start AS bar_time, 
+                    ticker_symbol, 
+                    toFloat64(open_price) AS open, 
+                    toFloat64(high_price) AS high, 
+                    toFloat64(low_price) AS low, 
+                    toFloat64(close_price) AS close, 
+                    toFloat64(volume) AS volume, 
+                    toFloat64(vwap) AS vwap
+                FROM quant_dw.market_intraday_bars FINAL
+                WHERE dataset_id = '{_GLOBAL_REPLAY_STATE.dataset_id}'
+                  AND ticker_symbol IN ({ticker_list_sql})
+                  AND is_deleted = 0 AND close_price > 0
+                ORDER BY window_start ASC, ticker_symbol ASC
+                LIMIT 500
+            """)
+
+        if bars_df.empty:
+            # Fallback to Daily OHLCV bars (TRADING split first)
             bars_df = run_clickhouse_query(f"""
                 SELECT 
                     toString(trade_date) AS bar_time, 
@@ -1005,6 +1119,7 @@ class ReplayController:
                     toFloat64(vwap) AS vwap
                 FROM quant_dw.market_daily_ohlcv FINAL
                 WHERE dataset_id = '{_GLOBAL_REPLAY_STATE.dataset_id}'
+                  AND split_id = 'TRADING'
                   AND ticker_symbol IN ({ticker_list_sql})
                 ORDER BY trade_date ASC, ticker_symbol ASC
                 LIMIT 500

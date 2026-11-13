@@ -358,6 +358,29 @@ class PaperDatabase:
                     if existing and col not in existing:
                         cur.execute(f"ALTER TABLE {table} ADD COLUMN {col} TEXT")
 
+        # Alpha Lifecycle & Approved Ensemble Additive Columns
+        extra_schema = [
+            ("alpha_registry", "out_of_sample_metrics", "TEXT"),
+            ("alpha_registry", "split_id", "TEXT"),
+            ("alpha_backtest_results", "split_id", "TEXT"),
+            ("alpha_ensemble_config", "dataset_id", "TEXT"),
+            ("alpha_ensemble_config", "model_version", "TEXT"),
+            ("alpha_ensemble_config", "weights_json", "TEXT"),
+            ("alpha_ensemble_config", "approval_status", "TEXT"),
+            ("alpha_ensemble_config", "approved_by", "TEXT"),
+            ("alpha_ensemble_config", "approved_at", "TIMESTAMP WITH TIME ZONE" if self.is_postgres else "TEXT"),
+        ]
+        for tbl, col, ctype in extra_schema:
+            try:
+                if self.is_postgres:
+                    cur.execute(f"ALTER TABLE IF EXISTS {tbl} ADD COLUMN IF NOT EXISTS {col} {ctype}")
+                else:
+                    existing = {r[1] for r in cur.execute(f"PRAGMA table_info({tbl})").fetchall()}
+                    if existing and col not in existing:
+                        cur.execute(f"ALTER TABLE {tbl} ADD COLUMN {col} {ctype}")
+            except Exception:
+                pass
+
     def record_order(self, order: Dict[str, Any]) -> bool:
         """Insert order with idempotency check. Returns True if inserted, False if duplicate."""
         order = require_provenance(order, kind="order")
@@ -764,12 +787,16 @@ class PaperDatabase:
     def upsert_alpha(self, alpha: Dict[str, Any]) -> None:
         """Register or update an alpha model in alpha_registry (provenance required in integration)."""
         alpha = require_provenance(alpha, kind="alpha_registry row")
+        oos_metrics = alpha.get("out_of_sample_metrics", {})
+        oos_str = json.dumps(oos_metrics) if isinstance(oos_metrics, (dict, list)) else str(oos_metrics or "{}")
+        split_id = alpha.get("split_id", "IS")
         sql = """
             INSERT INTO alpha_registry (
                 alpha_id, version, alpha_type, status, description,
                 config_json, metrics_snapshot, created_at, promoted_at,
-                promoted_by, retired_at, model_version, dataset_id, feature_source
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                promoted_by, retired_at, model_version, dataset_id, feature_source,
+                out_of_sample_metrics, split_id
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
         params = (
             alpha["alpha_id"],
@@ -784,6 +811,8 @@ class PaperDatabase:
             alpha.get("promoted_by"),
             str(alpha.get("retired_at")) if alpha.get("retired_at") else None,
             *[str(alpha[f]) for f in PROVENANCE_FIELDS],
+            oos_str,
+            split_id,
         )
         if self.is_postgres:
             pg_sql = (
@@ -799,7 +828,9 @@ class PaperDatabase:
                     retired_at = EXCLUDED.retired_at,
                     model_version = EXCLUDED.model_version,
                     dataset_id = EXCLUDED.dataset_id,
-                    feature_source = EXCLUDED.feature_source
+                    feature_source = EXCLUDED.feature_source,
+                    out_of_sample_metrics = EXCLUDED.out_of_sample_metrics,
+                    split_id = EXCLUDED.split_id
                 """
             )
             cur = self._pg_conn.cursor()
@@ -1014,19 +1045,30 @@ class PaperDatabase:
             return []
 
     def upsert_ensemble_config(self, config: Dict[str, Any]) -> None:
-        """Persist Pick-5 ensemble config for a horizon (INTRADAY|DAILY)."""
-        sql = """
-            INSERT INTO alpha_ensemble_config (
-                ensemble_id, horizon, selected_alpha_ids, booksize,
-                top_k_tickers, updated_at, updated_by
-            ) VALUES (?, ?, ?, ?, ?, ?, ?)
-        """
+        """Persist Pick-5 ensemble config for a horizon (INTRADAY|DAILY) with immutable approval metadata."""
         selected = config.get("selected_alpha_ids", [])
         if isinstance(selected, list):
             selected_json = json.dumps(selected)
         else:
             selected_json = str(selected or "[]")
+
+        weights = config.get("weights") or [0.2] * len(selected)
+        weights_json = json.dumps(weights) if isinstance(weights, (list, dict)) else str(weights)
+
         now_ts = datetime.now(timezone.utc).isoformat()
+        dataset_id = config.get("dataset_id")
+        model_version = config.get("model_version")
+        approval_status = config.get("approval_status", "APPROVED_FROZEN")
+        approved_by = config.get("approved_by") or config.get("updated_by", "ADMIN")
+        approved_at = config.get("approved_at") or now_ts
+
+        sql = """
+            INSERT INTO alpha_ensemble_config (
+                ensemble_id, horizon, selected_alpha_ids, booksize,
+                top_k_tickers, updated_at, updated_by, dataset_id,
+                model_version, weights_json, approval_status, approved_by, approved_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """
         params = (
             str(config.get("ensemble_id") or "default"),
             str(config.get("horizon") or "INTRADAY").upper(),
@@ -1035,6 +1077,12 @@ class PaperDatabase:
             int(config.get("top_k_tickers", 5)),
             str(config.get("updated_at") or now_ts),
             config.get("updated_by", "system"),
+            dataset_id,
+            model_version,
+            weights_json,
+            approval_status,
+            approved_by,
+            approved_at,
         )
         if self.is_postgres:
             pg_sql = (
@@ -1044,7 +1092,13 @@ class PaperDatabase:
                     booksize = EXCLUDED.booksize,
                     top_k_tickers = EXCLUDED.top_k_tickers,
                     updated_at = EXCLUDED.updated_at,
-                    updated_by = EXCLUDED.updated_by
+                    updated_by = EXCLUDED.updated_by,
+                    dataset_id = EXCLUDED.dataset_id,
+                    model_version = EXCLUDED.model_version,
+                    weights_json = EXCLUDED.weights_json,
+                    approval_status = EXCLUDED.approval_status,
+                    approved_by = EXCLUDED.approved_by,
+                    approved_at = EXCLUDED.approved_at
                 """
             )
             cur = self._pg_conn.cursor()

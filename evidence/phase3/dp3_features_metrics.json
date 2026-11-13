@@ -5,12 +5,12 @@
     "table": "lakehouse.gold.feat_ticker_technical_indicators",
     "description": "Validation suite for offline technical features serving Feast"
   },
-  "evaluated_rows": 3488,
+  "evaluated_rows": 16704,
   "total_expectations": 7,
   "successful_expectations": 7,
   "success_percent": 100.0,
   "status": "PASSED",
-  "evaluated_at": "2026-11-12T07:14:57.713372+00:00",
+  "evaluated_at": "2026-11-13T00:01:28.701201+00:00",
   "results": [
     {
       "expectation_type": "expect_column_to_exist",
@@ -54,8 +54,8 @@
       "success": true,
       "result": {
         "unexpected_count": 0,
-        "min_observed": 67.9422,
-        "max_observed": 540.0663
+        "min_observed": 33.4005,
+        "max_observed": 543.4732
       }
     },
     {
@@ -69,7 +69,7 @@
       "result": {
         "unexpected_count": 0,
         "min_observed": 0.0,
-        "max_observed": 98.15950920239622
+        "max_observed": 97.98545539850988
       }
     },
     {
@@ -82,8 +82,8 @@
       "success": true,
       "result": {
         "unexpected_count": 0,
-        "min_observed": 0.00026341647322303095,
-        "max_observed": 0.25302783083526353
+        "min_observed": 0.0039426894421518205,
+        "max_observed": 0.2
       }
     },
     {
@@ -96,8 +96,8 @@
       "success": true,
       "result": {
         "unexpected_count": 0,
-        "min_observed": 0.9661310127178849,
-        "max_observed": 1.0070818615918502
+        "min_observed": 0.9420319084169466,
+        "max_observed": 1.0254633345160613
       }
     }
   ],

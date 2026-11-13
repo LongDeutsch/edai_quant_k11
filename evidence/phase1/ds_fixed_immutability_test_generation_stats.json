@@ -1,6 +1,7 @@
 {
   "dataset_id": "ds_fixed_immutability_test",
   "run_id": "ds_fixed_immutability_test",
+  "profile": "integration",
   "execution_mode": "SIMULATED",
   "status": "SUCCESS",
   "mode": "integration",
@@ -14,14 +15,25 @@
   "offline_end": "2024-01-03",
   "span_years": 0.0,
   "trading_days": 2,
-  "total_raw_ticks": 261,
-  "total_raw_volume": 39458,
-  "volume_skew_ratio": 0.7973,
-  "offline_duplicate_rate": 0.0195,
+  "total_raw_ticks": 33,
+  "total_raw_volume": 11252,
+  "splits": {
+    "is_ticks": 33,
+    "oos_ticks": 0,
+    "tr_ticks": 0,
+    "is_sessions": 2,
+    "oos_sessions": 0,
+    "tr_sessions": 0,
+    "is_density_avg": 16.5,
+    "oos_density_avg": 0.0,
+    "tr_density_avg": 0.0
+  },
+  "volume_skew_ratio": 0.7929,
+  "offline_duplicate_rate": 0.0312,
   "schema_evolution_boundary": "2024-06-01",
   "schema_evolution_populated_ticks": 0,
   "schema_evolved_rows": 0,
-  "offline_duplicates_count": 5,
+  "offline_duplicates_count": 1,
   "regime_drift_boundary": "2024-08-01",
   "schema_before_evolution": [
     "trade_id",
@@ -49,81 +61,87 @@
   "cardinality_profile": {
     "raw_market_ticks": {
       "trade_id": {
-        "unique_values": 256,
-        "total_rows": 261,
-        "cardinality_ratio": 0.980843,
+        "unique_values": 32,
+        "total_rows": 33,
+        "cardinality_ratio": 0.969697,
         "category": "HIGH"
       },
       "ticker_symbol": {
         "unique_values": 16,
-        "total_rows": 261,
-        "cardinality_ratio": 0.061303,
+        "total_rows": 33,
+        "cardinality_ratio": 0.484848,
         "category": "MEDIUM"
       },
       "trade_date": {
         "unique_values": 2,
-        "total_rows": 261,
-        "cardinality_ratio": 0.007663,
-        "category": "LOW"
+        "total_rows": 33,
+        "cardinality_ratio": 0.060606,
+        "category": "MEDIUM"
       },
       "price": {
-        "unique_values": 256,
-        "total_rows": 261,
-        "cardinality_ratio": 0.980843,
+        "unique_values": 32,
+        "total_rows": 33,
+        "cardinality_ratio": 0.969697,
         "category": "HIGH"
       },
       "size": {
-        "unique_values": 12,
-        "total_rows": 261,
-        "cardinality_ratio": 0.045977,
-        "category": "LOW"
+        "unique_values": 10,
+        "total_rows": 33,
+        "cardinality_ratio": 0.30303,
+        "category": "MEDIUM"
       },
       "event_timestamp": {
-        "unique_values": 256,
-        "total_rows": 261,
-        "cardinality_ratio": 0.980843,
+        "unique_values": 32,
+        "total_rows": 33,
+        "cardinality_ratio": 0.969697,
         "category": "HIGH"
       },
       "ingestion_timestamp": {
-        "unique_values": 261,
-        "total_rows": 261,
+        "unique_values": 33,
+        "total_rows": 33,
         "cardinality_ratio": 1.0,
         "category": "HIGH"
       },
       "exchange": {
         "unique_values": 2,
-        "total_rows": 261,
-        "cardinality_ratio": 0.007663,
-        "category": "LOW"
+        "total_rows": 33,
+        "cardinality_ratio": 0.060606,
+        "category": "MEDIUM"
       },
       "dataset_id": {
         "unique_values": 1,
-        "total_rows": 261,
-        "cardinality_ratio": 0.003831,
+        "total_rows": 33,
+        "cardinality_ratio": 0.030303,
+        "category": "LOW"
+      },
+      "split_id": {
+        "unique_values": 1,
+        "total_rows": 33,
+        "cardinality_ratio": 0.030303,
         "category": "LOW"
       },
       "market_regime": {
         "unique_values": 1,
-        "total_rows": 261,
-        "cardinality_ratio": 0.003831,
+        "total_rows": 33,
+        "cardinality_ratio": 0.030303,
         "category": "LOW"
       },
       "quote_condition": {
         "unique_values": 1,
-        "total_rows": 261,
-        "cardinality_ratio": 0.003831,
+        "total_rows": 33,
+        "cardinality_ratio": 0.030303,
         "category": "LOW"
       },
       "bid_price": {
         "unique_values": 1,
-        "total_rows": 261,
-        "cardinality_ratio": 0.003831,
+        "total_rows": 33,
+        "cardinality_ratio": 0.030303,
         "category": "LOW"
       },
       "ask_price": {
         "unique_values": 1,
-        "total_rows": 261,
-        "cardinality_ratio": 0.003831,
+        "total_rows": 33,
+        "cardinality_ratio": 0.030303,
         "category": "LOW"
       }
     },
@@ -147,33 +165,33 @@
         "category": "MEDIUM"
       },
       "open_price": {
-        "unique_values": 28,
+        "unique_values": 32,
         "total_rows": 32,
-        "cardinality_ratio": 0.875,
-        "category": "MEDIUM"
+        "cardinality_ratio": 1.0,
+        "category": "HIGH"
       },
       "high_price": {
-        "unique_values": 29,
+        "unique_values": 32,
         "total_rows": 32,
-        "cardinality_ratio": 0.90625,
+        "cardinality_ratio": 1.0,
         "category": "HIGH"
       },
       "low_price": {
-        "unique_values": 30,
+        "unique_values": 32,
         "total_rows": 32,
-        "cardinality_ratio": 0.9375,
+        "cardinality_ratio": 1.0,
         "category": "HIGH"
       },
       "close_price": {
-        "unique_values": 30,
+        "unique_values": 32,
         "total_rows": 32,
-        "cardinality_ratio": 0.9375,
+        "cardinality_ratio": 1.0,
         "category": "HIGH"
       },
       "volume": {
-        "unique_values": 26,
+        "unique_values": 10,
         "total_rows": 32,
-        "cardinality_ratio": 0.8125,
+        "cardinality_ratio": 0.3125,
         "category": "MEDIUM"
       },
       "exchange": {
@@ -201,59 +219,65 @@
         "category": "HIGH"
       },
       "trade_count": {
-        "unique_values": 17,
+        "unique_values": 1,
         "total_rows": 32,
-        "cardinality_ratio": 0.53125,
-        "category": "MEDIUM"
+        "cardinality_ratio": 0.03125,
+        "category": "LOW"
+      },
+      "split_id": {
+        "unique_values": 1,
+        "total_rows": 32,
+        "cardinality_ratio": 0.03125,
+        "category": "LOW"
       }
     },
     "financial_news": {
       "article_id": {
-        "unique_values": 9,
-        "total_rows": 9,
+        "unique_values": 11,
+        "total_rows": 11,
         "cardinality_ratio": 1.0,
         "category": "HIGH"
       },
       "ticker_symbol": {
-        "unique_values": 7,
-        "total_rows": 9,
-        "cardinality_ratio": 0.777778,
+        "unique_values": 9,
+        "total_rows": 11,
+        "cardinality_ratio": 0.818182,
         "category": "MEDIUM"
       },
       "publish_date": {
         "unique_values": 2,
-        "total_rows": 9,
-        "cardinality_ratio": 0.222222,
+        "total_rows": 11,
+        "cardinality_ratio": 0.181818,
         "category": "MEDIUM"
       },
       "published_ts": {
-        "unique_values": 9,
-        "total_rows": 9,
+        "unique_values": 11,
+        "total_rows": 11,
         "cardinality_ratio": 1.0,
         "category": "HIGH"
       },
       "headline": {
-        "unique_values": 9,
-        "total_rows": 9,
-        "cardinality_ratio": 1.0,
+        "unique_values": 10,
+        "total_rows": 11,
+        "cardinality_ratio": 0.909091,
         "category": "HIGH"
       },
       "summary": {
-        "unique_values": 7,
-        "total_rows": 9,
-        "cardinality_ratio": 0.777778,
+        "unique_values": 9,
+        "total_rows": 11,
+        "cardinality_ratio": 0.818182,
         "category": "MEDIUM"
       },
       "sentiment_score": {
-        "unique_values": 9,
-        "total_rows": 9,
+        "unique_values": 11,
+        "total_rows": 11,
         "cardinality_ratio": 1.0,
         "category": "HIGH"
       },
       "source_outlet": {
-        "unique_values": 3,
-        "total_rows": 9,
-        "cardinality_ratio": 0.333333,
+        "unique_values": 4,
+        "total_rows": 11,
+        "cardinality_ratio": 0.363636,
         "category": "MEDIUM"
       }
     },
@@ -339,9 +363,9 @@
         "category": "HIGH"
       },
       "daily_return_fwd": {
-        "unique_values": 15,
+        "unique_values": 16,
         "total_rows": 16,
-        "cardinality_ratio": 0.9375,
+        "cardinality_ratio": 1.0,
         "category": "HIGH"
       },
       "direction_label": {
@@ -349,27 +373,34 @@
         "total_rows": 16,
         "cardinality_ratio": 0.125,
         "category": "MEDIUM"
+      },
+      "split_id": {
+        "unique_values": 1,
+        "total_rows": 16,
+        "cardinality_ratio": 0.0625,
+        "category": "MEDIUM"
       }
     }
   },
-  "total_data_volume_bytes": 69268,
-  "total_data_volume_mb": 0.07,
+  "total_data_volume_bytes": 62045,
+  "total_data_volume_mb": 0.06,
   "total_market_rows": 32,
-  "total_volume": 39458,
-  "mega_cap_volume": 31458,
-  "total_news_articles": 9,
+  "total_volume": 11252,
+  "mega_cap_volume": 8922,
+  "total_news_articles": 11,
   "total_label_rows": 16,
   "total_dimension_rows": 32,
   "gold_features_written": false,
   "bronze_immutable": true,
   "lakehouse_bronze_uri": "s3a://lakehouse/bronze/runs/ds_fixed_immutability_test",
   "paths": {
-    "base_out_dir": "/private/var/folders/df/p7lmy0917s36_bmbrvhq4tn00000gp/T/pytest-of-nguyenbuihoanglong/pytest-235/test_bronze_immutable_fail_on_0/lakehouse",
-    "run_root": "/private/var/folders/df/p7lmy0917s36_bmbrvhq4tn00000gp/T/pytest-of-nguyenbuihoanglong/pytest-235/test_bronze_immutable_fail_on_0/lakehouse/runs/ds_fixed_immutability_test",
-    "raw_market_ticks": "/private/var/folders/df/p7lmy0917s36_bmbrvhq4tn00000gp/T/pytest-of-nguyenbuihoanglong/pytest-235/test_bronze_immutable_fail_on_0/lakehouse/runs/ds_fixed_immutability_test/raw_market_ticks",
-    "raw_market_ohlcv": "/private/var/folders/df/p7lmy0917s36_bmbrvhq4tn00000gp/T/pytest-of-nguyenbuihoanglong/pytest-235/test_bronze_immutable_fail_on_0/lakehouse/runs/ds_fixed_immutability_test/raw_market_ohlcv",
-    "dim_companies": "/private/var/folders/df/p7lmy0917s36_bmbrvhq4tn00000gp/T/pytest-of-nguyenbuihoanglong/pytest-235/test_bronze_immutable_fail_on_0/lakehouse/runs/ds_fixed_immutability_test/dim_companies/dim_companies.parquet",
-    "financial_news": "/private/var/folders/df/p7lmy0917s36_bmbrvhq4tn00000gp/T/pytest-of-nguyenbuihoanglong/pytest-235/test_bronze_immutable_fail_on_0/lakehouse/runs/ds_fixed_immutability_test/raw_financial_news",
-    "labels": "/private/var/folders/df/p7lmy0917s36_bmbrvhq4tn00000gp/T/pytest-of-nguyenbuihoanglong/pytest-235/test_bronze_immutable_fail_on_0/lakehouse/runs/ds_fixed_immutability_test/label_ticker_daily_return/labels.parquet"
+    "base_out_dir": "/private/var/folders/df/p7lmy0917s36_bmbrvhq4tn00000gp/T/pytest-of-nguyenbuihoanglong/pytest-298/test_bronze_immutable_fail_on_0/lakehouse",
+    "run_root": "/private/var/folders/df/p7lmy0917s36_bmbrvhq4tn00000gp/T/pytest-of-nguyenbuihoanglong/pytest-298/test_bronze_immutable_fail_on_0/lakehouse/runs/ds_fixed_immutability_test",
+    "raw_market_ticks": "/private/var/folders/df/p7lmy0917s36_bmbrvhq4tn00000gp/T/pytest-of-nguyenbuihoanglong/pytest-298/test_bronze_immutable_fail_on_0/lakehouse/runs/ds_fixed_immutability_test/raw_market_ticks",
+    "raw_market_ohlcv": "/private/var/folders/df/p7lmy0917s36_bmbrvhq4tn00000gp/T/pytest-of-nguyenbuihoanglong/pytest-298/test_bronze_immutable_fail_on_0/lakehouse/runs/ds_fixed_immutability_test/raw_market_ohlcv",
+    "dim_companies": "/private/var/folders/df/p7lmy0917s36_bmbrvhq4tn00000gp/T/pytest-of-nguyenbuihoanglong/pytest-298/test_bronze_immutable_fail_on_0/lakehouse/runs/ds_fixed_immutability_test/dim_companies/dim_companies.parquet",
+    "financial_news": "/private/var/folders/df/p7lmy0917s36_bmbrvhq4tn00000gp/T/pytest-of-nguyenbuihoanglong/pytest-298/test_bronze_immutable_fail_on_0/lakehouse/runs/ds_fixed_immutability_test/raw_financial_news",
+    "labels": "/private/var/folders/df/p7lmy0917s36_bmbrvhq4tn00000gp/T/pytest-of-nguyenbuihoanglong/pytest-298/test_bronze_immutable_fail_on_0/lakehouse/runs/ds_fixed_immutability_test/label_ticker_daily_return/labels.parquet",
+    "split_manifest": "/private/var/folders/df/p7lmy0917s36_bmbrvhq4tn00000gp/T/pytest-of-nguyenbuihoanglong/pytest-298/test_bronze_immutable_fail_on_0/lakehouse/runs/ds_fixed_immutability_test/split_manifest.json"
   }
 }

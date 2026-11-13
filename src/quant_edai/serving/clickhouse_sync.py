@@ -269,9 +269,10 @@ def align_to_schema(
                 date_col = cand
                 break
         if date_col:
-            dt_s = pd.to_datetime(df[date_col], errors="coerce")
-            is_mask = dt_s <= pd.to_datetime("2025-04-30")
-            oos_mask = dt_s <= pd.to_datetime("2026-04-30")
+            dt_s = pd.to_datetime(df[date_col], errors="coerce", utc=True)
+            # Use tz-aware timestamps for comparison to avoid tz-naive vs tz-aware errors
+            is_mask = dt_s <= pd.Timestamp("2025-04-30", tz="UTC")
+            oos_mask = dt_s <= pd.Timestamp("2026-04-30", tz="UTC")
             df["split_id"] = np.where(is_mask, "IS", np.where(oos_mask, "OOS", "TRADING"))
         else:
             df["split_id"] = "IS"

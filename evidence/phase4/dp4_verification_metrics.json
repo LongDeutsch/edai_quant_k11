@@ -1,24 +1,24 @@
 {
-  "dataset_id": "ds_g5_master_1794467581",
+  "dataset_id": null,
   "mode": "integration",
   "tables": {
     "dim_companies": {
-      "rows_final": 32,
-      "rows_raw": 32,
+      "rows_final": 353,
+      "rows_raw": 385,
       "has_data": true
     },
     "market_daily_ohlcv": {
-      "rows_final": 3488,
-      "rows_raw": 3488,
+      "rows_final": 89296,
+      "rows_raw": 106000,
       "has_data": true
     },
     "feat_technical_indicators": {
-      "rows_final": 3488,
-      "rows_raw": 3488,
+      "rows_final": 65508,
+      "rows_raw": 82212,
       "has_data": true
     }
   },
   "isolation_verified": true,
-  "timestamp": "2026-11-12T07:15:04.070122",
+  "timestamp": "2026-11-13T00:01:29.472239",
   "status": "SUCCESS"
 }

@@ -121,10 +121,18 @@ class QuantModelTrainer:
         date_lbl = "label_date" if "label_date" in df_label.columns else "trade_date"
         df_label["join_date"] = pd.to_datetime(df_label[date_lbl]).dt.strftime("%Y-%m-%d")
 
+        feat_select = ["ticker_symbol", "join_date"] + [c for c in self.FEATURE_COLS if c in df_feat.columns]
+        if "split_id" in df_feat.columns and "split_id" not in feat_select:
+            feat_select.append("split_id")
+
+        label_select = ["ticker_symbol", "join_date", "direction_label", "daily_return_fwd"]
+        if "split_id" in df_label.columns and "split_id" not in feat_select and "split_id" not in label_select:
+            label_select.append("split_id")
+
         # Merge on (ticker_symbol, join_date)
         df_merged = pd.merge(
-            df_label[["ticker_symbol", "join_date", "direction_label", "daily_return_fwd"]],
-            df_feat[["ticker_symbol", "join_date"] + [c for c in self.FEATURE_COLS if c in df_feat.columns]],
+            df_label[label_select],
+            df_feat[feat_select],
             on=["ticker_symbol", "join_date"],
             how="inner",
         )
@@ -141,9 +149,36 @@ class QuantModelTrainer:
         val_ratio: float = 0.1,
     ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
         """
-        Walk-forward temporal split: 80% Train, 10% Val, 10% Test.
-        Strictly splits on unique chronological trading dates to prevent look-ahead bias.
+        Walk-forward temporal split:
+        If split_id is present:
+          - Train & Val are strictly carved out from IN_SAMPLE ('IS').
+          - Test is the held-out OUT_OF_SAMPLE ('OOS') validation set.
+          - TRADING split is NEVER touched during training or tuning.
+        Otherwise falls back to standard 80/10/10 ratio on chronological dates.
         """
+        if "split_id" in df.columns and "IS" in df["split_id"].values:
+            df_is = df[df["split_id"] == "IS"].copy()
+            unique_is_dates = sorted(df_is["join_date"].unique())
+            n_is = len(unique_is_dates)
+            train_idx = int(n_is * 0.80)
+            train_dates = set(unique_is_dates[:train_idx])
+            val_dates = set(unique_is_dates[train_idx:])
+
+            df_train = df_is[df_is["join_date"].isin(train_dates)].copy()
+            df_val = df_is[df_is["join_date"].isin(val_dates)].copy()
+
+            if "OOS" in df["split_id"].values:
+                df_test = df[df["split_id"] == "OOS"].copy()
+            else:
+                df_test = df_val.copy()
+
+            logger.info(
+                f"Split-Aware Walk-Forward: Train (IS 80%)={len(df_train)} rows ({len(train_dates)} dates), "
+                f"Val (IS 20%)={len(df_val)} rows ({len(val_dates)} dates), "
+                f"Test (OOS Evaluation)={len(df_test)} rows ({len(df_test['join_date'].unique())} dates)"
+            )
+            return df_train, df_val, df_test
+
         unique_dates = sorted(df["join_date"].unique())
         n_dates = len(unique_dates)
 
@@ -222,12 +257,24 @@ class QuantModelTrainer:
             champion_model = rf
             champion_scaler = None
 
+        lgbm_val_probs = champion_model.predict_proba(X_val)[:, 1]
+        is_val_auc = float(roc_auc_score(y_val, lgbm_val_probs))
+        is_val_acc = float(accuracy_score(y_val, (lgbm_val_probs >= 0.5).astype(int)))
+        oos_auc = float(roc_auc_score(y_test, lgbm_probs))
+        oos_acc = float(accuracy_score(y_test, lgbm_preds))
+        degradation = round(((is_val_auc - oos_auc) / max(0.001, is_val_auc)) * 100.0, 2)
+
         champion_metrics = {
             "model_name": "LightGBM_Classifier_Champion",
-            "auc_roc": round(float(roc_auc_score(y_test, lgbm_probs)), 4),
+            "auc_roc": round(oos_auc, 4),
             "log_loss": round(float(log_loss(y_test, lgbm_probs)), 4),
-            "accuracy": round(float(accuracy_score(y_test, lgbm_preds)), 4),
+            "accuracy": round(oos_acc, 4),
             "f1_score": round(float(f1_score(y_test, lgbm_preds, zero_division=0)), 4),
+            "is_val_auc": round(is_val_auc, 4),
+            "is_val_accuracy": round(is_val_acc, 4),
+            "oos_auc": round(oos_auc, 4),
+            "oos_accuracy": round(oos_acc, 4),
+            "degradation_pct": degradation,
         }
 
         # Save artifacts to models directory
@@ -298,11 +345,16 @@ class QuantModelTrainer:
                     "log_loss": champion_metrics["log_loss"],
                     "directional_accuracy": champion_metrics["accuracy"],
                     "f1_score": champion_metrics["f1_score"],
+                    "is_val_auc": champion_metrics.get("is_val_auc", champion_metrics["auc_roc"]),
+                    "oos_auc": champion_metrics.get("oos_auc", champion_metrics["auc_roc"]),
+                    "degradation_pct": champion_metrics.get("degradation_pct", 0.0),
                 })
 
                 # Tag as production (Rubric M2-12)
                 mlflow.set_tag("stage", "production")
                 mlflow.set_tag("candidate_role", "champion")
+                mlflow.set_tag("train_split", "IS")
+                mlflow.set_tag("eval_split", "OOS")
                 mlflow.set_tag("walk_forward_verified", "true")
                 mlflow.set_tag("model_version", self.model_version)
                 mlflow.set_tag("dataset_id", str(self.dataset_id))

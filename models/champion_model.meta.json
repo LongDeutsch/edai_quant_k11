@@ -1,0 +1,18 @@
+{
+  "model_version": "lgbm-20261113T025254Z-ds_canonical_4y_eval_s05",
+  "dataset_id": "ds_canonical_4y_eval_s05",
+  "feature_source": "/tmp/lakehouse_source/runs/ds_canonical_4y_eval_s05/gold_features/feat_ticker_technical_indicators.parquet",
+  "trained_at": "2026-11-13T02:52:55.304318+00:00",
+  "features": [
+    "close_price",
+    "sma_20",
+    "sma_50",
+    "sma_ratio_20_50",
+    "rsi_14d",
+    "macd_12_26",
+    "macd_signal_9",
+    "macd_histogram",
+    "rolling_volatility_30d",
+    "intraday_return_1d"
+  ]
+}

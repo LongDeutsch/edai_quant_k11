@@ -52,6 +52,29 @@ st.sidebar.caption(f"Resolved Dataset ID: `{selected_dataset}`")
 with tab_eda:
     st.subheader(f"Statistical Distribution & Cross-Asset Correlation: `{selected_dataset}`")
 
+    # Split Distribution Overview
+    st.markdown("#### 🕒 Chronological 3-Split Distribution Overview")
+    from quant_edai.serving.dashboard.dashboard_service import run_clickhouse_query
+    df_splits = run_clickhouse_query(f"""
+        SELECT 
+            if(split_id = '', 'LEGACY', split_id) AS split,
+            count(*) AS daily_bars,
+            min(trade_date) AS start_date,
+            max(trade_date) AS end_date,
+            uniqExact(ticker_symbol) AS tickers_count
+        FROM quant_dw.market_daily_ohlcv FINAL
+        WHERE dataset_id = '{selected_dataset}'
+        GROUP BY split
+        ORDER BY min(trade_date) ASC
+    """)
+    if not df_splits.empty:
+        st.dataframe(df_splits, use_container_width=True, hide_index=True)
+    else:
+        st.info("No split metadata found for this dataset.")
+
+    st.markdown("---")
+    st.markdown("#### 📈 Price Volatility & Trading Volume Statistics")
+
     with st.spinner("Analyzing market distributions from ClickHouse..."):
         eda_data = HistoricalEDAService.get_market_eda_summary(selected_dataset)
 

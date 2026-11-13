@@ -333,7 +333,20 @@ def run_alpha_metrics(
         feature_source=None if source.startswith("synthetic") else source,
     )
     panel = _normalize_panel(panel_raw)
-    panel, window_meta = _clip_window(panel, years=window_years)
+
+    has_splits = "split_id" in panel.columns and "IS" in panel["split_id"].values
+    if has_splits:
+        panel_is = panel[panel["split_id"] == "IS"].copy()
+        panel_oos = panel[panel["split_id"] == "OOS"].copy()
+        window_meta = {
+            "window_start": str(pd.to_datetime(panel_is["event_timestamp"].min()).date()),
+            "window_end": str(pd.to_datetime(panel_is["event_timestamp"].max()).date()),
+            "window_used": "full_available",
+        }
+    else:
+        panel, window_meta = _clip_window(panel, years=window_years)
+        panel_is = panel
+        panel_oos = pd.DataFrame()
 
     alphas = db.list_alphas()
     if horizon:
@@ -346,8 +359,10 @@ def run_alpha_metrics(
         cfg = _parse_config(alpha.get("config_json"))
         strategy = str(cfg.get("strategy") or "composite_eq")
         alpha_horizon = str(alpha.get("alpha_type") or cfg.get("horizon") or "INTRADAY").upper()
+
+        # 1. In-Sample Evaluation (IS)
         metrics = _simulate_alpha(
-            panel=panel,
+            panel=panel_is,
             strategy=strategy,
             config=cfg,
             booksize=booksize,
@@ -356,15 +371,36 @@ def run_alpha_metrics(
         metrics.update(window_meta)
         metrics["strategy"] = strategy
         metrics["source"] = source
+        metrics["split_id"] = "IS"
         metrics["computed_at"] = datetime.now(timezone.utc).isoformat()
 
         # Preserve prior non-overlapping keys (e.g. ic_mean from seed)
         prior = _parse_metrics(alpha.get("metrics_snapshot"))
         prior.update(metrics)
 
+        # 2. Out-of-Sample Validation (OOS)
+        metrics_oos: Dict[str, Any] = {}
+        if not panel_oos.empty:
+            metrics_oos = _simulate_alpha(
+                panel=panel_oos,
+                strategy=strategy,
+                config=cfg,
+                booksize=booksize,
+                horizon=alpha_horizon,
+            )
+            metrics_oos["strategy"] = strategy
+            metrics_oos["split_id"] = "OOS"
+            is_sh = float(metrics.get("sharpe", 0.0))
+            oos_sh = float(metrics_oos.get("sharpe", 0.0))
+            metrics_oos["degradation_pct"] = round(((is_sh - oos_sh) / max(0.1, is_sh)) * 100.0, 2)
+            metrics_oos["computed_at"] = datetime.now(timezone.utc).isoformat()
+
         record = dict(alpha)
         record["config_json"] = cfg
         record["metrics_snapshot"] = prior
+        if metrics_oos:
+            record["out_of_sample_metrics"] = metrics_oos
+        record["split_id"] = "IS"
         # Metrics were computed from *this* feature source: stamp lineage (keep the row's own model_version)
         for f in ("dataset_id", "feature_source"):
             if base_prov.get(f):

@@ -1,0 +1,101 @@
+{
+  "dataset_id": "20261113T034846Z_smoke_s0p01_seed2024_156b6a7e",
+  "seed": 2024,
+  "mode": "smoke",
+  "scale": 0.01,
+  "created_at": "2026-11-13T03:48:46.421018+00:00",
+  "total_files": 18,
+  "total_bytes": 179587,
+  "files": [
+    {
+      "path": "dim_companies/dim_companies.parquet",
+      "size_bytes": 6908,
+      "sha256": "23fb8fec97bd80009d56c64c85275720c231afc962f0367e6f4e683f5e5e10f2"
+    },
+    {
+      "path": "label_ticker_daily_return/labels.parquet",
+      "size_bytes": 6350,
+      "sha256": "c9d68f8d9d27bc411089a983ac33ab5d3692d1452131cb0826a9c8ce873c1c7b"
+    },
+    {
+      "path": "raw_financial_news/publish_date=2024-06-03/7bfa9c95e0c84041a56c47f856af2ec1-0.parquet",
+      "size_bytes": 6104,
+      "sha256": "09f0cb04dc391cd8fede97a5c362a1500fcbeeda2465b4756972d392baab7519"
+    },
+    {
+      "path": "raw_financial_news/publish_date=2024-06-04/7bfa9c95e0c84041a56c47f856af2ec1-0.parquet",
+      "size_bytes": 6459,
+      "sha256": "3e075dceaca90eeab8f0cac21b7cdb77df724a21ab4977252e295d5f518590c0"
+    },
+    {
+      "path": "raw_financial_news/publish_date=2024-06-05/7bfa9c95e0c84041a56c47f856af2ec1-0.parquet",
+      "size_bytes": 6297,
+      "sha256": "a9ea6b979f2b6b1be14243ab26aef89be941209c12cc356251fc2f6e6ad034e6"
+    },
+    {
+      "path": "raw_financial_news/publish_date=2024-06-06/7bfa9c95e0c84041a56c47f856af2ec1-0.parquet",
+      "size_bytes": 6083,
+      "sha256": "eca2191b69b2a1e7714a9591defc721df64b75d1ecc3746913119d9cc953cecb"
+    },
+    {
+      "path": "raw_financial_news/publish_date=2024-06-07/7bfa9c95e0c84041a56c47f856af2ec1-0.parquet",
+      "size_bytes": 6329,
+      "sha256": "7d3c5aeec5b93d6a61ddb2e6927ee82adb4b0cde68facac9c67a47db0a1f22fb"
+    },
+    {
+      "path": "raw_market_ohlcv/trade_date=2024-06-03/6289dbb4f82f4a459a926db1e84b923c-0.parquet",
+      "size_bytes": 9618,
+      "sha256": "53e6c6816d48608826e33107edddc8d19e58f671de92d9382097efbafe9ba2e0"
+    },
+    {
+      "path": "raw_market_ohlcv/trade_date=2024-06-04/6289dbb4f82f4a459a926db1e84b923c-0.parquet",
+      "size_bytes": 9630,
+      "sha256": "dc80fc6ccb2bb293c3b2886da589a181cab23bac121e4942d228d1cad6b3e217"
+    },
+    {
+      "path": "raw_market_ohlcv/trade_date=2024-06-05/6289dbb4f82f4a459a926db1e84b923c-0.parquet",
+      "size_bytes": 9636,
+      "sha256": "53ec12e705c93bdaa9d254338bc15fee89d5474f9ed44ddcc11db7bc583b4906"
+    },
+    {
+      "path": "raw_market_ohlcv/trade_date=2024-06-06/6289dbb4f82f4a459a926db1e84b923c-0.parquet",
+      "size_bytes": 9620,
+      "sha256": "1090fb7593001f1b521b57763558b44ee63f37a2737fa064f57c90c1cbfad593"
+    },
+    {
+      "path": "raw_market_ohlcv/trade_date=2024-06-07/6289dbb4f82f4a459a926db1e84b923c-0.parquet",
+      "size_bytes": 9628,
+      "sha256": "60875722d4f881768f2fae499811e23d62d2fb72a4422a2e3b4d5d4a7318ea5e"
+    },
+    {
+      "path": "raw_market_ticks/trade_date=2024-06-03/b707816414504221af5bdc0b1bbe5ceb-0.parquet",
+      "size_bytes": 17437,
+      "sha256": "b674601859d62f77b212aedde32f44e2fe473bda488666143acb402fe0ecea29"
+    },
+    {
+      "path": "raw_market_ticks/trade_date=2024-06-04/b707816414504221af5bdc0b1bbe5ceb-0.parquet",
+      "size_bytes": 16893,
+      "sha256": "b8ee55a22b77ae0648c38ba434b7f68446ea7a1306a022214228b086cb1dd0d7"
+    },
+    {
+      "path": "raw_market_ticks/trade_date=2024-06-05/b707816414504221af5bdc0b1bbe5ceb-0.parquet",
+      "size_bytes": 16628,
+      "sha256": "6128d9341353916550253dea68f32769dd8f501075d6683ca839ec7d89e74307"
+    },
+    {
+      "path": "raw_market_ticks/trade_date=2024-06-06/b707816414504221af5bdc0b1bbe5ceb-0.parquet",
+      "size_bytes": 16907,
+      "sha256": "1c39926dec3403b4d65f0c0454c3b8050d3d8e6defd38bf42a75cc8ee8ada649"
+    },
+    {
+      "path": "raw_market_ticks/trade_date=2024-06-07/b707816414504221af5bdc0b1bbe5ceb-0.parquet",
+      "size_bytes": 16372,
+      "sha256": "73a90924dc9d33e5a86ff3e4db740543ee7a03b13c8364e8007e8640454f3ed8"
+    },
+    {
+      "path": "split_manifest.json",
+      "size_bytes": 2688,
+      "sha256": "98c5790b834d4972ef23251c27d11c3ba0acd925cc0f66ccf1ff15e9c5dce247"
+    }
+  ]
+}

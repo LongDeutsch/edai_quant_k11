@@ -1,0 +1,671 @@
+{
+  "dataset_id": "20261113T035100Z_smoke_s0p1_seed42_cbc79ee0",
+  "seed": 42,
+  "mode": "smoke",
+  "scale": 0.1,
+  "created_at": "2026-11-13T03:51:03.149083+00:00",
+  "total_files": 132,
+  "total_bytes": 3182478,
+  "files": [
+    {
+      "path": "dim_companies/dim_companies.parquet",
+      "size_bytes": 6908,
+      "sha256": "23fb8fec97bd80009d56c64c85275720c231afc962f0367e6f4e683f5e5e10f2"
+    },
+    {
+      "path": "label_ticker_daily_return/labels.parquet",
+      "size_bytes": 19263,
+      "sha256": "a3526a7a1d2cec33302b456b1196b126ab0c43b3484ebaa1d80a4217dbc9946a"
+    },
+    {
+      "path": "raw_financial_news/publish_date=2024-01-02/0673bd40ccf0486b91ac5eeb55e0be71-0.parquet",
+      "size_bytes": 5943,
+      "sha256": "29991b24fc74d1508e7119f8ed93636206dbb0887860b1b3b39e486efb3a8c79"
+    },
+    {
+      "path": "raw_financial_news/publish_date=2024-01-03/0673bd40ccf0486b91ac5eeb55e0be71-0.parquet",
+      "size_bytes": 6323,
+      "sha256": "a7b6b9fd475e8483de8a3d28400d20758d71e3c9ed0c0290242badf88dd427a0"
+    },
+    {
+      "path": "raw_financial_news/publish_date=2024-01-04/0673bd40ccf0486b91ac5eeb55e0be71-0.parquet",
+      "size_bytes": 6433,
+      "sha256": "104f9e54d9bc7b03aee465eda090db06279af2c75a4ed55e039eb97ccc87a0a8"
+    },
+    {
+      "path": "raw_financial_news/publish_date=2024-01-05/0673bd40ccf0486b91ac5eeb55e0be71-0.parquet",
+      "size_bytes": 6423,
+      "sha256": "84604d6e7a82ec8a3efb36b0b8374eb94832137e8c14decbc03109e6a8d2022a"
+    },
+    {
+      "path": "raw_financial_news/publish_date=2024-01-08/0673bd40ccf0486b91ac5eeb55e0be71-0.parquet",
+      "size_bytes": 6331,
+      "sha256": "8b4893d83351a04b6d751c10244b2f13948bfd80c7d0a9af9e884b0c4fa79518"
+    },
+    {
+      "path": "raw_financial_news/publish_date=2024-01-09/0673bd40ccf0486b91ac5eeb55e0be71-0.parquet",
+      "size_bytes": 6126,
+      "sha256": "4ac04ca75f6ba391c0e3fe14b00933d8735d54f855622b86026c28359e659e14"
+    },
+    {
+      "path": "raw_financial_news/publish_date=2024-01-10/0673bd40ccf0486b91ac5eeb55e0be71-0.parquet",
+      "size_bytes": 6446,
+      "sha256": "a51ee18e0a3afd7784b0d1435687bafd48a52ea271b638ae26e1b060b71cb290"
+    },
+    {
+      "path": "raw_financial_news/publish_date=2024-01-11/0673bd40ccf0486b91ac5eeb55e0be71-0.parquet",
+      "size_bytes": 6019,
+      "sha256": "77d3fc3cbb0924ba1bd9e6a6154703284e2d64b7a0b8fdc0aba60d8376fd93f3"
+    },
+    {
+      "path": "raw_financial_news/publish_date=2024-01-12/0673bd40ccf0486b91ac5eeb55e0be71-0.parquet",
+      "size_bytes": 5711,
+      "sha256": "16f0aae0d623944169fa89827184f678f77849aed4d276098d4616149346204f"
+    },
+    {
+      "path": "raw_financial_news/publish_date=2024-01-15/0673bd40ccf0486b91ac5eeb55e0be71-0.parquet",
+      "size_bytes": 6247,
+      "sha256": "ec9d5233b59f6d7f26f81bc81085dd0c40861fe5b56e4ce4b9c63b66c89895a3"
+    },
+    {
+      "path": "raw_financial_news/publish_date=2024-01-16/0673bd40ccf0486b91ac5eeb55e0be71-0.parquet",
+      "size_bytes": 5898,
+      "sha256": "73be355cbb552a9e980335b1ea8927de1cb14fed2dce01c857e30a016f450d24"
+    },
+    {
+      "path": "raw_financial_news/publish_date=2024-01-17/0673bd40ccf0486b91ac5eeb55e0be71-0.parquet",
+      "size_bytes": 6344,
+      "sha256": "6122f42402403963527bb5c1d19afb26b2bab2c8912117837236a9b4473a1a74"
+    },
+    {
+      "path": "raw_financial_news/publish_date=2024-01-18/0673bd40ccf0486b91ac5eeb55e0be71-0.parquet",
+      "size_bytes": 6408,
+      "sha256": "3f50fc50947b5b18d441abb395fc51a185c04360472939d3376c98680691b8f4"
+    },
+    {
+      "path": "raw_financial_news/publish_date=2024-01-19/0673bd40ccf0486b91ac5eeb55e0be71-0.parquet",
+      "size_bytes": 6361,
+      "sha256": "9cb9d072c2cc81482575fea1f06caad946446a9015cac2423e9e25907b8aa26d"
+    },
+    {
+      "path": "raw_financial_news/publish_date=2024-01-22/0673bd40ccf0486b91ac5eeb55e0be71-0.parquet",
+      "size_bytes": 6654,
+      "sha256": "14a2f62fa4acabbb62d59f629b7d72fa7b38429ef9569f7d3cecad1b580a2666"
+    },
+    {
+      "path": "raw_financial_news/publish_date=2024-01-23/0673bd40ccf0486b91ac5eeb55e0be71-0.parquet",
+      "size_bytes": 6218,
+      "sha256": "263895b367d5e0072220775b904a1d962cf6826be608907b74d464325f83d007"
+    },
+    {
+      "path": "raw_financial_news/publish_date=2024-01-24/0673bd40ccf0486b91ac5eeb55e0be71-0.parquet",
+      "size_bytes": 6164,
+      "sha256": "5ad54cd225b92c01e1cda2411171bfc1a6ac7b321495deac0bc2d9f5d1a3af82"
+    },
+    {
+      "path": "raw_financial_news/publish_date=2024-01-25/0673bd40ccf0486b91ac5eeb55e0be71-0.parquet",
+      "size_bytes": 6119,
+      "sha256": "80d69b9db772afe924c4b55567dba8eda1a9515dc8a3791292e58f2b7d6fb1f9"
+    },
+    {
+      "path": "raw_financial_news/publish_date=2024-01-26/0673bd40ccf0486b91ac5eeb55e0be71-0.parquet",
+      "size_bytes": 6203,
+      "sha256": "9c52b5852572fb0fc7cd0ee046ba4bc1f3a97be07a26c66c9c86b7d46625f2f9"
+    },
+    {
+      "path": "raw_financial_news/publish_date=2024-01-29/0673bd40ccf0486b91ac5eeb55e0be71-0.parquet",
+      "size_bytes": 6285,
+      "sha256": "1b92f2eacab960815f6187b1330f3afc78cc153821843850d9c5d491946fdbd6"
+    },
+    {
+      "path": "raw_financial_news/publish_date=2024-01-30/0673bd40ccf0486b91ac5eeb55e0be71-0.parquet",
+      "size_bytes": 6321,
+      "sha256": "d34cf7e1f0d3ff5d436fbc948e6ad6a388811d868be0ad988e002bf670f9d3ab"
+    },
+    {
+      "path": "raw_financial_news/publish_date=2024-01-31/0673bd40ccf0486b91ac5eeb55e0be71-0.parquet",
+      "size_bytes": 6368,
+      "sha256": "ea7439fad2c527db423736e46b0debb860d7dc38a1e4f89b75195b85ea58b7bf"
+    },
+    {
+      "path": "raw_financial_news/publish_date=2024-02-01/0673bd40ccf0486b91ac5eeb55e0be71-0.parquet",
+      "size_bytes": 6102,
+      "sha256": "8830171604078cac85d636141b50bf54c9da8cb9b544a71d19e0591f83157afb"
+    },
+    {
+      "path": "raw_financial_news/publish_date=2024-02-02/0673bd40ccf0486b91ac5eeb55e0be71-0.parquet",
+      "size_bytes": 6017,
+      "sha256": "960e4e0b12e25396735e942fd3045de4b34aeeed46b5cdcf3348172878964501"
+    },
+    {
+      "path": "raw_financial_news/publish_date=2024-02-05/0673bd40ccf0486b91ac5eeb55e0be71-0.parquet",
+      "size_bytes": 6266,
+      "sha256": "31f4596472a1e15f862fe9e2fe4c7d5c8e19525feed48a92c393c0fe6d4a4cbd"
+    },
+    {
+      "path": "raw_financial_news/publish_date=2024-02-06/0673bd40ccf0486b91ac5eeb55e0be71-0.parquet",
+      "size_bytes": 6399,
+      "sha256": "711f79f78b01924b753c14baffbb7eb75379b37d1d998281efffcf084f09cab0"
+    },
+    {
+      "path": "raw_financial_news/publish_date=2024-02-07/0673bd40ccf0486b91ac5eeb55e0be71-0.parquet",
+      "size_bytes": 6283,
+      "sha256": "7dca011fbea0c89d1b3059dd16e8fbe9cf3fe1bbb5ebfcc587f58724a5da42b2"
+    },
+    {
+      "path": "raw_financial_news/publish_date=2024-02-08/0673bd40ccf0486b91ac5eeb55e0be71-0.parquet",
+      "size_bytes": 6131,
+      "sha256": "b02b6e6caf1f8cbe81e341b82239e29326d0afd4615b79aed6b25b2e32a755f0"
+    },
+    {
+      "path": "raw_financial_news/publish_date=2024-02-09/0673bd40ccf0486b91ac5eeb55e0be71-0.parquet",
+      "size_bytes": 6117,
+      "sha256": "c8cfbbddf80084afade8a235d178263bae6f085727b20491d8399ad64029f2dd"
+    },
+    {
+      "path": "raw_financial_news/publish_date=2024-02-12/0673bd40ccf0486b91ac5eeb55e0be71-0.parquet",
+      "size_bytes": 6079,
+      "sha256": "91d84e62234349319883a4d2e6dc8fbeece07e90f1781f96908939a965dd28d8"
+    },
+    {
+      "path": "raw_financial_news/publish_date=2024-02-13/0673bd40ccf0486b91ac5eeb55e0be71-0.parquet",
+      "size_bytes": 6472,
+      "sha256": "dded19703bc12c30ed77b6b0a47557093e54db6ead857e60687b63e4d1b69e19"
+    },
+    {
+      "path": "raw_financial_news/publish_date=2024-02-14/0673bd40ccf0486b91ac5eeb55e0be71-0.parquet",
+      "size_bytes": 6513,
+      "sha256": "950e02833448332f37fc5dc629adc71915cff70023cf06f45c25bd70d30aa9e5"
+    },
+    {
+      "path": "raw_financial_news/publish_date=2024-02-15/0673bd40ccf0486b91ac5eeb55e0be71-0.parquet",
+      "size_bytes": 6121,
+      "sha256": "174b1b570493bb5364c9f1f9ad7155813a743f4659326ae6dc047035adc11b42"
+    },
+    {
+      "path": "raw_financial_news/publish_date=2024-02-16/0673bd40ccf0486b91ac5eeb55e0be71-0.parquet",
+      "size_bytes": 6399,
+      "sha256": "0c1ebe3e4dce4781ca4f78cb4f9ccbf1eb4ab8d25844e7c2ab857bf1cf901ca9"
+    },
+    {
+      "path": "raw_financial_news/publish_date=2024-02-19/0673bd40ccf0486b91ac5eeb55e0be71-0.parquet",
+      "size_bytes": 6338,
+      "sha256": "a86fb84dfa48fb19f4f5f748fb3c46b7faaafdd5c45ff40adad50d07acb60abf"
+    },
+    {
+      "path": "raw_financial_news/publish_date=2024-02-20/0673bd40ccf0486b91ac5eeb55e0be71-0.parquet",
+      "size_bytes": 6162,
+      "sha256": "63eccf80c2b80eacb6a147c11401333699eb8b6b84b893baa4d3d910919ab6a8"
+    },
+    {
+      "path": "raw_financial_news/publish_date=2024-02-21/0673bd40ccf0486b91ac5eeb55e0be71-0.parquet",
+      "size_bytes": 6343,
+      "sha256": "d3dc93db8e2f1d473aebe38a63f4bab89a2ae5414c75c1131de0f21a06a5601b"
+    },
+    {
+      "path": "raw_financial_news/publish_date=2024-02-22/0673bd40ccf0486b91ac5eeb55e0be71-0.parquet",
+      "size_bytes": 6131,
+      "sha256": "25262a1b1067a205f390c36e20a825be0c2134939fc052e298715913c502a130"
+    },
+    {
+      "path": "raw_financial_news/publish_date=2024-02-23/0673bd40ccf0486b91ac5eeb55e0be71-0.parquet",
+      "size_bytes": 6498,
+      "sha256": "963a6975960fd18ed61627f485e1978d82be0fa6f9513c87c59c0c57717083fc"
+    },
+    {
+      "path": "raw_financial_news/publish_date=2024-02-26/0673bd40ccf0486b91ac5eeb55e0be71-0.parquet",
+      "size_bytes": 6418,
+      "sha256": "4a7f4a107361180cadaea328e3ad24bcae4d693145ca741a7b131fde09aac442"
+    },
+    {
+      "path": "raw_financial_news/publish_date=2024-02-27/0673bd40ccf0486b91ac5eeb55e0be71-0.parquet",
+      "size_bytes": 6464,
+      "sha256": "86d3ed4cc9a0ba5b9a08d4485e65566d4131b98777f1b2be28de5cc1283a80e0"
+    },
+    {
+      "path": "raw_financial_news/publish_date=2024-02-28/0673bd40ccf0486b91ac5eeb55e0be71-0.parquet",
+      "size_bytes": 5836,
+      "sha256": "25d0b82cbe7533497c910b418451c86d6cdb7d1bfb11d71ec87dfc2525deb159"
+    },
+    {
+      "path": "raw_financial_news/publish_date=2024-02-29/0673bd40ccf0486b91ac5eeb55e0be71-0.parquet",
+      "size_bytes": 6477,
+      "sha256": "813929ad486167abad8e2e8114aac3dd4b0531550fbc4d5ee9498bbfaf028fc0"
+    },
+    {
+      "path": "raw_market_ohlcv/trade_date=2024-01-02/3a6d93d148324252b14d8f1e449a3c9e-0.parquet",
+      "size_bytes": 9628,
+      "sha256": "864e0c16cfb881272d7032017ff272624f5a82dd8931e8c06f82aea2b4b58fc6"
+    },
+    {
+      "path": "raw_market_ohlcv/trade_date=2024-01-03/3a6d93d148324252b14d8f1e449a3c9e-0.parquet",
+      "size_bytes": 9621,
+      "sha256": "fa611dfdb7e004036c3aeff630524d53d0664e17702b42949a29ea17f6763f1a"
+    },
+    {
+      "path": "raw_market_ohlcv/trade_date=2024-01-04/3a6d93d148324252b14d8f1e449a3c9e-0.parquet",
+      "size_bytes": 9624,
+      "sha256": "bd3155a6fa3fdc8b7ed1adffef4bbe0052f366c07b27a0d2bffd3e73009fec95"
+    },
+    {
+      "path": "raw_market_ohlcv/trade_date=2024-01-05/3a6d93d148324252b14d8f1e449a3c9e-0.parquet",
+      "size_bytes": 9617,
+      "sha256": "5b6d9d4e9537f684783fe0e6cd64f7f33fdc4abff82c65e2bbebb81f72f9be7c"
+    },
+    {
+      "path": "raw_market_ohlcv/trade_date=2024-01-08/3a6d93d148324252b14d8f1e449a3c9e-0.parquet",
+      "size_bytes": 9628,
+      "sha256": "2addddc6a41ff4000e88111dde06d14be8312914c8252e8c4fb3cc5ffe85459a"
+    },
+    {
+      "path": "raw_market_ohlcv/trade_date=2024-01-09/3a6d93d148324252b14d8f1e449a3c9e-0.parquet",
+      "size_bytes": 9611,
+      "sha256": "f065606619040d8200cb4bff65fe8652c3c84dece1b9fe122ddc4edcd9fa15ec"
+    },
+    {
+      "path": "raw_market_ohlcv/trade_date=2024-01-10/3a6d93d148324252b14d8f1e449a3c9e-0.parquet",
+      "size_bytes": 9622,
+      "sha256": "de277684495107f9cdbe345ea6de1eb689d0b73a1487621e129bf85f7d2440a5"
+    },
+    {
+      "path": "raw_market_ohlcv/trade_date=2024-01-11/3a6d93d148324252b14d8f1e449a3c9e-0.parquet",
+      "size_bytes": 9628,
+      "sha256": "f8f452fd562fbd26d1dc8d5a5ea75c3537cbc9a09879110c61722529749b76f9"
+    },
+    {
+      "path": "raw_market_ohlcv/trade_date=2024-01-12/3a6d93d148324252b14d8f1e449a3c9e-0.parquet",
+      "size_bytes": 9619,
+      "sha256": "f5b4d242d8f4e788959afe25dfc8e0f8ca7ac87a1ecca377006dd67157aa2ce9"
+    },
+    {
+      "path": "raw_market_ohlcv/trade_date=2024-01-15/3a6d93d148324252b14d8f1e449a3c9e-0.parquet",
+      "size_bytes": 9631,
+      "sha256": "3d492f9a87a534a98a8a79d366cc33eddb1294cffb6d1321fe4897aebf56c2c1"
+    },
+    {
+      "path": "raw_market_ohlcv/trade_date=2024-01-16/3a6d93d148324252b14d8f1e449a3c9e-0.parquet",
+      "size_bytes": 9608,
+      "sha256": "18c9e6c8ee6fd0ecb867f328b9f5ec7382c034e591136241f58a0c6341c77e45"
+    },
+    {
+      "path": "raw_market_ohlcv/trade_date=2024-01-17/3a6d93d148324252b14d8f1e449a3c9e-0.parquet",
+      "size_bytes": 9614,
+      "sha256": "b38f2cae1646851985eb2216597eb6b2b6a1a82a8e9d3082ffadd9e24b567269"
+    },
+    {
+      "path": "raw_market_ohlcv/trade_date=2024-01-18/3a6d93d148324252b14d8f1e449a3c9e-0.parquet",
+      "size_bytes": 9607,
+      "sha256": "8658bf93cf588f7ee8f9bde7208dd1e6f63489720f38c6ceed19e52293a1e1c4"
+    },
+    {
+      "path": "raw_market_ohlcv/trade_date=2024-01-19/3a6d93d148324252b14d8f1e449a3c9e-0.parquet",
+      "size_bytes": 9632,
+      "sha256": "abfbade0eb787809b9ef0f22d6c198fd05c437c320831701a2814ce308ef32d1"
+    },
+    {
+      "path": "raw_market_ohlcv/trade_date=2024-01-22/3a6d93d148324252b14d8f1e449a3c9e-0.parquet",
+      "size_bytes": 9636,
+      "sha256": "9ba67ba8427d639eb9fb7eb20d9a7cfd81d74cc1897c718b7c8d1181857295d2"
+    },
+    {
+      "path": "raw_market_ohlcv/trade_date=2024-01-23/3a6d93d148324252b14d8f1e449a3c9e-0.parquet",
+      "size_bytes": 9607,
+      "sha256": "6bd90507627179972d19831a6bb850fb0da359d35d15812610290ecfeb1b3ffa"
+    },
+    {
+      "path": "raw_market_ohlcv/trade_date=2024-01-24/3a6d93d148324252b14d8f1e449a3c9e-0.parquet",
+      "size_bytes": 9597,
+      "sha256": "92dcb15e18cf23cbda8cd1fa1c6739df28b9ef1eeeaab287869ee5597b1679da"
+    },
+    {
+      "path": "raw_market_ohlcv/trade_date=2024-01-25/3a6d93d148324252b14d8f1e449a3c9e-0.parquet",
+      "size_bytes": 9619,
+      "sha256": "6ba6ab0c414f42f84e28c64c7074fadb3ac991815404a99cc5bfbd1e213647de"
+    },
+    {
+      "path": "raw_market_ohlcv/trade_date=2024-01-26/3a6d93d148324252b14d8f1e449a3c9e-0.parquet",
+      "size_bytes": 9643,
+      "sha256": "65a906411f810ce3943f2123806fe502cd0d923c7b4c92d3e6ec5c2be894631a"
+    },
+    {
+      "path": "raw_market_ohlcv/trade_date=2024-01-29/3a6d93d148324252b14d8f1e449a3c9e-0.parquet",
+      "size_bytes": 9614,
+      "sha256": "55161cffd8ca6bb5477e3ed6b5ad7460a33c24f5e3d4e50694bbdef909a2a077"
+    },
+    {
+      "path": "raw_market_ohlcv/trade_date=2024-01-30/3a6d93d148324252b14d8f1e449a3c9e-0.parquet",
+      "size_bytes": 9611,
+      "sha256": "17172767ee02455f51c2def641b2fc615b79a9fb057eb888db72dc5e2f6947fb"
+    },
+    {
+      "path": "raw_market_ohlcv/trade_date=2024-01-31/3a6d93d148324252b14d8f1e449a3c9e-0.parquet",
+      "size_bytes": 9609,
+      "sha256": "2f1ae3df7630f7197f463a59a7d6fc87da7bfe7d9156736fb19d3a200d8ebdde"
+    },
+    {
+      "path": "raw_market_ohlcv/trade_date=2024-02-01/3a6d93d148324252b14d8f1e449a3c9e-0.parquet",
+      "size_bytes": 9635,
+      "sha256": "2bf8e2c1c53ef9e452334e882aadf48acae11dbdbad2379ab81d2aede395e204"
+    },
+    {
+      "path": "raw_market_ohlcv/trade_date=2024-02-02/3a6d93d148324252b14d8f1e449a3c9e-0.parquet",
+      "size_bytes": 9626,
+      "sha256": "bacf3c785cc0b0bc05102eb5adcbc77aee2a7cee7701c33bd336f5c42c2ec85c"
+    },
+    {
+      "path": "raw_market_ohlcv/trade_date=2024-02-05/3a6d93d148324252b14d8f1e449a3c9e-0.parquet",
+      "size_bytes": 9622,
+      "sha256": "aa9179f53cc30d649b39a57f10d1bafc9b1f0f5aa1c1a6305e13d208732f72fa"
+    },
+    {
+      "path": "raw_market_ohlcv/trade_date=2024-02-06/3a6d93d148324252b14d8f1e449a3c9e-0.parquet",
+      "size_bytes": 9621,
+      "sha256": "0ed8dcbf4a9d401e9fdd842ff6cf13c2af97fbee7bdb1672e555798acd0c78d3"
+    },
+    {
+      "path": "raw_market_ohlcv/trade_date=2024-02-07/3a6d93d148324252b14d8f1e449a3c9e-0.parquet",
+      "size_bytes": 9647,
+      "sha256": "3d894ed6737373e3c6416a247475937e4846b15877f967576d493ec08ce85fae"
+    },
+    {
+      "path": "raw_market_ohlcv/trade_date=2024-02-08/3a6d93d148324252b14d8f1e449a3c9e-0.parquet",
+      "size_bytes": 9629,
+      "sha256": "1c07f2c87c0cde82f935394c5bf65ebd5cbb60c15c7e17d1ecafc8927cd47365"
+    },
+    {
+      "path": "raw_market_ohlcv/trade_date=2024-02-09/3a6d93d148324252b14d8f1e449a3c9e-0.parquet",
+      "size_bytes": 9623,
+      "sha256": "3f9e7f9b760139add08ad87bf9a31136cc458bb1bd03d9fc91ea3eccb59c0ca8"
+    },
+    {
+      "path": "raw_market_ohlcv/trade_date=2024-02-12/3a6d93d148324252b14d8f1e449a3c9e-0.parquet",
+      "size_bytes": 9620,
+      "sha256": "bd89e29d2535835c3adbb66ac25bef181615a0e36b5442d5ecf87713146e505e"
+    },
+    {
+      "path": "raw_market_ohlcv/trade_date=2024-02-13/3a6d93d148324252b14d8f1e449a3c9e-0.parquet",
+      "size_bytes": 9607,
+      "sha256": "39e3862b9d5afe26461211218ea07abb411476c5fb34a6d595b4bb8ff6ae49d0"
+    },
+    {
+      "path": "raw_market_ohlcv/trade_date=2024-02-14/3a6d93d148324252b14d8f1e449a3c9e-0.parquet",
+      "size_bytes": 9618,
+      "sha256": "d9564ccb66c9a2b947f51972cba5f8361eaddbef25e59cb6ff76da561f65f58a"
+    },
+    {
+      "path": "raw_market_ohlcv/trade_date=2024-02-15/3a6d93d148324252b14d8f1e449a3c9e-0.parquet",
+      "size_bytes": 9607,
+      "sha256": "bf7c43a0968b2f1dfd9bcf4a3ec83cc4fe3897bc7e1ffa037bdae9caeb80445b"
+    },
+    {
+      "path": "raw_market_ohlcv/trade_date=2024-02-16/3a6d93d148324252b14d8f1e449a3c9e-0.parquet",
+      "size_bytes": 9610,
+      "sha256": "4ebb1d3b455c69edb3ec538c7a9109af1e7f4a4a62082690dd427fcf01be0a11"
+    },
+    {
+      "path": "raw_market_ohlcv/trade_date=2024-02-19/3a6d93d148324252b14d8f1e449a3c9e-0.parquet",
+      "size_bytes": 9620,
+      "sha256": "bae098392d4241d4b1ae31621677046148e2ac9df317ba1b61f1fdad12807ca6"
+    },
+    {
+      "path": "raw_market_ohlcv/trade_date=2024-02-20/3a6d93d148324252b14d8f1e449a3c9e-0.parquet",
+      "size_bytes": 9626,
+      "sha256": "0f6fffa4b49bbc988d84a30eaeae5f29dcbed1cc1c14fb72febc20469e7bd378"
+    },
+    {
+      "path": "raw_market_ohlcv/trade_date=2024-02-21/3a6d93d148324252b14d8f1e449a3c9e-0.parquet",
+      "size_bytes": 9638,
+      "sha256": "ce393cd0b2f5635f84d2f4e060f9e04df8167e054d677f249b8aed8b3222299e"
+    },
+    {
+      "path": "raw_market_ohlcv/trade_date=2024-02-22/3a6d93d148324252b14d8f1e449a3c9e-0.parquet",
+      "size_bytes": 9638,
+      "sha256": "c09a7bae7dae4c754a19d5026a19b9e0848a4003725401f56e2d8ae67c15d8ab"
+    },
+    {
+      "path": "raw_market_ohlcv/trade_date=2024-02-23/3a6d93d148324252b14d8f1e449a3c9e-0.parquet",
+      "size_bytes": 9604,
+      "sha256": "a5d6e4e1be143869e0b440d451cd881d86d48382349da894196964adc62459eb"
+    },
+    {
+      "path": "raw_market_ohlcv/trade_date=2024-02-26/3a6d93d148324252b14d8f1e449a3c9e-0.parquet",
+      "size_bytes": 9608,
+      "sha256": "53efbf07b3f1c440af58f973ee787696ba46312397a8dbf550ef8edf4436b4b8"
+    },
+    {
+      "path": "raw_market_ohlcv/trade_date=2024-02-27/3a6d93d148324252b14d8f1e449a3c9e-0.parquet",
+      "size_bytes": 9610,
+      "sha256": "593dea5412ed051ce087ca58e1e46aecc7df0d8560afce5be6a3acc1b72e4639"
+    },
+    {
+      "path": "raw_market_ohlcv/trade_date=2024-02-28/3a6d93d148324252b14d8f1e449a3c9e-0.parquet",
+      "size_bytes": 9643,
+      "sha256": "35ec6fdc8efec45d67455326c9af436c7bba3726bf584dd90535f0e747c75e9a"
+    },
+    {
+      "path": "raw_market_ohlcv/trade_date=2024-02-29/3a6d93d148324252b14d8f1e449a3c9e-0.parquet",
+      "size_bytes": 9611,
+      "sha256": "b4cd17c3cb26e3d64a2426376290bab0f202b06f2d3325e3d14709a9a73fe3dd"
+    },
+    {
+      "path": "raw_market_ticks/trade_date=2024-01-02/785d4fea5182454ba325bb5ba75bdab7-0.parquet",
+      "size_bytes": 59987,
+      "sha256": "d670245eb09ae47af9bddee08d91cf63323e0d02ceddf381085801f9f6c2e4b1"
+    },
+    {
+      "path": "raw_market_ticks/trade_date=2024-01-03/785d4fea5182454ba325bb5ba75bdab7-0.parquet",
+      "size_bytes": 57136,
+      "sha256": "39929db816d7368390283b89a58ac0cc0d2bbf2aadac50766288cc2e732d3b6f"
+    },
+    {
+      "path": "raw_market_ticks/trade_date=2024-01-04/785d4fea5182454ba325bb5ba75bdab7-0.parquet",
+      "size_bytes": 53681,
+      "sha256": "0853a74c94fcfb3ae196432a1626318a17e4a766937f603fcd0a48aaeefd42b7"
+    },
+    {
+      "path": "raw_market_ticks/trade_date=2024-01-05/785d4fea5182454ba325bb5ba75bdab7-0.parquet",
+      "size_bytes": 54087,
+      "sha256": "b87da5df5e30a5977669640c60991b3a3154ca4d7c5746031fcc2959ff83f335"
+    },
+    {
+      "path": "raw_market_ticks/trade_date=2024-01-08/785d4fea5182454ba325bb5ba75bdab7-0.parquet",
+      "size_bytes": 54642,
+      "sha256": "9cfb42f9ab8b7894ccd72a8990f26250f9c4c22d66c26d89eafd4aa73e63b4f5"
+    },
+    {
+      "path": "raw_market_ticks/trade_date=2024-01-09/785d4fea5182454ba325bb5ba75bdab7-0.parquet",
+      "size_bytes": 52862,
+      "sha256": "e344f2499c559219f70f04b0b0e85db928c9bb92563daa1a0b39f2de1ef70a87"
+    },
+    {
+      "path": "raw_market_ticks/trade_date=2024-01-10/785d4fea5182454ba325bb5ba75bdab7-0.parquet",
+      "size_bytes": 62597,
+      "sha256": "6bfa2ae68cdf2593d91e9d0c9d15d994f7cc7df1346c16933eede28d72df5d45"
+    },
+    {
+      "path": "raw_market_ticks/trade_date=2024-01-11/785d4fea5182454ba325bb5ba75bdab7-0.parquet",
+      "size_bytes": 40325,
+      "sha256": "9c10d782ddbe0495f27dd1808f754d8f693917d55486ecccf78402da75b63e02"
+    },
+    {
+      "path": "raw_market_ticks/trade_date=2024-01-12/785d4fea5182454ba325bb5ba75bdab7-0.parquet",
+      "size_bytes": 62044,
+      "sha256": "6c38cd06313188fb5f5d713100dc2311db4c66411009ed5e2b61a70d734bd681"
+    },
+    {
+      "path": "raw_market_ticks/trade_date=2024-01-15/785d4fea5182454ba325bb5ba75bdab7-0.parquet",
+      "size_bytes": 58294,
+      "sha256": "c78b53f4faebaa133e5d9c9dbecb98071f2327295a10769b5b21eef36adc4d3d"
+    },
+    {
+      "path": "raw_market_ticks/trade_date=2024-01-16/785d4fea5182454ba325bb5ba75bdab7-0.parquet",
+      "size_bytes": 57498,
+      "sha256": "779de12662920303d9a0880d3c9a7632f594305af9cd8ca0c421205c13f990af"
+    },
+    {
+      "path": "raw_market_ticks/trade_date=2024-01-17/785d4fea5182454ba325bb5ba75bdab7-0.parquet",
+      "size_bytes": 56599,
+      "sha256": "72f7aa57359fe5b3336673635634660d2a73d8abefe53edd9660a8acc466dbf8"
+    },
+    {
+      "path": "raw_market_ticks/trade_date=2024-01-18/785d4fea5182454ba325bb5ba75bdab7-0.parquet",
+      "size_bytes": 60686,
+      "sha256": "204c9451c6fef357a52151a652d6435e23cb9500ba1a64875088443afd42455a"
+    },
+    {
+      "path": "raw_market_ticks/trade_date=2024-01-19/785d4fea5182454ba325bb5ba75bdab7-0.parquet",
+      "size_bytes": 56342,
+      "sha256": "65ae9e156a066be6844d0ccc684b96fabb57fc5e4ddf7db0db7541602ebb6eaa"
+    },
+    {
+      "path": "raw_market_ticks/trade_date=2024-01-22/785d4fea5182454ba325bb5ba75bdab7-0.parquet",
+      "size_bytes": 51307,
+      "sha256": "ee9431b2e74a31e3a75ab96e31aa1a1710753dc55fe8be0bbcb3f146ee45e7d5"
+    },
+    {
+      "path": "raw_market_ticks/trade_date=2024-01-23/785d4fea5182454ba325bb5ba75bdab7-0.parquet",
+      "size_bytes": 65685,
+      "sha256": "c7f409cd46d2bf3f1a94797f4b4a308e47a0beab438be0df299c91c2c3d6f81c"
+    },
+    {
+      "path": "raw_market_ticks/trade_date=2024-01-24/785d4fea5182454ba325bb5ba75bdab7-0.parquet",
+      "size_bytes": 62310,
+      "sha256": "366964bf0cc02848b46d41154062171bcd2addf05be34b6daedcf88137d3fd1b"
+    },
+    {
+      "path": "raw_market_ticks/trade_date=2024-01-25/785d4fea5182454ba325bb5ba75bdab7-0.parquet",
+      "size_bytes": 64117,
+      "sha256": "0150aa51d797a462e370bb5df618d7b615ea791cd16477aaa885a792f295d5a3"
+    },
+    {
+      "path": "raw_market_ticks/trade_date=2024-01-26/785d4fea5182454ba325bb5ba75bdab7-0.parquet",
+      "size_bytes": 59013,
+      "sha256": "5aee4af840b93ad8e3ee6eb8a67f689b478cdbef8003b2dc70016b50e78909c8"
+    },
+    {
+      "path": "raw_market_ticks/trade_date=2024-01-29/785d4fea5182454ba325bb5ba75bdab7-0.parquet",
+      "size_bytes": 60731,
+      "sha256": "b2a4939ba9be221b11c78a42b8694e8e807136c23219b368a61850a11869ac83"
+    },
+    {
+      "path": "raw_market_ticks/trade_date=2024-01-30/785d4fea5182454ba325bb5ba75bdab7-0.parquet",
+      "size_bytes": 49151,
+      "sha256": "b008c47f98a1a9c6d200c2b22d36cd926ea11cf2c9a926103261dd3935f6533b"
+    },
+    {
+      "path": "raw_market_ticks/trade_date=2024-01-31/785d4fea5182454ba325bb5ba75bdab7-0.parquet",
+      "size_bytes": 54847,
+      "sha256": "dd99755400615217766edc840b4b20536d62142929bc118dbc184aeeccf66bc2"
+    },
+    {
+      "path": "raw_market_ticks/trade_date=2024-02-01/785d4fea5182454ba325bb5ba75bdab7-0.parquet",
+      "size_bytes": 54739,
+      "sha256": "9dc54a8005b009277e7a48f6bb97dd6f211e5799d19c4d1f7723874d6d0997f5"
+    },
+    {
+      "path": "raw_market_ticks/trade_date=2024-02-02/785d4fea5182454ba325bb5ba75bdab7-0.parquet",
+      "size_bytes": 61273,
+      "sha256": "0edca924624f61de2f49cc79729f34424703ca4f5d78572834c7afde3ad79b8e"
+    },
+    {
+      "path": "raw_market_ticks/trade_date=2024-02-05/785d4fea5182454ba325bb5ba75bdab7-0.parquet",
+      "size_bytes": 68617,
+      "sha256": "d9bde37d67dba6b89cdd2d554cca5dc152ec7175bd871f38844170b863a0dd65"
+    },
+    {
+      "path": "raw_market_ticks/trade_date=2024-02-06/785d4fea5182454ba325bb5ba75bdab7-0.parquet",
+      "size_bytes": 63472,
+      "sha256": "682aa58d9963358c972d6c179f08713d83dde774db52ad87d31b2c93558d1919"
+    },
+    {
+      "path": "raw_market_ticks/trade_date=2024-02-07/785d4fea5182454ba325bb5ba75bdab7-0.parquet",
+      "size_bytes": 55752,
+      "sha256": "ebe36115056cac55927fa4d1c2bc726a6acadc510f5e19abea1db0e0c9976662"
+    },
+    {
+      "path": "raw_market_ticks/trade_date=2024-02-08/785d4fea5182454ba325bb5ba75bdab7-0.parquet",
+      "size_bytes": 85898,
+      "sha256": "2c98daa58def5881b4d81a1669f207e2d3725ada2f4ec2206a0fe9f2e047ec76"
+    },
+    {
+      "path": "raw_market_ticks/trade_date=2024-02-09/785d4fea5182454ba325bb5ba75bdab7-0.parquet",
+      "size_bytes": 49403,
+      "sha256": "8534ecaa9d4f5e8d59681598a05a82d158ea15f7a64e7a5ef6120d4768f22fd7"
+    },
+    {
+      "path": "raw_market_ticks/trade_date=2024-02-12/785d4fea5182454ba325bb5ba75bdab7-0.parquet",
+      "size_bytes": 57493,
+      "sha256": "63bb9fbb12a38c741a913ebd769837b145b0a9dedb516964537b88fe59edf556"
+    },
+    {
+      "path": "raw_market_ticks/trade_date=2024-02-13/785d4fea5182454ba325bb5ba75bdab7-0.parquet",
+      "size_bytes": 45676,
+      "sha256": "12784892b83b8b858eb58c7a9e37fffb3f4d749b564b510e738aa9567333415b"
+    },
+    {
+      "path": "raw_market_ticks/trade_date=2024-02-14/785d4fea5182454ba325bb5ba75bdab7-0.parquet",
+      "size_bytes": 59428,
+      "sha256": "adb5e9b277266fcbcd70522fd9c79342b2ce467920b988d008783516277db423"
+    },
+    {
+      "path": "raw_market_ticks/trade_date=2024-02-15/785d4fea5182454ba325bb5ba75bdab7-0.parquet",
+      "size_bytes": 46654,
+      "sha256": "0da1067c455de800b9e9f692c4f58c151c362bf69202b2ec5704e93702f01cdb"
+    },
+    {
+      "path": "raw_market_ticks/trade_date=2024-02-16/785d4fea5182454ba325bb5ba75bdab7-0.parquet",
+      "size_bytes": 62594,
+      "sha256": "6749c9662af579794002dd715d8d7d18590c1e83b82322788372d6d4d589ea0c"
+    },
+    {
+      "path": "raw_market_ticks/trade_date=2024-02-19/785d4fea5182454ba325bb5ba75bdab7-0.parquet",
+      "size_bytes": 47471,
+      "sha256": "efa92c0829c1b58f2075307d7e987838adb9f0ee545b6a505ae14a8694664a3e"
+    },
+    {
+      "path": "raw_market_ticks/trade_date=2024-02-20/785d4fea5182454ba325bb5ba75bdab7-0.parquet",
+      "size_bytes": 57637,
+      "sha256": "25902a958f9f0e0ed8e6032a32dba334a6687db38fe8dadf92b50b7b66d593fc"
+    },
+    {
+      "path": "raw_market_ticks/trade_date=2024-02-21/785d4fea5182454ba325bb5ba75bdab7-0.parquet",
+      "size_bytes": 50912,
+      "sha256": "697f1e7aba1669246625a954d85f035a4a1b1fbcd95b677f4c966ab2bc864d9c"
+    },
+    {
+      "path": "raw_market_ticks/trade_date=2024-02-22/785d4fea5182454ba325bb5ba75bdab7-0.parquet",
+      "size_bytes": 61730,
+      "sha256": "c81aafd2584a06e68e8b1a0a806b887e790338b60b67cf5aca53676a82ca0b8e"
+    },
+    {
+      "path": "raw_market_ticks/trade_date=2024-02-23/785d4fea5182454ba325bb5ba75bdab7-0.parquet",
+      "size_bytes": 63195,
+      "sha256": "d4ffc8e60865ae00da9b73b03bbd93471de087420b5490cce4f3a5610c395f70"
+    },
+    {
+      "path": "raw_market_ticks/trade_date=2024-02-26/785d4fea5182454ba325bb5ba75bdab7-0.parquet",
+      "size_bytes": 51561,
+      "sha256": "81b497190f8ff625b0b5fec6ac33404906be182e4e40544dcf84b817325df0b6"
+    },
+    {
+      "path": "raw_market_ticks/trade_date=2024-02-27/785d4fea5182454ba325bb5ba75bdab7-0.parquet",
+      "size_bytes": 48440,
+      "sha256": "eb29475005c2d1aa73ce31650743f777c0611c36e6898f806289fd1267a59492"
+    },
+    {
+      "path": "raw_market_ticks/trade_date=2024-02-28/785d4fea5182454ba325bb5ba75bdab7-0.parquet",
+      "size_bytes": 67484,
+      "sha256": "fcfd2ad52b8c973fb2f279fb1eae21832e30a9ea64ceea2e09b01ef21bff25df"
+    },
+    {
+      "path": "raw_market_ticks/trade_date=2024-02-29/785d4fea5182454ba325bb5ba75bdab7-0.parquet",
+      "size_bytes": 57646,
+      "sha256": "c1095c4cf393010b04ab2698d4864b5f61c16039f86cd5eb2afaf95a2b983e96"
+    },
+    {
+      "path": "split_manifest.json",
+      "size_bytes": 2691,
+      "sha256": "68f14141bebabdb45b9ab8157485271f5b8ea6ebc393419cab71a0baacd393ca"
+    }
+  ]
+}

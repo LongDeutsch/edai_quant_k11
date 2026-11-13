@@ -1,25 +1,26 @@
 {
   "status": "PASSED_SIMULATED",
   "execution_mode": "SIMULATED",
-  "dataset_id": "20261112T043007Z_smoke_s0p001_seed7_87aa5fb4",
+  "dataset_id": "20261113T035304Z_smoke_s0p001_seed7_8f306d30",
   "benchmark": true,
-  "run_id": "20261112T043007Z_smoke_s0p001_seed7_87aa5fb4",
+  "run_id": "20261113T035304Z_smoke_s0p001_seed7_8f306d30",
   "scale": 0.001,
   "mode": "smoke",
   "seed": 7,
-  "started_at": "2026-11-12T04:30:08.164699+00:00",
-  "total_latency_seconds": 0.2671,
-  "approx_bytes": 429599,
-  "approx_mb": 0.41,
+  "started_at": "2026-11-13T03:53:05.151458+00:00",
+  "total_latency_seconds": 0.2589,
+  "approx_bytes": 379712,
+  "approx_mb": 0.362,
   "steps": [
     {
       "step": "generate",
       "ok": true,
-      "latency_seconds": 0.0994,
+      "latency_seconds": 0.0802,
       "error": null,
       "result": {
-        "dataset_id": "20261112T043007Z_smoke_s0p001_seed7_87aa5fb4",
-        "run_id": "20261112T043007Z_smoke_s0p001_seed7_87aa5fb4",
+        "dataset_id": "20261113T035304Z_smoke_s0p001_seed7_8f306d30",
+        "run_id": "20261113T035304Z_smoke_s0p001_seed7_8f306d30",
+        "profile": "smoke",
         "execution_mode": "SIMULATED",
         "status": "SUCCESS",
         "mode": "smoke",
@@ -33,14 +34,25 @@
         "offline_end": "2024-01-10",
         "span_years": 0.02,
         "trading_days": 7,
-        "total_raw_ticks": 832,
-        "total_raw_volume": 133952,
-        "volume_skew_ratio": 0.8015,
-        "offline_duplicate_rate": 0.0196,
+        "total_raw_ticks": 117,
+        "total_raw_volume": 33580,
+        "splits": {
+          "is_ticks": 117,
+          "oos_ticks": 0,
+          "tr_ticks": 0,
+          "is_sessions": 7,
+          "oos_sessions": 0,
+          "tr_sessions": 0,
+          "is_density_avg": 16.71,
+          "oos_density_avg": 0.0,
+          "tr_density_avg": 0.0
+        },
+        "volume_skew_ratio": 0.7984,
+        "offline_duplicate_rate": 0.0174,
         "schema_evolution_boundary": "2024-06-01",
         "schema_evolution_populated_ticks": 0,
         "schema_evolved_rows": 0,
-        "offline_duplicates_count": 16,
+        "offline_duplicates_count": 2,
         "regime_drift_boundary": "2024-08-01",
         "schema_before_evolution": [
           "trade_id",
@@ -68,81 +80,87 @@
         "cardinality_profile": {
           "raw_market_ticks": {
             "trade_id": {
-              "unique_values": 816,
-              "total_rows": 832,
-              "cardinality_ratio": 0.980769,
+              "unique_values": 115,
+              "total_rows": 117,
+              "cardinality_ratio": 0.982906,
               "category": "HIGH"
             },
             "ticker_symbol": {
               "unique_values": 16,
-              "total_rows": 832,
-              "cardinality_ratio": 0.019231,
-              "category": "LOW"
+              "total_rows": 117,
+              "cardinality_ratio": 0.136752,
+              "category": "MEDIUM"
             },
             "trade_date": {
               "unique_values": 7,
-              "total_rows": 832,
-              "cardinality_ratio": 0.008413,
-              "category": "LOW"
+              "total_rows": 117,
+              "cardinality_ratio": 0.059829,
+              "category": "MEDIUM"
             },
             "price": {
-              "unique_values": 798,
-              "total_rows": 832,
-              "cardinality_ratio": 0.959135,
+              "unique_values": 115,
+              "total_rows": 117,
+              "cardinality_ratio": 0.982906,
               "category": "HIGH"
             },
             "size": {
-              "unique_values": 12,
-              "total_rows": 832,
-              "cardinality_ratio": 0.014423,
-              "category": "LOW"
+              "unique_values": 11,
+              "total_rows": 117,
+              "cardinality_ratio": 0.094017,
+              "category": "MEDIUM"
             },
             "event_timestamp": {
-              "unique_values": 816,
-              "total_rows": 832,
-              "cardinality_ratio": 0.980769,
+              "unique_values": 115,
+              "total_rows": 117,
+              "cardinality_ratio": 0.982906,
               "category": "HIGH"
             },
             "ingestion_timestamp": {
-              "unique_values": 832,
-              "total_rows": 832,
+              "unique_values": 117,
+              "total_rows": 117,
               "cardinality_ratio": 1.0,
               "category": "HIGH"
             },
             "exchange": {
               "unique_values": 2,
-              "total_rows": 832,
-              "cardinality_ratio": 0.002404,
+              "total_rows": 117,
+              "cardinality_ratio": 0.017094,
               "category": "LOW"
             },
             "dataset_id": {
               "unique_values": 1,
-              "total_rows": 832,
-              "cardinality_ratio": 0.001202,
+              "total_rows": 117,
+              "cardinality_ratio": 0.008547,
+              "category": "LOW"
+            },
+            "split_id": {
+              "unique_values": 1,
+              "total_rows": 117,
+              "cardinality_ratio": 0.008547,
               "category": "LOW"
             },
             "market_regime": {
               "unique_values": 1,
-              "total_rows": 832,
-              "cardinality_ratio": 0.001202,
+              "total_rows": 117,
+              "cardinality_ratio": 0.008547,
               "category": "LOW"
             },
             "quote_condition": {
               "unique_values": 1,
-              "total_rows": 832,
-              "cardinality_ratio": 0.001202,
+              "total_rows": 117,
+              "cardinality_ratio": 0.008547,
               "category": "LOW"
             },
             "bid_price": {
               "unique_values": 1,
-              "total_rows": 832,
-              "cardinality_ratio": 0.001202,
+              "total_rows": 117,
+              "cardinality_ratio": 0.008547,
               "category": "LOW"
             },
             "ask_price": {
               "unique_values": 1,
-              "total_rows": 832,
-              "cardinality_ratio": 0.001202,
+              "total_rows": 117,
+              "cardinality_ratio": 0.008547,
               "category": "LOW"
             }
           },
@@ -166,33 +184,33 @@
               "category": "MEDIUM"
             },
             "open_price": {
-              "unique_values": 90,
+              "unique_values": 110,
               "total_rows": 112,
-              "cardinality_ratio": 0.803571,
-              "category": "MEDIUM"
+              "cardinality_ratio": 0.982143,
+              "category": "HIGH"
             },
             "high_price": {
-              "unique_values": 88,
+              "unique_values": 110,
               "total_rows": 112,
-              "cardinality_ratio": 0.785714,
-              "category": "MEDIUM"
+              "cardinality_ratio": 0.982143,
+              "category": "HIGH"
             },
             "low_price": {
-              "unique_values": 90,
+              "unique_values": 110,
               "total_rows": 112,
-              "cardinality_ratio": 0.803571,
-              "category": "MEDIUM"
+              "cardinality_ratio": 0.982143,
+              "category": "HIGH"
             },
             "close_price": {
-              "unique_values": 90,
+              "unique_values": 110,
               "total_rows": 112,
-              "cardinality_ratio": 0.803571,
-              "category": "MEDIUM"
+              "cardinality_ratio": 0.982143,
+              "category": "HIGH"
             },
             "volume": {
-              "unique_values": 84,
+              "unique_values": 13,
               "total_rows": 112,
-              "cardinality_ratio": 0.75,
+              "cardinality_ratio": 0.116071,
               "category": "MEDIUM"
             },
             "exchange": {
@@ -220,59 +238,65 @@
               "category": "HIGH"
             },
             "trade_count": {
-              "unique_values": 19,
+              "unique_values": 2,
               "total_rows": 112,
-              "cardinality_ratio": 0.169643,
-              "category": "MEDIUM"
+              "cardinality_ratio": 0.017857,
+              "category": "LOW"
+            },
+            "split_id": {
+              "unique_values": 1,
+              "total_rows": 112,
+              "cardinality_ratio": 0.008929,
+              "category": "LOW"
             }
           },
           "financial_news": {
             "article_id": {
-              "unique_values": 43,
-              "total_rows": 43,
+              "unique_values": 46,
+              "total_rows": 46,
               "cardinality_ratio": 1.0,
               "category": "HIGH"
             },
             "ticker_symbol": {
-              "unique_values": 11,
-              "total_rows": 43,
-              "cardinality_ratio": 0.255814,
+              "unique_values": 13,
+              "total_rows": 46,
+              "cardinality_ratio": 0.282609,
               "category": "MEDIUM"
             },
             "publish_date": {
               "unique_values": 7,
-              "total_rows": 43,
-              "cardinality_ratio": 0.162791,
+              "total_rows": 46,
+              "cardinality_ratio": 0.152174,
               "category": "MEDIUM"
             },
             "published_ts": {
-              "unique_values": 43,
-              "total_rows": 43,
+              "unique_values": 46,
+              "total_rows": 46,
               "cardinality_ratio": 1.0,
               "category": "HIGH"
             },
             "headline": {
-              "unique_values": 36,
-              "total_rows": 43,
-              "cardinality_ratio": 0.837209,
-              "category": "MEDIUM"
+              "unique_values": 42,
+              "total_rows": 46,
+              "cardinality_ratio": 0.913043,
+              "category": "HIGH"
             },
             "summary": {
-              "unique_values": 11,
-              "total_rows": 43,
-              "cardinality_ratio": 0.255814,
+              "unique_values": 13,
+              "total_rows": 46,
+              "cardinality_ratio": 0.282609,
               "category": "MEDIUM"
             },
             "sentiment_score": {
-              "unique_values": 43,
-              "total_rows": 43,
+              "unique_values": 46,
+              "total_rows": 46,
               "cardinality_ratio": 1.0,
               "category": "HIGH"
             },
             "source_outlet": {
               "unique_values": 4,
-              "total_rows": 43,
-              "cardinality_ratio": 0.093023,
+              "total_rows": 46,
+              "cardinality_ratio": 0.086957,
               "category": "MEDIUM"
             }
           },
@@ -346,62 +370,69 @@
               "category": "MEDIUM"
             },
             "close_price": {
-              "unique_values": 78,
+              "unique_values": 94,
               "total_rows": 96,
-              "cardinality_ratio": 0.8125,
-              "category": "MEDIUM"
+              "cardinality_ratio": 0.979167,
+              "category": "HIGH"
             },
             "next_day_close": {
-              "unique_values": 80,
+              "unique_values": 94,
               "total_rows": 96,
-              "cardinality_ratio": 0.833333,
-              "category": "MEDIUM"
+              "cardinality_ratio": 0.979167,
+              "category": "HIGH"
             },
             "daily_return_fwd": {
-              "unique_values": 73,
+              "unique_values": 96,
               "total_rows": 96,
-              "cardinality_ratio": 0.760417,
-              "category": "MEDIUM"
+              "cardinality_ratio": 1.0,
+              "category": "HIGH"
             },
             "direction_label": {
               "unique_values": 2,
               "total_rows": 96,
               "cardinality_ratio": 0.020833,
               "category": "LOW"
+            },
+            "split_id": {
+              "unique_values": 1,
+              "total_rows": 96,
+              "cardinality_ratio": 0.010417,
+              "category": "LOW"
             }
           }
         },
-        "total_data_volume_bytes": 212799,
-        "total_data_volume_mb": 0.2,
+        "total_data_volume_bytes": 190195,
+        "total_data_volume_mb": 0.18,
         "total_market_rows": 112,
-        "total_volume": 133952,
-        "mega_cap_volume": 107362,
-        "total_news_articles": 43,
+        "total_volume": 33580,
+        "mega_cap_volume": 26810,
+        "total_news_articles": 46,
         "total_label_rows": 96,
         "total_dimension_rows": 32,
         "gold_features_written": false,
         "bronze_immutable": true,
-        "lakehouse_bronze_uri": "s3a://lakehouse/bronze/runs/20261112T043007Z_smoke_s0p001_seed7_87aa5fb4",
+        "lakehouse_bronze_uri": "s3a://lakehouse/bronze/runs/20261113T035304Z_smoke_s0p001_seed7_8f306d30",
         "paths": {
-          "base_out_dir": "/private/var/folders/df/p7lmy0917s36_bmbrvhq4tn00000gp/T/pytest-of-nguyenbuihoanglong/pytest-235/test_benchmark_pipeline_smoke0/lakehouse",
-          "run_root": "/private/var/folders/df/p7lmy0917s36_bmbrvhq4tn00000gp/T/pytest-of-nguyenbuihoanglong/pytest-235/test_benchmark_pipeline_smoke0/lakehouse/runs/20261112T043007Z_smoke_s0p001_seed7_87aa5fb4",
-          "raw_market_ticks": "/private/var/folders/df/p7lmy0917s36_bmbrvhq4tn00000gp/T/pytest-of-nguyenbuihoanglong/pytest-235/test_benchmark_pipeline_smoke0/lakehouse/runs/20261112T043007Z_smoke_s0p001_seed7_87aa5fb4/raw_market_ticks",
-          "raw_market_ohlcv": "/private/var/folders/df/p7lmy0917s36_bmbrvhq4tn00000gp/T/pytest-of-nguyenbuihoanglong/pytest-235/test_benchmark_pipeline_smoke0/lakehouse/runs/20261112T043007Z_smoke_s0p001_seed7_87aa5fb4/raw_market_ohlcv",
-          "dim_companies": "/private/var/folders/df/p7lmy0917s36_bmbrvhq4tn00000gp/T/pytest-of-nguyenbuihoanglong/pytest-235/test_benchmark_pipeline_smoke0/lakehouse/runs/20261112T043007Z_smoke_s0p001_seed7_87aa5fb4/dim_companies/dim_companies.parquet",
-          "financial_news": "/private/var/folders/df/p7lmy0917s36_bmbrvhq4tn00000gp/T/pytest-of-nguyenbuihoanglong/pytest-235/test_benchmark_pipeline_smoke0/lakehouse/runs/20261112T043007Z_smoke_s0p001_seed7_87aa5fb4/raw_financial_news",
-          "labels": "/private/var/folders/df/p7lmy0917s36_bmbrvhq4tn00000gp/T/pytest-of-nguyenbuihoanglong/pytest-235/test_benchmark_pipeline_smoke0/lakehouse/runs/20261112T043007Z_smoke_s0p001_seed7_87aa5fb4/label_ticker_daily_return/labels.parquet"
+          "base_out_dir": "/private/var/folders/df/p7lmy0917s36_bmbrvhq4tn00000gp/T/pytest-of-nguyenbuihoanglong/pytest-298/test_benchmark_pipeline_smoke0/lakehouse",
+          "run_root": "/private/var/folders/df/p7lmy0917s36_bmbrvhq4tn00000gp/T/pytest-of-nguyenbuihoanglong/pytest-298/test_benchmark_pipeline_smoke0/lakehouse/runs/20261113T035304Z_smoke_s0p001_seed7_8f306d30",
+          "raw_market_ticks": "/private/var/folders/df/p7lmy0917s36_bmbrvhq4tn00000gp/T/pytest-of-nguyenbuihoanglong/pytest-298/test_benchmark_pipeline_smoke0/lakehouse/runs/20261113T035304Z_smoke_s0p001_seed7_8f306d30/raw_market_ticks",
+          "raw_market_ohlcv": "/private/var/folders/df/p7lmy0917s36_bmbrvhq4tn00000gp/T/pytest-of-nguyenbuihoanglong/pytest-298/test_benchmark_pipeline_smoke0/lakehouse/runs/20261113T035304Z_smoke_s0p001_seed7_8f306d30/raw_market_ohlcv",
+          "dim_companies": "/private/var/folders/df/p7lmy0917s36_bmbrvhq4tn00000gp/T/pytest-of-nguyenbuihoanglong/pytest-298/test_benchmark_pipeline_smoke0/lakehouse/runs/20261113T035304Z_smoke_s0p001_seed7_8f306d30/dim_companies/dim_companies.parquet",
+          "financial_news": "/private/var/folders/df/p7lmy0917s36_bmbrvhq4tn00000gp/T/pytest-of-nguyenbuihoanglong/pytest-298/test_benchmark_pipeline_smoke0/lakehouse/runs/20261113T035304Z_smoke_s0p001_seed7_8f306d30/raw_financial_news",
+          "labels": "/private/var/folders/df/p7lmy0917s36_bmbrvhq4tn00000gp/T/pytest-of-nguyenbuihoanglong/pytest-298/test_benchmark_pipeline_smoke0/lakehouse/runs/20261113T035304Z_smoke_s0p001_seed7_8f306d30/label_ticker_daily_return/labels.parquet",
+          "split_manifest": "/private/var/folders/df/p7lmy0917s36_bmbrvhq4tn00000gp/T/pytest-of-nguyenbuihoanglong/pytest-298/test_benchmark_pipeline_smoke0/lakehouse/runs/20261113T035304Z_smoke_s0p001_seed7_8f306d30/split_manifest.json"
         }
       }
     },
     {
       "step": "generate_online_ticks",
       "ok": true,
-      "latency_seconds": 0.0055,
+      "latency_seconds": 0.0056,
       "error": null,
       "result": {
         "status": "SUCCESS",
-        "dataset_id": "20261112T043007Z_smoke_s0p001_seed7_87aa5fb4",
-        "run_id": "20261112T043007Z_smoke_s0p001_seed7_87aa5fb4",
+        "dataset_id": "20261113T035304Z_smoke_s0p001_seed7_8f306d30",
+        "run_id": "20261113T035304Z_smoke_s0p001_seed7_8f306d30",
         "corpus_name": "online",
         "scale": 0.001,
         "scale_mode": "tick_budget",
@@ -417,8 +448,8 @@
         "late_arrival_ratio": 0.0,
         "duplicate_ratio": 0.25,
         "mega_cap_tick_row_share": 0.5,
-        "corpus_dir": "/private/var/folders/df/p7lmy0917s36_bmbrvhq4tn00000gp/T/pytest-of-nguyenbuihoanglong/pytest-235/test_benchmark_pipeline_smoke0/lakehouse/runs/20261112T043007Z_smoke_s0p001_seed7_87aa5fb4/raw_market_ticks_online",
-        "run_root": "/private/var/folders/df/p7lmy0917s36_bmbrvhq4tn00000gp/T/pytest-of-nguyenbuihoanglong/pytest-235/test_benchmark_pipeline_smoke0/lakehouse/runs/20261112T043007Z_smoke_s0p001_seed7_87aa5fb4",
+        "corpus_dir": "/private/var/folders/df/p7lmy0917s36_bmbrvhq4tn00000gp/T/pytest-of-nguyenbuihoanglong/pytest-298/test_benchmark_pipeline_smoke0/lakehouse/runs/20261113T035304Z_smoke_s0p001_seed7_8f306d30/raw_market_ticks_online",
+        "run_root": "/private/var/folders/df/p7lmy0917s36_bmbrvhq4tn00000gp/T/pytest-of-nguyenbuihoanglong/pytest-298/test_benchmark_pipeline_smoke0/lakehouse/runs/20261113T035304Z_smoke_s0p001_seed7_8f306d30",
         "mega_caps": [
           "AAPL",
           "NVDA",
@@ -433,18 +464,18 @@
     {
       "step": "spark_dedup",
       "ok": true,
-      "latency_seconds": 0.058,
+      "latency_seconds": 0.0685,
       "error": null,
       "result": {
         "job_type": "DEDUPLICATION_AND_SCHEMA_EVOLUTION",
         "engine": "sim",
-        "source_path": "/private/var/folders/df/p7lmy0917s36_bmbrvhq4tn00000gp/T/pytest-of-nguyenbuihoanglong/pytest-235/test_benchmark_pipeline_smoke0/lakehouse/runs/20261112T043007Z_smoke_s0p001_seed7_87aa5fb4/raw_market_ticks",
-        "target_path": "/private/var/folders/df/p7lmy0917s36_bmbrvhq4tn00000gp/T/pytest-of-nguyenbuihoanglong/pytest-235/test_benchmark_pipeline_smoke0/lakehouse/runs/20261112T043007Z_smoke_s0p001_seed7_87aa5fb4/stg_market_ohlcv",
-        "silver_ticks_path": "/private/var/folders/df/p7lmy0917s36_bmbrvhq4tn00000gp/T/pytest-of-nguyenbuihoanglong/pytest-235/test_benchmark_pipeline_smoke0/lakehouse/runs/20261112T043007Z_smoke_s0p001_seed7_87aa5fb4/stg_market_ticks",
-        "total_raw_rows": 832,
-        "deduplicated_rows": 816,
-        "duplicates_removed": 16,
-        "duplicate_elimination_rate": 0.0192,
+        "source_path": "/private/var/folders/df/p7lmy0917s36_bmbrvhq4tn00000gp/T/pytest-of-nguyenbuihoanglong/pytest-298/test_benchmark_pipeline_smoke0/lakehouse/runs/20261113T035304Z_smoke_s0p001_seed7_8f306d30/raw_market_ticks",
+        "target_path": "/private/var/folders/df/p7lmy0917s36_bmbrvhq4tn00000gp/T/pytest-of-nguyenbuihoanglong/pytest-298/test_benchmark_pipeline_smoke0/lakehouse/runs/20261113T035304Z_smoke_s0p001_seed7_8f306d30/stg_market_ohlcv",
+        "silver_ticks_path": "/private/var/folders/df/p7lmy0917s36_bmbrvhq4tn00000gp/T/pytest-of-nguyenbuihoanglong/pytest-298/test_benchmark_pipeline_smoke0/lakehouse/runs/20261113T035304Z_smoke_s0p001_seed7_8f306d30/stg_market_ticks",
+        "total_raw_rows": 117,
+        "deduplicated_rows": 115,
+        "duplicates_removed": 2,
+        "duplicate_elimination_rate": 0.0171,
         "schema_evolution_verified": true,
         "evolved_column_names": [
           "quote_condition",
@@ -454,7 +485,7 @@
           "trade_count"
         ],
         "evolved_rows_with_data": 1,
-        "pre_boundary_null_rows": 832,
+        "pre_boundary_null_rows": 117,
         "execution_mode": "SIMULATED",
         "status": "PASSED_SIMULATED"
       }
@@ -462,12 +493,12 @@
     {
       "step": "spark_flink_ohlcv_consistency",
       "ok": true,
-      "latency_seconds": 0.0329,
+      "latency_seconds": 0.0265,
       "error": null,
       "result": {
         "schema_version": "consistency_evidence.v1",
         "check": "spark_flink_ohlcv",
-        "dataset_id": "20261112T043007Z_smoke_s0p001_seed7_87aa5fb4",
+        "dataset_id": "20261113T035304Z_smoke_s0p001_seed7_8f306d30",
         "status": "PASSED_SIMULATED",
         "execution_mode": "SIMULATED",
         "mode": "smoke",
@@ -507,25 +538,25 @@
           "passed": true
         },
         "mismatches": [],
-        "generated_at": "2026-11-12T04:30:08.089283+00:00",
-        "evidence_path": "evidence/consistency/20261112T043007Z_smoke_s0p001_seed7_87aa5fb4/spark_flink_ohlcv.json"
+        "generated_at": "2026-11-13T03:53:05.069423+00:00",
+        "evidence_path": "evidence/consistency/20261113T035304Z_smoke_s0p001_seed7_8f306d30/spark_flink_ohlcv.json"
       }
     },
     {
       "step": "recovery_rededup",
       "ok": true,
-      "latency_seconds": 0.0713,
+      "latency_seconds": 0.0781,
       "error": null,
       "result": {
         "job_type": "DEDUPLICATION_AND_SCHEMA_EVOLUTION",
         "engine": "sim",
-        "source_path": "/private/var/folders/df/p7lmy0917s36_bmbrvhq4tn00000gp/T/pytest-of-nguyenbuihoanglong/pytest-235/test_benchmark_pipeline_smoke0/lakehouse/runs/20261112T043007Z_smoke_s0p001_seed7_87aa5fb4/raw_market_ticks",
-        "target_path": "/private/var/folders/df/p7lmy0917s36_bmbrvhq4tn00000gp/T/pytest-of-nguyenbuihoanglong/pytest-235/test_benchmark_pipeline_smoke0/lakehouse/runs/20261112T043007Z_smoke_s0p001_seed7_87aa5fb4/stg_market_ohlcv",
-        "silver_ticks_path": "/private/var/folders/df/p7lmy0917s36_bmbrvhq4tn00000gp/T/pytest-of-nguyenbuihoanglong/pytest-235/test_benchmark_pipeline_smoke0/lakehouse/runs/20261112T043007Z_smoke_s0p001_seed7_87aa5fb4/stg_market_ticks",
-        "total_raw_rows": 832,
-        "deduplicated_rows": 816,
-        "duplicates_removed": 16,
-        "duplicate_elimination_rate": 0.0192,
+        "source_path": "/private/var/folders/df/p7lmy0917s36_bmbrvhq4tn00000gp/T/pytest-of-nguyenbuihoanglong/pytest-298/test_benchmark_pipeline_smoke0/lakehouse/runs/20261113T035304Z_smoke_s0p001_seed7_8f306d30/raw_market_ticks",
+        "target_path": "/private/var/folders/df/p7lmy0917s36_bmbrvhq4tn00000gp/T/pytest-of-nguyenbuihoanglong/pytest-298/test_benchmark_pipeline_smoke0/lakehouse/runs/20261113T035304Z_smoke_s0p001_seed7_8f306d30/stg_market_ohlcv",
+        "silver_ticks_path": "/private/var/folders/df/p7lmy0917s36_bmbrvhq4tn00000gp/T/pytest-of-nguyenbuihoanglong/pytest-298/test_benchmark_pipeline_smoke0/lakehouse/runs/20261113T035304Z_smoke_s0p001_seed7_8f306d30/stg_market_ticks",
+        "total_raw_rows": 117,
+        "deduplicated_rows": 115,
+        "duplicates_removed": 2,
+        "duplicate_elimination_rate": 0.0171,
         "schema_evolution_verified": true,
         "evolved_column_names": [
           "quote_condition",
@@ -535,7 +566,7 @@
           "trade_count"
         ],
         "evolved_rows_with_data": 1,
-        "pre_boundary_null_rows": 832,
+        "pre_boundary_null_rows": 117,
         "execution_mode": "SIMULATED",
         "status": "PASSED_SIMULATED"
       }
@@ -549,7 +580,7 @@
     "honest_footprint_note": "Physical 100GB not required in CI; report scale curve + tick budget."
   },
   "paths": {
-    "run_root": "/private/var/folders/df/p7lmy0917s36_bmbrvhq4tn00000gp/T/pytest-of-nguyenbuihoanglong/pytest-235/test_benchmark_pipeline_smoke0/lakehouse/runs/20261112T043007Z_smoke_s0p001_seed7_87aa5fb4",
-    "out_dir": "/private/var/folders/df/p7lmy0917s36_bmbrvhq4tn00000gp/T/pytest-of-nguyenbuihoanglong/pytest-235/test_benchmark_pipeline_smoke0/lakehouse"
+    "run_root": "/private/var/folders/df/p7lmy0917s36_bmbrvhq4tn00000gp/T/pytest-of-nguyenbuihoanglong/pytest-298/test_benchmark_pipeline_smoke0/lakehouse/runs/20261113T035304Z_smoke_s0p001_seed7_8f306d30",
+    "out_dir": "/private/var/folders/df/p7lmy0917s36_bmbrvhq4tn00000gp/T/pytest-of-nguyenbuihoanglong/pytest-298/test_benchmark_pipeline_smoke0/lakehouse"
   }
 }

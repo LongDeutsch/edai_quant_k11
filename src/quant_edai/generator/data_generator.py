@@ -348,6 +348,7 @@ class QuantDataGenerator:
             close_p = float(grp.iloc[-1]["price"])
             high_p = float(grp["price"].max())
             low_p = float(grp["price"].min())
+            # Use actual tick volume sum for daily OHLCV
             vol = int(grp["size"].sum())
             px_size_sum = float(grp["price_x_size"].sum())
             vwap = round(px_size_sum / max(1, vol), 4)

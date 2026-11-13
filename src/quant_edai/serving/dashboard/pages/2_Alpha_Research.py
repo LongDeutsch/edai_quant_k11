@@ -37,9 +37,15 @@ selected_dataset = MarketDataService.resolve_dataset_id(selected_preset)
 st.sidebar.caption(f"Resolved Dataset ID: `{selected_dataset}`")
 
 # -----------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
 # Tabs Layout
 # -----------------------------------------------------------------------------
-tab1, tab2, tab3 = st.tabs(["🏛️ Alpha Registry", "⚡ Dynamic Backtest Engine", "🏆 Backtest Leaderboard & Top-5 Ensemble"])
+tab1, tab2, tab3, tab4 = st.tabs([
+    "🏛️ Alpha Registry",
+    "⚡ In-Sample Factor Backtesting",
+    "🛡️ Out-of-Sample Admin Validation",
+    "🏆 Leaderboard & Top-5 Ensemble"
+])
 
 # =============================================================================
 # TAB 1: Alpha Registry Explorer
@@ -66,27 +72,27 @@ with tab1:
 
 
 # =============================================================================
-# TAB 2: Dynamic Backtest Engine
+# TAB 2: In-Sample Factor Backtesting
 # =============================================================================
 with tab2:
-    st.subheader("Historical Factor Simulation Engine (No Look-Ahead)")
-    st.info("💡 **2-Year Target Data Coverage Notice**: Daily features are sourced from Lakehouse Gold (`2022-11-01` to `2025-10-31`, 3 full years, 12,544 rows). Actual duration is computed dynamically.")
+    st.subheader("In-Sample Factor Simulation Engine (IS Split: 2022-11 to 2025-04)")
+    st.info("💡 **In-Sample Research Boundary**: Research strictly evaluates against In-Sample (IS) split data (`2022-11-01` to `2025-04-30`). Out-of-Sample (OOS) data is reserved for Admin Validation in Tab 3. TRADING replay data is strictly isolated and inaccessible here.")
 
     b1, b2, b3, b4 = st.columns(4)
     with b1:
-        alpha_options = alphas_df["alpha_id"].tolist() if not alphas_df.empty else ["composite_eq", "momentum_1m", "vwap_dev", "rsi_reversal"]
+        alpha_options = alphas_df["alpha_id"].tolist() if not alphas_df.empty else ["alpha_sma_cross_daily", "alpha_mom_z_daily", "alpha_vwap_z_daily"]
         selected_alpha = st.selectbox("Select Strategy / Alpha ID", alpha_options, index=0)
     with b2:
-        selected_ticker = st.selectbox("Backtest Ticker Universe", ["ALL", "AAPL", "MSFT", "NVDA", "AMZN", "GOOGL", "SPY"], index=0)
+        selected_ticker = st.selectbox("Backtest Ticker Universe", ["ALL", "AAPL", "MSFT", "NVDA", "AMZN", "GOOGL", "META", "TSLA", "SPY"], index=0)
     with b3:
         slippage_input = st.number_input("Slippage (basis points)", min_value=0.0, max_value=50.0, value=5.0, step=0.5)
     with b4:
         comm_input = st.number_input("Commission (basis points)", min_value=0.0, max_value=20.0, value=1.0, step=0.5)
 
-    run_btn = st.button("🚀 Run Walk-Forward Backtest", type="primary")
+    run_btn = st.button("🚀 Run In-Sample Backtest", type="primary")
 
     if run_btn:
-        with st.spinner(f"Simulating walk-forward backtest for `{selected_alpha}` on `{selected_ticker}`..."):
+        with st.spinner(f"Simulating In-Sample walk-forward backtest for `{selected_alpha}` on `{selected_ticker}`..."):
             result = AlphaResearchService.run_historical_backtest(
                 alpha_id=selected_alpha,
                 ticker=selected_ticker,
@@ -94,11 +100,12 @@ with tab2:
                 slippage_bps=slippage_input,
                 commission_bps=comm_input,
                 dataset_id=selected_dataset,
+                split_id="IS",
             )
 
         if result["status"] == "SUCCESS":
             m = result["metrics"]
-            st.success(f"✅ Backtest completed successfully! Evaluated from `{m['start_date']}` to `{m['end_date']}` ({m['calendar_days']} calendar days). Run ID: `{m['run_id']}` (Persisted to PostgreSQL).")
+            st.success(f"✅ In-Sample Backtest completed successfully! Evaluated from `{m['start_date']}` to `{m['end_date']}` ({m['calendar_days']} calendar days). Run ID: `{m['run_id']}` (Persisted to PostgreSQL).")
 
             # Metrics Scorecard Strip
             s1, s2, s3, s4, s5, s6 = st.columns(6)
@@ -117,12 +124,15 @@ with tab2:
                 fig_eq.add_trace(go.Scatter(x=eq_df["time"], y=eq_df["strategy_equity"], name="Alpha Strategy Equity", line=dict(color="#10B981", width=2)))
                 fig_eq.add_trace(go.Scatter(x=eq_df["time"], y=eq_df["benchmark_equity"], name="Benchmark Equity", line=dict(color="#64748B", width=1.5, dash="dot")))
                 fig_eq.update_layout(
-                    title=f"Cumulative Equity Curve vs Benchmark: {selected_alpha} ({selected_ticker})",
+                    title=f"Cumulative In-Sample Equity Curve vs Benchmark: {selected_alpha} ({selected_ticker})",
                     template="plotly_dark",
                     height=450,
                     margin=dict(l=40, r=40, t=50, b=40),
                 )
                 st.plotly_chart(fig_eq, use_container_width=True)
+
+        elif result["status"] == "INELIGIBLE":
+            st.error(f"🚫 **Eligibility Block**: {result.get('message')}")
 
         elif result["status"] == "NO_TRADES":
             st.warning(f"⚠️ **No Trades Executed**: {result.get('message')}")
@@ -133,9 +143,67 @@ with tab2:
 
 
 # =============================================================================
-# TAB 3: Leaderboard & Top-5 Ensemble Selection
+# TAB 3: Out-of-Sample Admin Validation
 # =============================================================================
 with tab3:
+    st.subheader("🛡️ Independent Out-of-Sample (OOS) Validation & Quality Gate")
+    st.markdown("Strictly evaluated on held-out **OOS Split** (`2025-05-01` to `2026-04-30`). Admin reviews degradation across held-out market conditions before approving and freezing Top-5 ensembles.")
+
+    oos_df = AlphaResearchService.get_alpha_validation_comparison()
+    if not oos_df.empty:
+        col_ov1, col_ov2, col_ov3 = st.columns(3)
+        col_ov1.metric("Validated Alphas Count", len(oos_df))
+        approved_count = len(oos_df[oos_df["status"] == "APPROVED_FROZEN"])
+        col_ov2.metric("Approved Frozen Alphas", approved_count)
+        avg_deg = oos_df["degradation_pct"].mean()
+        col_ov3.metric("Average Factor Degradation", f"{avg_deg:.1f}%")
+
+        st.dataframe(
+            oos_df[["alpha_id", "horizon", "status", "is_sharpe", "oos_sharpe", "is_mdd", "oos_mdd", "degradation_pct", "oos_win_rate"]],
+            use_container_width=True,
+            hide_index=True,
+        )
+
+        st.markdown("---")
+        st.subheader("🔒 Admin Top-5 Approval & Freeze")
+        st.markdown("PM / Admin approves the Top-5 Ensemble based on OOS validation. This sets `status = APPROVED_FROZEN` in PostgreSQL and updates `alpha_ensemble_config` with cryptographic provenance.")
+
+        horizon_approve = st.radio("Target Serving Horizon", ["INTRADAY", "DAILY"], horizontal=True)
+        sub_oos = oos_df[oos_df["horizon"] == horizon_approve]
+        top_candidates = sub_oos.sort_values(by="oos_sharpe", ascending=False)["alpha_id"].tolist()
+        default_top5 = top_candidates[:5] if len(top_candidates) >= 5 else top_candidates
+
+        admin_top5 = st.multiselect(
+            f"Select 5 Validated {horizon_approve} Alphas for Approval",
+            options=top_candidates,
+            default=default_top5,
+            max_selections=5,
+            key=f"admin_approve_{horizon_approve}"
+        )
+
+        admin_user = st.text_input("Approving Admin User ID", value="ADMIN_PM")
+
+        if st.button(f"🔒 Approve & Freeze Top-5 {horizon_approve} Ensemble", type="primary", disabled=len(admin_top5) != 5):
+            success = AlphaResearchService.save_top5_ensemble(
+                alpha_ids=admin_top5,
+                horizon=horizon_approve,
+                dataset_id=selected_dataset,
+                approved_by=admin_user,
+                freeze=True,
+            )
+            if success:
+                st.success(f"✅ Successfully approved and frozen Top-5 {horizon_approve} Ensemble ({', '.join(admin_top5)})! Status: `APPROVED_FROZEN`. Live trading will use this verified ensemble.")
+                st.rerun()
+            else:
+                st.error("Failed to approve ensemble. Check database connection.")
+    else:
+        st.info("No validation comparison available. Please refresh alpha metrics with splits.")
+
+
+# =============================================================================
+# TAB 4: Leaderboard & Top-5 Ensemble Selection
+# =============================================================================
+with tab4:
     st.subheader("🏆 Quantitative Alpha Leaderboard")
     st.caption("Historical performance runs retrieved from PostgreSQL `alpha_backtest_results`.")
 
@@ -157,29 +225,19 @@ with tab3:
         st.info("No saved backtest runs found. Execute a backtest in Tab 2 to populate the leaderboard.")
 
     st.markdown("---")
-    st.subheader("🎯 Top-5 Alpha Selection for Live Trading (Page 3)")
-    st.markdown("Select exactly **5 Alphas** to build an Equal-Average ensemble signal ($Z_{\\text{combined}} = \\frac{1}{5} \\sum Z_i$) for execution in Page 3.")
-
-    # Multi-select for top 5
-    available_alpha_ids = alphas_df["alpha_id"].tolist() if not alphas_df.empty else ["composite_eq", "momentum_1m", "vwap_dev", "rsi_reversal", "breakout_vol"]
-    # Ensure default has 5 items
-    default_selection = available_alpha_ids[:5] if len(available_alpha_ids) >= 5 else available_alpha_ids
-
-    selected_top5 = st.multiselect(
-        "Choose Top 5 Alphas",
-        options=available_alpha_ids,
-        default=default_selection,
-        max_selections=5,
-        help="Select exactly 5 Alphas for the production trading ensemble.",
-    )
-
-    save_c1, save_c2 = st.columns([1, 3])
-    with save_c1:
-        save_btn = st.button("💾 Save Top-5 Ensemble", type="primary", disabled=len(selected_top5) != 5)
-
-    if save_btn:
-        success = AlphaResearchService.save_top5_ensemble(selected_top5, horizon="INTRADAY", dataset_id=selected_dataset)
-        if success:
-            st.success(f"✅ Top-5 Ensemble successfully saved to PostgreSQL `alpha_ensemble_config`! Alphas: {', '.join(selected_top5)}. Page 3 will use these Alphas for streaming signals.")
+    st.subheader("📋 Active Production Ensemble Handoff")
+    active_intraday_ens = AlphaResearchService.get_latest_top5_ensemble(horizon="INTRADAY")
+    active_daily_ens = AlphaResearchService.get_latest_top5_ensemble(horizon="DAILY")
+    col_e1, col_e2 = st.columns(2)
+    with col_e1:
+        st.markdown("**Active Intraday Ensemble (Page 3 Streaming)**")
+        if active_intraday_ens:
+            st.success(f"Status: `APPROVED_FROZEN`\n\nAlphas: {', '.join(active_intraday_ens)}")
         else:
-            st.error("Failed to persist ensemble to database. Check PostgreSQL logs.")
+            st.warning("No intraday ensemble configured.")
+    with col_e2:
+        st.markdown("**Active Daily Ensemble (Daily Factor Allocation)**")
+        if active_daily_ens:
+            st.success(f"Status: `APPROVED_FROZEN`\n\nAlphas: {', '.join(active_daily_ens)}")
+        else:
+            st.warning("No daily ensemble configured.")

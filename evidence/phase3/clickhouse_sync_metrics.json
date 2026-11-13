@@ -1,8 +1,8 @@
 {
   "engine": "clickhouse_live",
   "mode": "smoke",
-  "dataset_id": "ds_canonical_4y_pilot",
-  "source_root": "/tmp/lakehouse_source/runs/ds_canonical_4y_pilot",
+  "dataset_id": "ds_canonical_4y_eval_s05",
+  "source_root": "/tmp/lakehouse_source/runs/ds_canonical_4y_eval_s05",
   "host": "localhost",
   "port": 8123,
   "hosts_probed": [
@@ -18,7 +18,7 @@
       "rows": 32,
       "rows_read": 32,
       "unique_keys": 32,
-      "source": "/tmp/lakehouse_source/runs/ds_canonical_4y_pilot/gold_dim_companies/dim_companies.parquet",
+      "source": "/tmp/lakehouse_source/runs/ds_canonical_4y_eval_s05/dim_companies/dim_companies.parquet",
       "source_zone": "gold",
       "schema_alignment": {
         "filled": [],
@@ -29,8 +29,8 @@
       "status": "SYNCED",
       "rows_inserted": 32,
       "queryback": {
-        "table_rows_before": 321,
-        "table_rows_after": 353,
+        "table_rows_before": 353,
+        "table_rows_after": 385,
         "dataset_rows_final": 32,
         "expected_unique_keys": 32,
         "reconciled": true
@@ -40,7 +40,7 @@
       "rows": 16704,
       "rows_read": 16704,
       "unique_keys": 16704,
-      "source": "/tmp/lakehouse_source/runs/ds_canonical_4y_pilot/gold_market_bars_daily",
+      "source": "/tmp/lakehouse_source/runs/ds_canonical_4y_eval_s05/gold_market_bars_daily",
       "source_zone": "gold",
       "schema_alignment": {
         "filled": [
@@ -49,9 +49,9 @@
           "version=1"
         ],
         "dropped": [
+          "created_at",
           "dataset_id",
           "exchange",
-          "ingestion_timestamp",
           "market_regime",
           "trade_id"
         ],
@@ -61,8 +61,8 @@
       "status": "SYNCED",
       "rows_inserted": 16704,
       "queryback": {
-        "table_rows_before": 72592,
-        "table_rows_after": 89296,
+        "table_rows_before": 89296,
+        "table_rows_after": 106000,
         "dataset_rows_final": 16704,
         "expected_unique_keys": 16704,
         "reconciled": true
@@ -72,7 +72,7 @@
       "rows": 16704,
       "rows_read": 16704,
       "unique_keys": 16704,
-      "source": "/tmp/lakehouse_source/runs/ds_canonical_4y_pilot/gold_features/feat_ticker_technical_indicators.parquet",
+      "source": "/tmp/lakehouse_source/runs/ds_canonical_4y_eval_s05/gold_features/feat_ticker_technical_indicators.parquet",
       "source_zone": "gold",
       "schema_alignment": {
         "filled": [],
@@ -88,27 +88,29 @@
       "status": "SYNCED",
       "rows_inserted": 16704,
       "queryback": {
-        "table_rows_before": 48804,
-        "table_rows_after": 65508,
+        "table_rows_before": 65508,
+        "table_rows_after": 82212,
         "dataset_rows_final": 16704,
         "expected_unique_keys": 16704,
         "reconciled": true
       }
     },
     "market_intraday_bars": {
-      "rows": 79301,
-      "rows_read": 79301,
-      "unique_keys": 79301,
-      "source": "/tmp/lakehouse_source/runs/ds_canonical_4y_pilot/gold_market_bars_1m",
+      "rows": 383313,
+      "rows_read": 383313,
+      "unique_keys": 383313,
+      "source": "/tmp/lakehouse_source/runs/ds_canonical_4y_eval_s05/gold_market_bars_1m",
       "source_zone": "gold",
       "schema_alignment": {
         "filled": [
+          "event_timestamp<-bar_timestamp",
           "created=now",
           "version=1"
         ],
         "dropped": [
           "bar_id",
           "bar_timestamp",
+          "created_at",
           "dataset_id",
           "trade_date"
         ],
@@ -116,17 +118,17 @@
         "rows_dropped_invalid": 0
       },
       "status": "SYNCED",
-      "rows_inserted": 79301,
+      "rows_inserted": 383313,
       "queryback": {
-        "table_rows_before": 84860,
-        "table_rows_after": 164161,
-        "dataset_rows_final": 79301,
-        "expected_unique_keys": 79301,
+        "table_rows_before": 160623,
+        "table_rows_after": 543936,
+        "dataset_rows_final": 383313,
+        "expected_unique_keys": 383313,
         "reconciled": true
       }
     }
   },
-  "generated_at": "2026-11-12T17:18:24.301298+00:00",
+  "generated_at": "2026-11-12T17:53:45.223425+00:00",
   "status": "SUCCESS",
   "execution_mode": "LIVE"
 }

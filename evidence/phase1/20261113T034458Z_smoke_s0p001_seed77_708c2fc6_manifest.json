@@ -1,0 +1,56 @@
+{
+  "dataset_id": "20261113T034458Z_smoke_s0p001_seed77_708c2fc6",
+  "seed": 77,
+  "mode": "smoke",
+  "scale": 0.001,
+  "created_at": "2026-11-13T03:44:58.889847+00:00",
+  "total_files": 9,
+  "total_bytes": 65103,
+  "files": [
+    {
+      "path": "dim_companies/dim_companies.parquet",
+      "size_bytes": 6908,
+      "sha256": "23fb8fec97bd80009d56c64c85275720c231afc962f0367e6f4e683f5e5e10f2"
+    },
+    {
+      "path": "label_ticker_daily_return/labels.parquet",
+      "size_bytes": 5194,
+      "sha256": "ab95ac03d49dd41f4ca529621e21e63e871a220fb3b7bb402c3864ae4b5a5be2"
+    },
+    {
+      "path": "raw_financial_news/publish_date=2024-01-02/2e18d0d682264b98acc97afcbc292bfb-0.parquet",
+      "size_bytes": 6030,
+      "sha256": "0b63945f6f027664020b2f8dad456be66aa4574214b69e4aa1da9daa23112b8a"
+    },
+    {
+      "path": "raw_financial_news/publish_date=2024-01-03/2e18d0d682264b98acc97afcbc292bfb-0.parquet",
+      "size_bytes": 6386,
+      "sha256": "75d7e1aef262b6b018ae37a84dfcf11308cb12abc07a313ce470b3680eeec942"
+    },
+    {
+      "path": "raw_market_ohlcv/trade_date=2024-01-02/997b602d1b2a4fbc9279ddb7a8b6fa25-0.parquet",
+      "size_bytes": 9542,
+      "sha256": "dfafadc312f906b35464bc95090ddd3cc80b6c39fc9ee09a274dcba9ad981a32"
+    },
+    {
+      "path": "raw_market_ohlcv/trade_date=2024-01-03/997b602d1b2a4fbc9279ddb7a8b6fa25-0.parquet",
+      "size_bytes": 9598,
+      "sha256": "f3962e6c3c3c64606b5ced2ade5d86c2bb5e963576d70c3bc5d9c15b4171c932"
+    },
+    {
+      "path": "raw_market_ticks/trade_date=2024-01-02/f4546b177aac490287f8361a3de3a666-0.parquet",
+      "size_bytes": 9346,
+      "sha256": "39a2a9c6416b1a90729732bed9d820542c1c48474ff92ed555fd7dad138dbc93"
+    },
+    {
+      "path": "raw_market_ticks/trade_date=2024-01-03/f4546b177aac490287f8361a3de3a666-0.parquet",
+      "size_bytes": 9416,
+      "sha256": "aa2e020812ab8f7a4a402c23f4010ab24abba20dcdf2e5f5b7a5be9b1d8f20ce"
+    },
+    {
+      "path": "split_manifest.json",
+      "size_bytes": 2683,
+      "sha256": "ce00022d651023873f5ccba88ec9f5a7521eb4f8ef704abca689bbf51d88bf23"
+    }
+  ]
+}

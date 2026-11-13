@@ -35,12 +35,13 @@ st.sidebar.header("🕹️ Market Controls")
 
 adv_mode = st.sidebar.checkbox("⚙️ Advanced Mode", value=False, help="Show raw ClickHouse test/idempotency datasets.")
 ds_options = MarketDataService.get_catalog_options(advanced_mode=adv_mode)
-selected_preset = st.sidebar.selectbox("Active Dataset Preset", ds_options, index=0)
+selected_preset = st.sidebar.selectbox("Active Dataset Context", ds_options, index=0)
 selected_dataset = MarketDataService.resolve_dataset_id(selected_preset)
+selected_split = MarketDataService.resolve_split_id(selected_preset)
 
 # Dynamic dataset capabilities discovery from ClickHouse
 caps = MarketDataService.discover_dataset_capabilities(selected_dataset)
-st.sidebar.caption(f"Resolved Dataset ID: `{selected_dataset}`")
+st.sidebar.caption(f"Resolved Dataset ID: `{selected_dataset}`" + (f" | Split: `{selected_split}`" if selected_split else ""))
 st.sidebar.caption(f"📊 Discovered: **{caps['daily_count']:,}** Daily bars | **{caps['intraday_count']:,}** Intraday 1m bars")
 
 tickers = caps["tickers"]
@@ -59,7 +60,10 @@ selected_timeframe = st.sidebar.selectbox(
     help="Timeframes dynamically discovered from ClickHouse: 1m/5m/10m/15m require intraday streaming bars; Daily requires historical OHLCV.",
 )
 
-candle_limit = st.sidebar.slider("Max Candles to Display", min_value=50, max_value=1000, value=250, step=50)
+if adv_mode:
+    candle_limit = st.sidebar.slider("Max Candles to Display", min_value=50, max_value=1000, value=300, step=50)
+else:
+    candle_limit = 300
 
 filter_by_date = st.sidebar.checkbox("📅 Filter by Date Window", value=False, help="Filter candles by start and end dates.")
 start_date_str = None
@@ -97,7 +101,7 @@ if show_trades:
 # Data Retrieval & Processing
 # -----------------------------------------------------------------------------
 @st.cache_data(ttl=10)
-def load_and_prepare_data(dataset_id: str, ticker: str, timeframe: str, limit: int, start_date: Optional[str] = None, end_date: Optional[str] = None):
+def load_and_prepare_data(dataset_id: str, ticker: str, timeframe: str, limit: int, start_date: Optional[str] = None, end_date: Optional[str] = None, split_id: Optional[str] = None):
     raw_df = MarketDataService.fetch_candlesticks(
         dataset_id=dataset_id,
         ticker=ticker,
@@ -105,13 +109,14 @@ def load_and_prepare_data(dataset_id: str, ticker: str, timeframe: str, limit: i
         limit=limit,
         start_date=start_date,
         end_date=end_date,
+        split_id=split_id,
     )
     if raw_df.empty:
         return pd.DataFrame()
     return MarketDataService.calculate_indicators(raw_df)
 
 with st.spinner("Fetching candles from ClickHouse OLAP..."):
-    df_candles = load_and_prepare_data(selected_dataset, selected_ticker, selected_timeframe, candle_limit, start_date_str, end_date_str)
+    df_candles = load_and_prepare_data(selected_dataset, selected_ticker, selected_timeframe, candle_limit, start_date_str, end_date_str, selected_split)
 
 if df_candles.empty:
     st.warning(f"⚠️ No candlestick data found for dataset `{selected_dataset}` and ticker `{selected_ticker}` with timeframe `{selected_timeframe}` in ClickHouse.")

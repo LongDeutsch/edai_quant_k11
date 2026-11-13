@@ -394,13 +394,13 @@
   "bronze_immutable": true,
   "lakehouse_bronze_uri": "s3a://lakehouse/bronze/runs/ds_test_canonical_4y",
   "paths": {
-    "base_out_dir": "/private/var/folders/df/p7lmy0917s36_bmbrvhq4tn00000gp/T/pytest-of-nguyenbuihoanglong/pytest-281/canonical_4y_test0",
-    "run_root": "/private/var/folders/df/p7lmy0917s36_bmbrvhq4tn00000gp/T/pytest-of-nguyenbuihoanglong/pytest-281/canonical_4y_test0/runs/ds_test_canonical_4y",
-    "raw_market_ticks": "/private/var/folders/df/p7lmy0917s36_bmbrvhq4tn00000gp/T/pytest-of-nguyenbuihoanglong/pytest-281/canonical_4y_test0/runs/ds_test_canonical_4y/raw_market_ticks",
-    "raw_market_ohlcv": "/private/var/folders/df/p7lmy0917s36_bmbrvhq4tn00000gp/T/pytest-of-nguyenbuihoanglong/pytest-281/canonical_4y_test0/runs/ds_test_canonical_4y/raw_market_ohlcv",
-    "dim_companies": "/private/var/folders/df/p7lmy0917s36_bmbrvhq4tn00000gp/T/pytest-of-nguyenbuihoanglong/pytest-281/canonical_4y_test0/runs/ds_test_canonical_4y/dim_companies/dim_companies.parquet",
-    "financial_news": "/private/var/folders/df/p7lmy0917s36_bmbrvhq4tn00000gp/T/pytest-of-nguyenbuihoanglong/pytest-281/canonical_4y_test0/runs/ds_test_canonical_4y/raw_financial_news",
-    "labels": "/private/var/folders/df/p7lmy0917s36_bmbrvhq4tn00000gp/T/pytest-of-nguyenbuihoanglong/pytest-281/canonical_4y_test0/runs/ds_test_canonical_4y/label_ticker_daily_return/labels.parquet",
-    "split_manifest": "/private/var/folders/df/p7lmy0917s36_bmbrvhq4tn00000gp/T/pytest-of-nguyenbuihoanglong/pytest-281/canonical_4y_test0/runs/ds_test_canonical_4y/split_manifest.json"
+    "base_out_dir": "/private/var/folders/df/p7lmy0917s36_bmbrvhq4tn00000gp/T/pytest-of-nguyenbuihoanglong/pytest-298/canonical_4y_test0",
+    "run_root": "/private/var/folders/df/p7lmy0917s36_bmbrvhq4tn00000gp/T/pytest-of-nguyenbuihoanglong/pytest-298/canonical_4y_test0/runs/ds_test_canonical_4y",
+    "raw_market_ticks": "/private/var/folders/df/p7lmy0917s36_bmbrvhq4tn00000gp/T/pytest-of-nguyenbuihoanglong/pytest-298/canonical_4y_test0/runs/ds_test_canonical_4y/raw_market_ticks",
+    "raw_market_ohlcv": "/private/var/folders/df/p7lmy0917s36_bmbrvhq4tn00000gp/T/pytest-of-nguyenbuihoanglong/pytest-298/canonical_4y_test0/runs/ds_test_canonical_4y/raw_market_ohlcv",
+    "dim_companies": "/private/var/folders/df/p7lmy0917s36_bmbrvhq4tn00000gp/T/pytest-of-nguyenbuihoanglong/pytest-298/canonical_4y_test0/runs/ds_test_canonical_4y/dim_companies/dim_companies.parquet",
+    "financial_news": "/private/var/folders/df/p7lmy0917s36_bmbrvhq4tn00000gp/T/pytest-of-nguyenbuihoanglong/pytest-298/canonical_4y_test0/runs/ds_test_canonical_4y/raw_financial_news",
+    "labels": "/private/var/folders/df/p7lmy0917s36_bmbrvhq4tn00000gp/T/pytest-of-nguyenbuihoanglong/pytest-298/canonical_4y_test0/runs/ds_test_canonical_4y/label_ticker_daily_return/labels.parquet",
+    "split_manifest": "/private/var/folders/df/p7lmy0917s36_bmbrvhq4tn00000gp/T/pytest-of-nguyenbuihoanglong/pytest-298/canonical_4y_test0/runs/ds_test_canonical_4y/split_manifest.json"
   }
 }
