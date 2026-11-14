@@ -23,7 +23,7 @@
       "rows": 32,
       "rows_read": 32,
       "unique_keys": 32,
-      "source": "/tmp/lakehouse_source/runs/ds_canonical_4y_eval_s05/dim_companies/dim_companies.parquet",
+      "source": "/tmp/lakehouse_source/runs/ds_canonical_4y_eval_s05/gold_dim_companies/dim_companies.parquet",
       "source_zone": "gold",
       "schema_alignment": {
         "filled": [],
@@ -101,7 +101,7 @@
       }
     }
   },
-  "generated_at": "2026-11-13T00:01:13.066387+00:00",
+  "generated_at": "2026-11-14T01:15:18.136485+00:00",
   "status": "SUCCESS",
   "execution_mode": "LIVE"
 }

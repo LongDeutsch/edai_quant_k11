@@ -1,321 +1,239 @@
-# Real-time Paper Trading Simulation Specification
+# Real-Time Event-Driven Paper Trading & Market Replay Specification
 
 ## 1. Executive Summary & Objective
 
-The **Real-time Paper Trading Simulation Module** is an operational, real-time extension built on top of the Quant Data & AI Platform. It demonstrates end-to-end production readiness by connecting:
+The **Real-Time Paper Trading Simulation & Market Replay Module** (Rubric M1-38, M1-39) provides an institutional-grade, event-driven paper execution engine and market replay controller. It bridges big data analytical serving (ClickHouse), quantitative alpha research (Alpha Registry & Signal Server), and real-time portfolio execution with strict ACID persistence (PostgreSQL / SQLite).
 
-$$\text{Market Data Replay} \longrightarrow \text{Kafka} \longrightarrow \text{Flink} \longrightarrow \text{Feast} \longrightarrow \text{KServe} \longrightarrow \text{Signal Gen} \longrightarrow \text{Paper Simulator} \longrightarrow \text{ClickHouse / Dashboard}$$
+```mermaid
+flowchart TD
+    subgraph Data_Source["1. Market Data Feed"]
+        CH["ClickHouse OLAP (quant_dw.market_intraday_bars)<br>split_id = 'TRADING' (1-minute OHLCV + VWAP)"]
+        CH_Feat["ClickHouse Features (quant_dw.feat_technical_indicators)<br>Lagged T-1 Point-in-Time As-Of Join"]
+        Kafka["Apache Kafka (market.bars.1m)<br>Optional Live Flink Stream"]
+    end
 
-### Core Design Principles
-1. **Zero Pipeline Disruption**: Runs as an optional add-on that consumes from existing feeds or a dedicated replay topic; does not break batch Lakehouse or offline training jobs.
-2. **Reusing Existing Tech Stack**: Implemented strictly in Python (FastAPI), Apache Kafka, Apache Flink, ClickHouse OLAP, and PostgreSQL. No external heavy broker APIs or matching engines.
-3. **Temporal Integrity (Zero Look-Ahead Bias)**: Enforces strict separation between `event_timestamp`, `signal_timestamp`, `prediction_horizon`, and `execution_timestamp`.
-4. **State Persistence & Idempotency**: Resilient against stream retries, Kafka rebalances, and service crashes via PostgreSQL transactions and event deduplication tables.
-5. **Unified Alpha Evaluation**: Reuses the core metrics (IC, Sharpe, Max Drawdown, Benchmark Alpha) established in the offline backtesting module.
+    subgraph Replay_Controller["2. Replay Orchestrator & State Management"]
+        RC["ReplayController (dashboard_service.py)<br>Background Thread | Pacing (1x - 50x) | Step-by-Step"]
+        RS["ReplayState (Thread-safe Lock)<br>Session State, Telemetry, Signal Cache"]
+        RC <--> RS
+    end
+
+    subgraph Signal_Engine["3. Alpha Signal Serving (alpha_serving.py)"]
+        ASS["AlphaSignalServer"]
+        Cat["Alpha Catalog (alpha_catalog.py)<br>10 Strategies | score_strategy_strict()"]
+        Reg["Alpha Registry (alpha_registry.py)<br>APPROVED_FROZEN Ensemble or Single Alpha"]
+        ASS --> Cat
+        ASS --> Reg
+    end
+
+    subgraph Execution_Core["4. Paper Trading Engine (paper_trading.py)"]
+        PTE["PaperTradingEngine.on_bar()"]
+        PMC["PMControlService (pm_controls.py)<br>Emergency Block & Exposure Limits"]
+        PTE --> PMC
+        PTE --> ASS
+    end
+
+    subgraph Risk_Controls["5. Institutional Risk Governance"]
+        SL["Stop-Loss: -12 bps (-0.12%)"]
+        TP["Take-Profit: +20 bps (+0.20%)"]
+        CB["Circuit Breaker: -2.0% Daily Loss"]
+        EOD["EOD Flatting: 15:55 America/New_York"]
+        CAP["Max Positions: 5 | Trade Notional: $10,000"]
+    end
+
+    subgraph Ledger_Storage["6. ACID Ledger & Persistence (paper_db.py)"]
+        PDB["PaperDatabase (PostgreSQL / SQLite Fallback)"]
+        T_Ord["paper_orders (Idempotency: uq_order_idempotency)"]
+        T_Trd["paper_trades (Fills, Slippage 5 bps, Commission 1 bps)"]
+        T_Pos["paper_positions (Mark-to-Market Real-Time)"]
+        T_Snap["paper_portfolio_snapshots (Equity, Cash, Drawdown)"]
+        T_Hist["paper_alpha_scores | paper_position_lifecycle | paper_position_marks"]
+        PDB --> T_Ord
+        PDB --> T_Trd
+        PDB --> T_Pos
+        PDB --> T_Snap
+        PDB --> T_Hist
+    end
+
+    subgraph Presentation["7. Streamlit Quant Terminal (3_Real_Time_Trading.py)"]
+        UI_Ctrl["Replay Controls: Start / Pause / Resume / Stop / Step"]
+        UI_KPI["Live Portfolio KPIs: Cash, Equity, Realized & Unrealized PnL"]
+        UI_Sig["Signals Matrix & Individual Alpha Breakdown"]
+        UI_Chart["Dual-Panel Synchronized Plotly Charts<br>• Panel 1: Portfolio Equity Curve (Auto-Scaled)<br>• Panel 2: Realized & Unrealized PnL (Zero Baseline)"]
+    end
+
+    CH -->|Streaming TRADING Bars| RC
+    CH_Feat -->|As-Of Features| RC
+    Kafka -.->|Live Streaming Bars| RC
+    RC -->|MarketBar Instance| PTE
+    PTE --> Risk_Controls
+    PTE -->|Transactions & Marks| PDB
+    RS -.->|In-Memory Push| UI_KPI
+    RS -.->|In-Memory Push| UI_Sig
+    RS -.->|Equity History| UI_Chart
+    PDB -.->|Historical Audit Query| UI_Ctrl
+```
 
 ---
 
-## 2. End-to-End Data Flow & Sequence Diagram
+## 2. Core Execution Engine (`PaperTradingEngine`)
+
+### 2.1 Dependencies & Initialization
+Located at [`src/quant_edai/quant/paper_trading.py`](file:///Users/nguyenbuihoanglong/Desktop/FSDS/edai_11/quant_edai/src/quant_edai/quant/paper_trading.py#L87-L187).
+
+- **Dependencies**:
+  - `PaperDatabase`: Data access layer for PostgreSQL with automatic SQLite fallback (`paper_db.py`).
+  - `AlphaSignalServer`: Multi-alpha signal scoring and equal-average aggregation (`alpha_serving.py`).
+  - `PMControlService`: Portfolio Manager governance checks and emergency circuit overrides (`pm_controls.py`).
+  - `market_time`: Timezone utilities for Eastern Time (ET) session windows and EOD flat checks (`common/market_time.py`).
+- **Institutional Execution Parameters**:
+  - `starting_cash`: `$100,000.00` default portfolio cash.
+  - `trade_notional`: Fixed `$10,000.00` notional position size.
+  - `max_positions`: 5 concurrent open positions.
+  - `slippage_bps`: `5.0 bps` ($0.05\%$) institutional spread and market impact.
+  - `commission_bps`: `1.0 bps` ($0.01\%$) broker/exchange fee.
+  - `tp_bps`: `+20.0 bps` ($+0.20\%$) Take-Profit target.
+  - `sl_bps`: `-12.0 bps` ($-0.12\%$) Stop-Loss threshold.
+  - `max_daily_loss_pct`: `-2.0%` daily portfolio circuit breaker.
+  - `alpha_source`: `"store"` (pure `AlphaSignalServer`) or `"inline"` (local rolling buffers).
+
+### 2.2 Complete `on_bar()` Sequence Flow
 
 ```mermaid
 sequenceDiagram
     autonumber
-    participant Replay as Market Data Replay
-    participant Kafka as Apache Kafka
-    participant Flink as Apache Flink
-    participant Feast as Feast Online (Redis)
-    participant KServe as KServe ML v2 Service
-    participant SigGen as Signal Generator
-    participant Sim as Paper Trading Simulator
-    participant DB as PostgreSQL
-    participant CH as ClickHouse OLAP
-    participant Dash as Real-time Dashboard
+    participant Worker as Replay Worker Loop
+    participant PTE as PaperTradingEngine
+    participant Mark as Mark-to-Market & Stops
+    participant Risk as Risk & Circuit Breaker
+    participant Alpha as AlphaSignalServer
+    participant PDB as PaperDatabase (PostgreSQL)
 
-    Note over Replay,Kafka: Step 1: Out-of-sample bar replay with speed toggle (1x, 10x, 100x)
-    Replay->>Kafka: Publish to market.bars (Bar t)
-    
-    Note over Kafka,Flink: Step 2: Event-time stream processing
-    Kafka->>Flink: Consume market.bars
-    Flink->>Flink: Calculate rolling VWAP, RSI, MACD
-    Flink->>Kafka: Publish to quant.features
-    Flink->>Feast: Sync latest features to Redis
+    Worker->>PTE: on_bar(MarketBar)
+    Note over PTE: Step 1: Update Cumulative VWAP & Parse Timestamp
 
-    Note over Kafka,SigGen: Step 3: ML Inference & Signal Generation
-    Kafka->>SigGen: Consume quant.features (Bar t Close)
-    SigGen->>KServe: POST /v2/models/ticker_direction/infer
-    KServe-->>SigGen: Return Probability P(Up)
-    SigGen->>SigGen: Evaluate Decision Rules (>0.6 BUY, <0.4 SELL)
-    SigGen->>Kafka: Publish to quant.signals
+    PTE->>Mark: Evaluate Open Position for Ticker
+    alt Ticker has Open Position
+        Mark->>Mark: Update mark price = close_price
+        Mark->>Mark: Compute Unrealized PnL & %
+        Mark->>PDB: upsert_position() & record_position_mark()
+        alt close <= stop_loss_price OR close >= take_profit_price
+            Mark->>PTE: _close_position(reason="STOP_LOSS"|"TAKE_PROFIT")
+            PTE->>PDB: record_order() & record_trade() & close_position_lifecycle()
+        end
+    end
 
-    Note over Kafka,Sim: Step 4: Paper Execution & Accounting
-    Replay->>Kafka: Publish next bar to market.bars (Bar t+1)
-    Kafka->>Sim: Consume quant.signals + Bar t+1 Open
-    Sim->>Sim: Check Idempotency & Fill at Bar t+1 Open
-    Sim->>DB: Persist Trade, Position & Portfolio State (Atomic ACID)
-    Sim->>Kafka: Publish to quant.paper_trades
+    Note over PTE: Step 2: Check EOD Flatting (15:55 America/New_York)
+    opt dt_et == 15:55:00 ET
+        PTE->>PTE: Liquidate all open positions (reason="EOD_FLAT")
+        PTE->>PDB: Record closing trades & lifecycle updates
+    end
 
-    Note over Kafka,Dash: Step 5: Real-time Serving & Telemetry
-    DB->>CH: Sync market bars & features
-    DB->>Dash: Read portfolio equity & historical PnL
-    CH->>Dash: Sub-50ms query for live price & signal candles
+    PTE->>Risk: Compute Portfolio Total Equity
+    Risk->>Risk: total_equity = cash + sum(pos.mark * pos.qty)
+    Risk->>Risk: daily_pnl_pct = (total_equity - daily_start_equity) / daily_start_equity
+    opt daily_pnl_pct <= -2.0% (Circuit Breaker Tripped)
+        Risk->>PTE: Liquidate all positions (reason="CIRCUIT_BREAKER") & daily_halted = True
+    end
+
+    Note over PTE: Step 3: Alpha Scoring & Entry Check
+    opt Not EOD AND Not Daily Halted AND PM Not Blocked
+        PTE->>Alpha: get_intraday_signal(ticker, close, features, alpha_ids)
+        Alpha-->>PTE: Return TradeSignal (action, z_score, alpha_scores)
+        opt Open Position flips/weakens (FLAT / opposite side)
+            PTE->>PTE: _close_position(reason="SIGNAL_EXIT")
+        end
+        opt Capacity Available & Action == BUY / SELL & In Top-K
+            PTE->>PTE: _open_position(side, price * (1 ± slippage))
+            PTE->>PDB: record_order(), record_trade(), open_position_lifecycle()
+        end
+    end
+
+    Note over PTE: Step 4: Record Snapshot & Latency Telemetry
+    PTE->>PDB: record_snapshot(session_id, equity, cash, realized, unrealized, drawdown)
+    PTE-->>Worker: Return on_bar Summary Result
 ```
 
 ---
 
-## 3. Data Contracts & Kafka Topics Specification
+## 3. Alpha Research & Signal Serving Stack
 
-All messages are serialized as JSON with strict schema validation.
+### 3.1 10-Alpha Strategy Catalog (`alpha_catalog.py`)
+All alphas operate under standardized `FeatureContext` and output normalized `(z_score, confidence)`:
+1. `alpha_mom_z`: OHLCV return rolling z-score momentum.
+2. `alpha_vwap_z`: Close vs. VWAP deviation z-score.
+3. `alpha_rsi_mr`: RSI-14 mean-reversion factor.
+4. `alpha_macd_z`: MACD histogram z-score.
+5. `alpha_sma_cross`: SMA 20/50 ratio trend factor.
+6. `alpha_vol_break`: Price breakout vs. rolling volatility.
+7. `alpha_volume_z`: Volume surge z-score.
+8. `alpha_ml_prob`: Centered ML directional probability $(P_{\text{ML}} - 0.5) \times 4.0$.
+9. `alpha_composite_eq`: Equal-weight blend of momentum, technical, and ML factors.
+10. `alpha_regime_adapt`: Market regime-adaptive factor weighting (Bull / Bear / Sideway).
 
-### Topic 1: `market.bars`
-Represents continuous OHLCV market bars replayed from out-of-sample data.
-```json
-{
-  "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "MarketBarEvent",
-  "type": "object",
-  "properties": {
-    "ticker_symbol": { "type": "string" },
-    "event_timestamp": { "type": "string", "format": "date-time" },
-    "ingestion_timestamp": { "type": "string", "format": "date-time" },
-    "open_price": { "type": "number", "minimum": 0.01 },
-    "high_price": { "type": "number", "minimum": 0.01 },
-    "low_price": { "type": "number", "minimum": 0.01 },
-    "close_price": { "type": "number", "minimum": 0.01 },
-    "volume": { "type": "integer", "minimum": 0 },
-    "vwap": { "type": "number", "minimum": 0.01 },
-    "replay_sequence_id": { "type": "integer" },
-    "is_synthetic": { "type": "boolean" }
-  },
-  "required": ["ticker_symbol", "event_timestamp", "ingestion_timestamp", "open_price", "close_price", "volume"]
-}
-```
+### 3.2 Dual Scoring Modes: Strict vs. Fallback
+- `score_strategy_strict()`: Strictly evaluates real features and clean rolling buffers. Returns `(0.0, 0.0)` if inputs are missing; strictly **forbids** synthetic trigonometric imputation.
+- `score_strategy()`: Fallback mode for smoke testing with graceful geometric imputation.
 
-### Topic 2: `quant.features`
-Technical indicators generated by Apache Flink based on event-time sliding windows.
-```json
-{
-  "ticker_symbol": "NVDA",
-  "feature_timestamp": "2024-10-15T15:59:00Z",
-  "event_timestamp": "2024-10-15T15:59:00Z",
-  "rsi_14": 42.6,
-  "sma_ratio_20_50": 1.025,
-  "macd_histogram": 0.18,
-  "intraday_vwap_spread": -0.0032,
-  "rolling_volatility_15m": 0.0185
-}
-```
-
-### Topic 3: `quant.predictions`
-Raw output from KServe model inference for directional forecasting.
-```json
-{
-  "ticker_symbol": "NVDA",
-  "prediction_timestamp": "2024-10-15T15:59:05Z",
-  "feature_event_timestamp": "2024-10-15T15:59:00Z",
-  "prediction_horizon": "T+1_CLOSE",
-  "model_version": "v1.2-champion",
-  "probability_up": 0.684,
-  "predicted_class": 1
-}
-```
-
-### Topic 4: `quant.signals`
-Decision actionable signals emitted after applying decision thresholds.
-```json
-{
-  "signal_id": "sig-nvda-20241015-155900",
-  "ticker_symbol": "NVDA",
-  "signal_timestamp": "2024-10-15T15:59:06Z",
-  "source_bar_timestamp": "2024-10-15T15:59:00Z",
-  "target_execution_horizon": "NEXT_BAR_OPEN",
-  "signal_action": "BUY",
-  "ml_probability": 0.684,
-  "alpha_score": 0.732,
-  "confidence": "HIGH"
-}
-```
-
-### Topic 5: `quant.paper_trades`
-Simulated order fill event published after executing against the next bar's Open price.
-```json
-{
-  "trade_id": "trd-20241015-0012",
-  "order_id": "ord-20241015-0012",
-  "signal_id": "sig-nvda-20241015-155900",
-  "ticker_symbol": "NVDA",
-  "side": "BUY",
-  "quantity": 15,
-  "execution_price": 132.50,
-  "execution_timestamp": "2024-10-15T16:00:00Z",
-  "transaction_cost": 0.99,
-  "cash_balance_after": 8011.50,
-  "portfolio_equity_after": 10000.00
-}
-```
+### 3.3 Multi-Alpha Combination: Equal Average (Rule 5)
+For an ensemble of $K$ active alphas:
+$$Z_{\text{combined}} = \frac{1}{K} \sum_{i=1}^{K} Z_i, \quad \text{Action} = \begin{cases} \text{BUY} & \text{if } Z_{\text{combined}} \ge \bar{Z}_{\text{entry}} \\ \text{SELL} & \text{if } Z_{\text{combined}} \le -\bar{Z}_{\text{entry}} \\ \text{FLAT} & \text{otherwise} \end{cases}$$
 
 ---
 
-## 4. Simulator State & PostgreSQL Storage Schema
+## 4. Replay Controller & Concurrency Management
 
-To ensure **idempotency** and **instant recovery** after pod restarts, the simulator stores state in PostgreSQL (or SQLite fallback via `PaperDatabase`) using relational tables and unique constraints matching [02_paper_trading_schema.sql](file:///Users/nguyenbuihoanglong/Desktop/FSDS/edai_11/quant_edai/sql/postgres/02_paper_trading_schema.sql) and [paper_db.py](file:///Users/nguyenbuihoanglong/Desktop/FSDS/edai_11/quant_edai/src/quant_edai/quant/paper_db.py):
+Located at [`src/quant_edai/serving/dashboard/dashboard_service.py`](file:///Users/nguyenbuihoanglong/Desktop/FSDS/edai_11/quant_edai/src/quant_edai/serving/dashboard/dashboard_service.py#L2285).
 
-```sql
--- 1. Paper Orders (Atomic order generation & deduplication key)
-CREATE TABLE IF NOT EXISTS paper_orders (
-    order_id VARCHAR(64) PRIMARY KEY,
-    session_id VARCHAR(64) NOT NULL,
-    ticker_symbol VARCHAR(16) NOT NULL,
-    order_type VARCHAR(16) NOT NULL,    -- 'MARKET', 'STOP_LOSS', 'TAKE_PROFIT', 'EOD_FLAT', 'CIRCUIT_BREAKER'
-    direction VARCHAR(8) NOT NULL,      -- 'BUY', 'SELL'
-    quantity NUMERIC(14, 4) NOT NULL,
-    requested_price NUMERIC(14, 4) NOT NULL,
-    status VARCHAR(16) NOT NULL,        -- 'FILLED', 'REJECTED', 'CANCELLED'
-    bar_timestamp TIMESTAMP WITH TIME ZONE NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-    CONSTRAINT uq_order_idempotency UNIQUE (session_id, ticker_symbol, bar_timestamp, direction, order_type)
-);
+- **Execution Threading**: Runs in a dedicated background `threading.Thread(daemon=True)` to prevent blocking the Streamlit UI.
+- **Pacing Mechanism**: Adjustable replay speed (1x, 5x, 10x, 25x, 50x) via `time.sleep(0.05 / speed)`.
+- **Step-by-Step Execution**: While paused, pressing `Step` queues `pending_steps += 1`, allowing exactly one bar to process through the engine before pausing again.
+- **Session Modes**:
+  - **Approved Ensemble Mode**: Strictly validates `load_approved_replay_ensemble(dataset_id)` and freezes session metadata into `replay_session_ensemble`.
+  - **Single Alpha Studio Mode**: Allows executing any standalone registered alpha with isolated session IDs.
 
--- 2. Paper Trades (Executed fills with slippage, commission, and PnL)
-CREATE TABLE IF NOT EXISTS paper_trades (
-    trade_id VARCHAR(64) PRIMARY KEY,
-    order_id VARCHAR(64) REFERENCES paper_orders(order_id),
-    session_id VARCHAR(64) NOT NULL,
-    ticker_symbol VARCHAR(16) NOT NULL,
-    direction VARCHAR(8) NOT NULL,
-    fill_price NUMERIC(14, 4) NOT NULL,
-    fill_quantity NUMERIC(14, 4) NOT NULL,
-    slippage_bps NUMERIC(8, 2) NOT NULL DEFAULT 5.0,
-    commission NUMERIC(10, 4) NOT NULL DEFAULT 0.0,
-    realized_pnl NUMERIC(14, 4) NOT NULL DEFAULT 0.0,
-    executed_at TIMESTAMP WITH TIME ZONE NOT NULL
-);
+---
 
--- 3. Paper Positions (Active mark-to-market positions)
-CREATE TABLE IF NOT EXISTS paper_positions (
-    session_id VARCHAR(64) NOT NULL,
-    ticker_symbol VARCHAR(16) NOT NULL,
-    side VARCHAR(8) NOT NULL,
-    quantity NUMERIC(14, 4) NOT NULL,
-    average_entry_price NUMERIC(14, 4) NOT NULL,
-    current_mark_price NUMERIC(14, 4) NOT NULL,
-    unrealized_pnl NUMERIC(14, 4) NOT NULL DEFAULT 0.0,
-    unrealized_pnl_pct NUMERIC(8, 4) NOT NULL DEFAULT 0.0,
-    stop_loss_price NUMERIC(14, 4),
-    take_profit_price NUMERIC(14, 4),
-    updated_at TIMESTAMP WITH TIME ZONE NOT NULL,
-    PRIMARY KEY (session_id, ticker_symbol)
-);
+## 5. PostgreSQL ACID Ledger & State Persistence
 
--- 4. Equity Time-Series Snapshots (Drawdown, Sharpe, and portfolio valuation)
-CREATE TABLE IF NOT EXISTS paper_portfolio_snapshots (
-    snapshot_id BIGSERIAL PRIMARY KEY,
-    session_id VARCHAR(64) NOT NULL,
-    cash_balance NUMERIC(16, 4) NOT NULL,
-    invested_equity NUMERIC(16, 4) NOT NULL,
-    total_portfolio_equity NUMERIC(16, 4) NOT NULL,
-    realized_pnl NUMERIC(16, 4) NOT NULL DEFAULT 0.0,
-    unrealized_pnl NUMERIC(16, 4) NOT NULL DEFAULT 0.0,
-    drawdown_pct NUMERIC(8, 4) NOT NULL DEFAULT 0.0,
-    snapshot_timestamp TIMESTAMP WITH TIME ZONE NOT NULL
-);
+### 5.1 Tables & Schema Constraints
+1. **`paper_orders`**:
+   - Primary Key: `order_id VARCHAR(64)`.
+   - Idempotency Guarantee: `CONSTRAINT uq_order_idempotency UNIQUE (session_id, ticker_symbol, bar_timestamp, direction, order_type)`.
+2. **`paper_trades`**: Executed fills with `fill_price`, `slippage_bps`, `commission`, `realized_pnl`, `executed_at`, and ML provenance tags.
+3. **`paper_positions`**: Current active mark-to-market positions keyed by `(session_id, ticker_symbol)`.
+4. **`paper_portfolio_snapshots`**: Sequential portfolio valuation keyed by `snapshot_id BIGSERIAL`.
+5. **Additive Audit Tables**:
+   - `paper_alpha_scores`: Historical individual alpha scores per bar.
+   - `paper_position_lifecycle`: End-to-end trade roundtrips with entry, peak open mark, exit reason, and net realized PnL.
+   - `paper_position_marks`: Granular mark-to-market trajectory per open position.
 
--- 5. ML Model Provenance & Signal Tables (Shared with Alpha Serving)
-CREATE TABLE IF NOT EXISTS alpha_registry (
-    alpha_id VARCHAR(64) PRIMARY KEY,
-    alpha_name VARCHAR(128) NOT NULL,
-    alpha_type VARCHAR(32) NOT NULL,
-    formula_or_model VARCHAR(256) NOT NULL,
-    hyperparams JSONB DEFAULT '{}'::jsonb,
-    is_active BOOLEAN NOT NULL DEFAULT TRUE,
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
-);
+---
 
-CREATE TABLE IF NOT EXISTS alpha_signals_daily (
-    signal_id BIGSERIAL PRIMARY KEY,
-    alpha_id VARCHAR(64) REFERENCES alpha_registry(alpha_id),
-    ticker_symbol VARCHAR(16) NOT NULL,
-    trade_date DATE NOT NULL,
-    raw_score NUMERIC(12, 6) NOT NULL,
-    rank_score NUMERIC(6, 4) NOT NULL,
-    target_weight NUMERIC(6, 4) NOT NULL,
-    model_version VARCHAR(64) NOT NULL,
-    dataset_id VARCHAR(64) NOT NULL,
-    feature_source VARCHAR(64) NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-    CONSTRAINT uq_signal_date UNIQUE (alpha_id, ticker_symbol, trade_date)
-);
+## 6. Streamlit Visual Terminal: Dual-Panel Performance Charts
+
+Located at [`src/quant_edai/serving/dashboard/pages/3_Real_Time_Trading.py`](file:///Users/nguyenbuihoanglong/Desktop/FSDS/edai_11/quant_edai/src/quant_edai/serving/dashboard/pages/3_Real_Time_Trading.py).
+
+To eliminate the **Scale Mismatch** problem (where small PnL variations appear flat against $100,000 cash), the terminal uses a **TradingView / QuantConnect dual-panel stacked layout**:
+
+```mermaid
+graph TD
+    subgraph Dual_Panel_Chart["TradingView / QuantConnect Dual-Panel Architecture"]
+        subgraph Panel1["Panel 1: Portfolio Equity Curve ($) (62% Height)"]
+            P1_Trace["Equity Line (TradingView Blue #2962FF)"]
+            P1_Y["Independent Auto-Ranged Y-Axis: Zoomed to [$99,500 - $100,500]"]
+        end
+        subgraph Panel2["Panel 2: PnL Performance ($) (38% Height)"]
+            P2_R["Realized PnL (Teal #26A69A)"]
+            P2_U["Unrealized PnL (Orange #FF9800)"]
+            P2_Zero["Zero Baseline: y=0 Dash Line"]
+            P2_Y["Independent Auto-Ranged Y-Axis: Centered around $0"]
+        end
+        SharedX["Shared Time X-Axis & Synchronized Crosshair (hovermode='x unified')"]
+        Panel1 --- SharedX
+        Panel2 --- SharedX
+    end
 ```
 
----
-
-## 5. Paper Trading Execution Rules
-
-1. **Initial Virtual Capital**: Exactly **$10,000.00 USD**.
-2. **Strategy Style**: **Long/Flat**. No margin, no leverage, no naked short-selling.
-3. **Decision Thresholds**:
-   - $\text{Probability}(Up) > 0.60 \implies \mathbf{BUY}$ (if flat or below position cap).
-   - $\text{Probability}(Up) < 0.40 \implies \mathbf{SELL}$ (liquidate existing long position to Flat).
-   - $0.40 \le \text{Probability}(Up) \le 0.60 \implies \mathbf{HOLD}$ (no trading action).
-4. **Position Sizing & Risk Cap**:
-   - Max capital per ticker: **20% of total portfolio equity** ($2,000 initially).
-   - Max active positions: 5 tickers simultaneously.
-   - Sizing formula:
-     $$\text{Target Capital} = \min(0.20 \times \text{Equity}, \text{Cash Balance})$$
-     $$\text{Order Quantity} = \lfloor \frac{\text{Target Capital}}{\text{Open Price}_{t+1}} \rfloor$$
-5. **Fill Simulation (Next Bar Open)**:
-   - Signals generated at close of Bar $t$ are queued and filled strictly at the **Open price of Bar $t+1$**.
-   - Transaction friction: 5 basis points ($0.05\%$) simulated slippage and commission.
-
----
-
-## 6. API Contracts (FastAPI Microservice)
-
-The simulator exposes clean, asynchronous REST endpoints for control and telemetry:
-
-| Method | Endpoint | Description |
-|---|---|---|
-| `POST` | `/api/v1/replay/start` | Starts historical bar replay (`speed_multiplier`: 1, 10, 100; `seed`: 42; `sample_rate`: 0.1 / 1.0). |
-| `POST` | `/api/v1/replay/stop` | Pauses or stops the ongoing market data replay. |
-| `GET` | `/api/v1/replay/status` | Returns current replay progress, speed, and processed event count. |
-| `GET` | `/api/v1/portfolio/state` | Returns live cash balance, open positions, total equity, and current PnL. |
-| `GET` | `/api/v1/portfolio/equity-curve` | Time-series data of portfolio equity vs SPY benchmark. |
-| `GET` | `/api/v1/portfolio/trades` | Paginated simulated order fills with execution timestamps. |
-| `GET` | `/api/v1/portfolio/performance` | Returns Sharpe Ratio, Max Drawdown, Cumulative Return, Win Rate, and Alpha vs SPY. |
-| `POST` | `/api/v1/portfolio/reset` | Resets portfolio to $10,000.00 and clears historical simulation state. |
-
----
-
-## 7. Testing & Verification Strategy
-
-### 1. Deterministic Replay Verification
-- Given the same seed and input parquet files, running replay at `1x`, `10x`, or `100x` must yield the exact identical sequence of signals, trades, and ending equity down to the penny.
-
-### 2. Idempotency & Duplicate Resiliency
-- Injected duplicates in `market.bars` (1.5%) and re-delivered messages on `quant.signals` must be filtered out by `uq_order_idempotency UNIQUE (session_id, ticker_symbol, bar_timestamp, direction, order_type)`.
-- Assert that zero duplicate orders/trades are inserted into `paper_orders` and `paper_trades`.
-
-### 3. Timestamp & Anti-Lookahead Audit
-- For every simulated trade:
-  $$\text{Execution Timestamp} > \text{Signal Timestamp} \ge \text{Feature Timestamp}$$
-- Assert that no feature calculated using Bar $t+1$ data is ever consumed to generate a signal for Bar $t$.
-
-### 4. Recovery Testing
-- Kill the simulator service container mid-replay.
-- Upon container restart, the service must reload its state from `sim_portfolios` and `sim_positions` in PostgreSQL, consume from the committed Kafka offset, and continue execution without balance corruption.
-
-### 5. Multi-Strategy Performance Comparison
-The platform evaluates and reports:
-- **ML-Based Strategy**: Adaptive signals ($P > 0.6 \implies \text{BUY}, P < 0.4 \implies \text{SELL}$).
-- **Technical-Only Baseline**: Traditional RSI/SMA crossover strategy without ML.
-- **Passive Benchmark**: SPY Buy & Hold over the identical period.
-
----
-
-## 8. Dashboard Specification (Real-Time Visuals)
-
-A lightweight web dashboard (Streamlit or Grafana) connecting to ClickHouse and PostgreSQL:
-1. **Live Price & Candlesticks**: Displays incoming replayed OHLCV with overlaid BUY/SELL markers.
-2. **Model Probability Gauges**: Real-time gauge of $P(\text{Up})$ alongside current feature values (RSI, VWAP spread).
-3. **Portfolio Equity vs. Benchmark**: Live line chart showing simulated $10k portfolio equity vs. SPY Buy & Hold.
-4. **Key Alpha Metrics KPI Cards**: Cumulative Return (%), Annualized Sharpe Ratio, Max Drawdown (%), and Win Rate (%).
-5. **Recent Trades Ledger**: Scrolling table of the last 20 simulated order executions.
+- **Synchronized Hover**: Crosshairs and tooltips move simultaneously across both panels.
+- **Zero-Lag Telemetry**: In-memory `live_metrics` are pushed to the UI, while historical audit reconciliation reads PostgreSQL on demand.

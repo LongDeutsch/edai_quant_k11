@@ -49,6 +49,29 @@ flowchart LR
 
 ## 3. PySpark Skew Optimization (Baseline vs. Optimized)
 
+```mermaid
+flowchart TD
+    subgraph BaselineExecution["Baseline Hash Partitioning (7 Stragglers)"]
+        TicksB["raw_market_ticks (80% Mega-Caps)"] --> HashB["hash(ticker_symbol) % 200"]
+        HashB --> P193["193 Partitions (Small Caps)<br>Finished in <3 seconds"]
+        HashB --> P7["7 Partitions (Mega-Caps: AAPL, NVDA, ...)<br>Stragglers: >180s, Disk Spill, GC Overhead"]
+        P193 --> JoinB["Shuffle Hash Join"]
+        P7 --> JoinB
+        JoinB --> OutB["Total Time: 342s"]
+    end
+
+    subgraph OptimizedExecution["Key Salting (K=16) + AQE Skew Join"]
+        TicksO["raw_market_ticks (80% Mega-Caps)"] --> SaltO["Append Salt: concat(ticker, '_', rand(0..15))"]
+        DimO["dim_companies (32 rows)"] --> RepDim["Replicate Dim Rows K=16 times OR broadcast(dim)"]
+        SaltO --> Spread["16x Parallel Sub-Partitions per Mega-Cap"]
+        Spread --> AQE["Spark AQE: Dynamically splits partitions >64MB"]
+        RepDim --> AQE
+        AQE --> Stage1["Parallel Partial Aggregations (Max task: 4.2s)"]
+        Stage1 --> LightAgg["Global Light Aggregation (strip salt)"]
+        LightAgg --> OutO["Total Time: 28s (12.2x Speedup)"]
+    end
+```
+
 ### Baseline Job (Unoptimized)
 - **Implementation**: Joins `fact_daily_ohlcv` with `dim_companies` on `ticker_symbol` and groups by `ticker_symbol` using default hash partitioning (`spark.sql.shuffle.partitions=200`).
 - **Observed Behavior on Spark UI**:

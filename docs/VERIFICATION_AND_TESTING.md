@@ -48,7 +48,27 @@ All containerized microservices (Data Generator, Web APIs, MCP Tools) use multi-
 
 ## 3. Unit Testing & Coverage (Pytest)
 
-- **Coverage Requirement**: Maintained at **>90%** across core modules (`src/generator/`, `src/spark_jobs/`, `src/agent_platform/`, `src/ml_platform/`).
+```mermaid
+flowchart LR
+    subgraph TestSuites["Automated Test Suites (tests/unit/*)"]
+        T1["Alpha Research & Catalog<br>(test_alpha_catalog.py, test_alpha_lifecycle.py)"]
+        T2["Event-Driven Trading Engine<br>(test_paper_trading.py, test_replay_simulation_modes.py)"]
+        T3["Data Processing & Resampling<br>(test_tick_resample_and_silver.py, test_spark_salting.py)"]
+        T4["Serving & Analytics<br>(test_chart_signals.py, test_phase3_quality_and_serving.py)"]
+    end
+
+    subgraph CI["CI/CD Validation Pipeline"]
+        Runner["Pytest Runner (.venv/bin/pytest)"]
+        Assert["Zero Look-Ahead & Math Conservation Assertions"]
+        Report["Coverage & Evidence Generation (evidence/phase*)"]
+    end
+
+    TestSuites --> Runner
+    Runner --> Assert
+    Assert --> Report
+```
+
+- **Coverage Requirement**: Maintained at **>90%** across core modules (`src/quant_edai/generator/`, `src/quant_edai/processing/`, `src/quant_edai/quant/`, `src/quant_edai/serving/`, `src/quant_edai/ml/`).
 - **Equivalence Partitioning (EP) & Boundary Value Analysis (BVA)** applied to:
   - Technical indicator calculations (RSI boundaries: 0, 30, 70, 100; SMA division by zero).
   - Time-series walk-forward date splits (leap years, market holidays, weekend gaps).

@@ -186,6 +186,162 @@ def score_strategy(
     return float(z), _confidence(float(z))
 
 
+def action_from_z(z_score: float, entry_z: float, exit_z: float) -> str:
+    """Map a z-score onto BUY / SELL / FLAT using the alpha's entry band."""
+    if z_score >= entry_z:
+        return "BUY"
+    if z_score <= -entry_z:
+        return "SELL"
+    return "FLAT"
+
+
+def _finite(value: Any) -> Optional[float]:
+    if value is None:
+        return None
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    if np.isnan(number):
+        return None
+    return number
+
+
+STRICT_STRATEGIES = frozenset({
+    "momentum_z",
+    "vwap_dev_z",
+    "rsi_mr",
+    "macd_hist_z",
+    "sma_ratio",
+    "vol_breakout",
+    "volume_z",
+    "ml_prob",
+    "composite_eq",
+    "regime_adapt",
+})
+
+
+def score_strategy_strict(
+    strategy: str,
+    ctx: FeatureContext,
+    config: Optional[Dict[str, Any]] = None,
+) -> Tuple[float, float]:
+    """Score one strategy from real features only.
+
+    Missing inputs return (0, 0). This path does not synthesize a z-score from price.
+    """
+    config = config or {}
+    feats = ctx.features or {}
+    w_mom = float(config.get("w_mom", 0.50))
+    w_tech = float(config.get("w_tech", 0.30))
+    w_ml = float(config.get("w_ml", 0.20))
+
+    z_mom = _zscore(ctx.mom_buf or []) if ctx.mom_buf and len(ctx.mom_buf) >= 5 else None
+    if z_mom is None:
+        ret = _finite(feats.get("intraday_return_1d"))
+        if ret is not None:
+            z_mom = ret * 50.0
+
+    z_vwap = _zscore(ctx.vwap_buf or []) if ctx.vwap_buf and len(ctx.vwap_buf) >= 5 else None
+
+    z_ml = None
+    if ctx.p_ml is not None and _finite(ctx.p_ml) is not None:
+        if ctx.ml_buf and len(ctx.ml_buf) >= 5:
+            z_ml = _zscore(ctx.ml_buf)
+        else:
+            z_ml = float((float(ctx.p_ml) - 0.5) * 4.0)
+
+    rsi = _finite(feats.get("rsi_14d"))
+    z_rsi = float(-(rsi - 50.0) / 10.0) if rsi is not None else None
+
+    macd = _finite(feats.get("macd_histogram"))
+    z_macd = None
+    if macd is not None:
+        z_macd = float(macd * 5.0) if abs(macd) < 2 else 0.0
+
+    sma_ratio = _finite(feats.get("sma_ratio_20_50"))
+    z_sma = float((sma_ratio - 1.0) * 50.0) if sma_ratio is not None else None
+
+    z_break = None
+    closes = list(ctx.close_buf or [])
+    if len(closes) >= 10:
+        rets = np.diff(closes) / np.maximum(np.asarray(closes[:-1], dtype=float), 1e-8)
+        vol = float(np.std(rets)) if len(rets) else 0.0
+        last_ret = float(rets[-1]) if len(rets) else 0.0
+        z_break = float(last_ret / vol) if vol > 1e-8 else 0.0
+
+    z_vol = _zscore(ctx.volume_buf or []) if ctx.volume_buf and len(ctx.volume_buf) >= 5 else None
+
+    def _missing() -> Tuple[float, float]:
+        return 0.0, 0.0
+
+    if strategy == "momentum_z":
+        if z_mom is None:
+            return _missing()
+        z = z_mom
+    elif strategy == "vwap_dev_z":
+        if z_vwap is None:
+            return _missing()
+        z = z_vwap
+    elif strategy == "rsi_mr":
+        if z_rsi is None:
+            return _missing()
+        z = z_rsi
+    elif strategy == "macd_hist_z":
+        if z_macd is None:
+            return _missing()
+        z = z_macd
+    elif strategy == "sma_ratio":
+        if z_sma is None:
+            return _missing()
+        z = z_sma
+    elif strategy == "vol_breakout":
+        if z_break is None:
+            return _missing()
+        z = z_break
+    elif strategy == "volume_z":
+        if z_vol is None:
+            return _missing()
+        z = z_vol
+    elif strategy == "ml_prob":
+        if z_ml is None:
+            return _missing()
+        z = z_ml
+    elif strategy == "composite_eq":
+        parts: List[float] = []
+        if z_mom is not None:
+            parts.append(w_mom * z_mom)
+        tech_bits = [v for v in (z_rsi, z_vwap) if v is not None]
+        if tech_bits:
+            parts.append(w_tech * float(np.mean(tech_bits)))
+        if z_ml is not None:
+            parts.append(w_ml * z_ml)
+        if not parts:
+            return _missing()
+        z = float(sum(parts))
+    elif strategy == "regime_adapt":
+        parts = []
+        regime = detect_market_regime(ctx.realized_vol_ann)
+        weights = REGIME_WEIGHT_MAP.get(regime, FIXED_BASELINE_WEIGHTS)
+        if z_mom is not None:
+            parts.append(weights.w_momentum * z_mom)
+        tech_bits = [v for v in (z_rsi, z_macd) if v is not None]
+        if tech_bits:
+            parts.append(weights.w_technical * float(np.mean(tech_bits)))
+        if z_ml is not None:
+            parts.append(weights.w_ml * z_ml)
+        if not parts:
+            return _missing()
+        z = float(sum(parts))
+    else:
+        return _missing()
+
+    z = float(z)
+    if z == 0.0:
+        return 0.0, 0.0
+    return z, _confidence(z)
+
+
 def score_row_features(
     strategy: str,
     row: Dict[str, Any],

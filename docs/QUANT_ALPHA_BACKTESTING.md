@@ -34,6 +34,38 @@ $$Z_{i, t} = w_{\text{mom}} \cdot \text{zscore}(\text{Momentum}_{i, t}) + w_{\te
 - **MVP Default Weights**: $w_{\text{mom}} = 0.40, w_{\text{tech}} = 0.35, w_{\text{ml}} = 0.25$ (when ML prediction is present) or purely technical $w_{\text{mom}} = 0.50, w_{\text{tech}} = 0.50$ (baseline).
 - **Stretch Weighting (with Phase 7 News Sentiment)**: $w_{\text{ml}} = 0.50, w_{\text{sentiment}} = 0.30, w_{\text{mom}} = 0.20$.
 
+### 3.1. Walk-Forward Temporal Split Architecture
+
+To evaluate alpha robustness across market cycles, the platform uses a 4-year canonical timeline divided into 3 contiguous, non-overlapping splits:
+
+```mermaid
+flowchart TD
+    subgraph Timeline["4-Year Canonical Market Timeline (2022-11-01 to 2026-10-31)"]
+        Split1["Split 1: In-Sample (IS_TRAIN_VAL)<br>2022-11-01 to 2025-10-31 (3 Years)<br>Baseline model training & alpha parameter optimization"]
+        Split2["Split 2: Out-of-Sample (OOS_TEST)<br>2025-11-01 to 2026-04-30 (6 Months)<br>Unseen factor validation & Approved Frozen promotion"]
+        Split3["Split 3: Live Trading Replay (TRADING)<br>2026-05-01 to 2026-10-31 (6 Months)<br>Paper trading simulation & intraday execution"]
+    end
+
+    subgraph StrategyEvaluation["Alpha Catalog Evaluation Flow (alpha_catalog.py)"]
+        Alphas["10-Alpha Catalog<br>(Mean Reversion, Trend, Volatility, Regime, ML)"]
+        IS_Eval["IS Optimization & Parameter Tuning"]
+        OOS_Eval["OOS Degradation & IC Decay Audit"]
+        Approve{"Passes Hurdle?<br>IC > +0.03, Sharpe > 1.0<br>MaxDD < 15%"}
+        Frozen["alpha_registry: APPROVED_FROZEN"]
+        TradingReplay["PaperTradingEngine Replay"]
+    end
+
+    Split1 --> IS_Eval
+    Alphas --> IS_Eval
+    IS_Eval --> Split2
+    Split2 --> OOS_Eval
+    OOS_Eval --> Approve
+    Approve -- Yes --> Frozen
+    Frozen --> Split3
+    Split3 --> TradingReplay
+    Approve -- No --> Reject["REJECTED / RETIRE"]
+```
+
 ---
 
 ## 3. Walk-Forward Simulation Methodology

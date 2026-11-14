@@ -12,11 +12,11 @@ from __future__ import annotations
 from typing import Optional
 
 import pandas as pd
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 import streamlit as st
 
-from quant_edai.serving.dashboard.dashboard_service import MarketDataService
+from quant_edai.quant.metrics import format_sharpe
+from quant_edai.serving.dashboard.dashboard_service import AlphaResearchService, MarketDataService
+from quant_edai.serving.dashboard.market_chart import build_chart_payload, render_market_chart
 
 st.set_page_config(
     page_title="Market Charts | Quant Terminal",
@@ -40,7 +40,11 @@ selected_dataset = MarketDataService.resolve_dataset_id(selected_preset)
 selected_split = MarketDataService.resolve_split_id(selected_preset)
 
 # Dynamic dataset capabilities discovery from ClickHouse
-caps = MarketDataService.discover_dataset_capabilities(selected_dataset)
+@st.cache_data(ttl=60)
+def load_dataset_capabilities(dataset_id: str):
+    return MarketDataService.discover_dataset_capabilities(dataset_id)
+
+caps = load_dataset_capabilities(selected_dataset)
 st.sidebar.caption(f"Resolved Dataset ID: `{selected_dataset}`" + (f" | Split: `{selected_split}`" if selected_split else ""))
 st.sidebar.caption(f"📊 Discovered: **{caps['daily_count']:,}** Daily bars | **{caps['intraday_count']:,}** Intraday 1m bars")
 
@@ -48,9 +52,9 @@ tickers = caps["tickers"]
 default_ticker = "AAPL" if "AAPL" in tickers else (tickers[0] if tickers else "AAPL")
 selected_ticker = st.sidebar.selectbox("Ticker Symbol", tickers, index=tickers.index(default_ticker) if default_ticker in tickers else 0)
 
-# Dynamic Timeframe Selection based on dataset capabilities
+# Timeframe default comes from the preset catalog (Trading Replay is Daily).
 supported_tfs = caps["supported_timeframes"]
-default_tf = caps["default_timeframe"]
+default_tf = MarketDataService.resolve_default_timeframe(selected_preset, supported_tfs)
 default_idx = supported_tfs.index(default_tf) if default_tf in supported_tfs else 0
 
 selected_timeframe = st.sidebar.selectbox(
@@ -60,22 +64,17 @@ selected_timeframe = st.sidebar.selectbox(
     help="Timeframes dynamically discovered from ClickHouse: 1m/5m/10m/15m require intraday streaming bars; Daily requires historical OHLCV.",
 )
 
-if adv_mode:
-    candle_limit = st.sidebar.slider("Max Candles to Display", min_value=50, max_value=1000, value=300, step=50)
-else:
-    candle_limit = 300
-
-filter_by_date = st.sidebar.checkbox("📅 Filter by Date Window", value=False, help="Filter candles by start and end dates.")
-start_date_str = None
-end_date_str = None
+filter_by_date = st.sidebar.checkbox("📅 Filter by Date Window", value=False, help="Override the preset candle window.")
+manual_start = None
+manual_end = None
 if filter_by_date:
     col_d1, col_d2 = st.sidebar.columns(2)
     with col_d1:
         s_date = st.date_input("From Date", value=None)
-        start_date_str = str(s_date) if s_date else None
+        manual_start = str(s_date) if s_date else None
     with col_d2:
         e_date = st.date_input("To Date", value=None)
-        end_date_str = str(e_date) if e_date else None
+        manual_end = str(e_date) if e_date else None
 
 st.sidebar.markdown("---")
 st.sidebar.subheader("📐 Technical Overlays & Execution")
@@ -87,7 +86,7 @@ show_rsi = st.sidebar.checkbox("RSI (14)", value=False)
 show_macd = st.sidebar.checkbox("MACD (12, 26, 9)", value=False)
 
 st.sidebar.markdown("---")
-st.sidebar.subheader("🎯 Execution Markers")
+st.sidebar.subheader("🎯 Execution Markers & Alpha Signals")
 show_trades = st.sidebar.checkbox("Display Execution Trades (PostgreSQL)", value=True)
 selected_session = "ALL"
 if show_trades:
@@ -96,6 +95,47 @@ if show_trades:
         selected_session = st.sidebar.selectbox("Filter by Trading Session", ["ALL"] + trade_sessions, index=0)
     else:
         st.sidebar.caption("No trade sessions recorded for this dataset/ticker.")
+
+registered = AlphaResearchService.get_registered_alphas()
+alpha_ids = registered["alpha_id"].drop_duplicates().tolist() if not registered.empty and "alpha_id" in registered.columns else []
+selected_alpha_label = st.sidebar.selectbox(
+    "Alpha Signal",
+    ["All fills"] + alpha_ids,
+    help="All fills shows every paper_trades row. Choosing an alpha filters those fills. Xác nhận scores that alpha on the candles in view.",
+)
+selected_alpha_id = None if selected_alpha_label == "All fills" else selected_alpha_label
+
+fill_bounds = MarketDataService.get_fill_time_bounds(
+    dataset_id=selected_dataset,
+    ticker=selected_ticker,
+    session_id=selected_session if selected_session != "ALL" else None,
+)
+if manual_start or manual_end:
+    start_date_str, end_date_str = manual_start, manual_end
+else:
+    start_date_str, end_date_str = MarketDataService.resolve_candle_window(
+        selected_preset,
+        selected_timeframe,
+        None if fill_bounds.error else fill_bounds.min_time,
+        None if fill_bounds.error else fill_bounds.max_time,
+    )
+if start_date_str or end_date_str:
+    st.sidebar.caption(f"Candle window: `{start_date_str or '…'}` → `{end_date_str or '…'}`")
+
+signal_request = {
+    "alpha_id": selected_alpha_id,
+    "ticker": selected_ticker,
+    "timeframe": selected_timeframe,
+    "dataset_id": selected_dataset,
+    "start": start_date_str,
+    "end": end_date_str,
+    "split": selected_split,
+}
+if st.sidebar.button("Xác nhận", disabled=selected_alpha_id is None, help="Score the selected alpha on this ticker and timeframe, then show signals and book metrics."):
+    st.session_state["chart_signal_run"] = signal_request
+confirmed_run = st.session_state.get("chart_signal_run") == signal_request
+if selected_alpha_id and not confirmed_run:
+    st.sidebar.caption("Bấm Xác nhận để chấm alpha này trên các nến đang xem.")
 
 # -----------------------------------------------------------------------------
 # Data Retrieval & Processing
@@ -116,7 +156,7 @@ def load_and_prepare_data(dataset_id: str, ticker: str, timeframe: str, limit: i
     return MarketDataService.calculate_indicators(raw_df)
 
 with st.spinner("Fetching candles from ClickHouse OLAP..."):
-    df_candles = load_and_prepare_data(selected_dataset, selected_ticker, selected_timeframe, candle_limit, start_date_str, end_date_str, selected_split)
+    df_candles = load_and_prepare_data(selected_dataset, selected_ticker, selected_timeframe, 500, start_date_str, end_date_str, selected_split)
 
 if df_candles.empty:
     st.warning(f"⚠️ No candlestick data found for dataset `{selected_dataset}` and ticker `{selected_ticker}` with timeframe `{selected_timeframe}` in ClickHouse.")
@@ -153,233 +193,153 @@ m1.metric("Latest Close", f"${latest_bar['close']:.2f}", delta=f"{change_abs:+.2
 m2.metric("Period High", f"${df_candles['high'].max():.2f}")
 m3.metric("Period Low", f"${df_candles['low'].min():.2f}")
 m4.metric("Total Volume", f"{int(df_candles['volume'].sum()):,}")
-m5.metric("Bars Rendered", f"{len(df_candles)} ({selected_timeframe})")
+m5.metric("Bars Rendered", f"{len(df_candles):,} ({selected_timeframe})")
 
 # -----------------------------------------------------------------------------
-# Chart Construction (Plotly Subplots)
+# Canvas chart: the full window is loaded; the browser paints the viewport
 # -----------------------------------------------------------------------------
-rows = 1
-row_heights = [0.7]
-
-if show_volume:
-    rows += 1
-    row_heights.append(0.15)
-if show_rsi or show_macd:
-    rows += 1
-    row_heights.append(0.15)
-
-# Normalize heights
-total_h = sum(row_heights)
-row_heights = [h / total_h for h in row_heights]
-
-fig = make_subplots(
-    rows=rows,
-    cols=1,
-    shared_xaxes=True,
-    vertical_spacing=0.03,
-    row_heights=row_heights,
-)
-
-# 1. Main Candlestick Chart (Row 1)
-candle_hover = [
-    f"<b>{selected_ticker} ({selected_timeframe})</b><br>"
-    f"Time: {t}<br>"
-    f"Open: ${o:.2f}<br>"
-    f"High: ${h:.2f}<br>"
-    f"Low: ${l:.2f}<br>"
-    f"Close: ${c:.2f}<br>"
-    f"Volume: {int(v):,}"
-    for t, o, h, l, c, v in zip(
-        df_candles["hover_time"],
-        df_candles["open"],
-        df_candles["high"],
-        df_candles["low"],
-        df_candles["close"],
-        df_candles["volume"],
-    )
-]
-
-fig.add_trace(
-    go.Candlestick(
-        x=df_candles["time_label"],
-        open=df_candles["open"],
-        high=df_candles["high"],
-        low=df_candles["low"],
-        close=df_candles["close"],
-        name=f"{selected_ticker} ({selected_timeframe})",
-        increasing_line_color="#10B981",
-        decreasing_line_color="#EF4444",
-        increasing_fillcolor="#10B981",
-        decreasing_fillcolor="#EF4444",
-        increasing_line_width=1.5,
-        decreasing_line_width=1.5,
-        hovertext=candle_hover,
-        hoverinfo="text",
-    ),
-    row=1, col=1,
-)
-
-# Overlays (SMA, EMA, VWAP)
+lines = []
 if show_sma:
     if "sma_20" in df_candles:
-        fig.add_trace(go.Scatter(x=df_candles["time_label"], y=df_candles["sma_20"], name="SMA 20", line=dict(color="#38BDF8", width=1.5)), row=1, col=1)
+        lines.append({"name": "SMA 20", "color": "#38BDF8", "values": df_candles["sma_20"]})
     if "sma_50" in df_candles:
-        fig.add_trace(go.Scatter(x=df_candles["time_label"], y=df_candles["sma_50"], name="SMA 50", line=dict(color="#F59E0B", width=1.5)), row=1, col=1)
-
+        lines.append({"name": "SMA 50", "color": "#F59E0B", "values": df_candles["sma_50"]})
 if show_ema:
     if "ema_12" in df_candles:
-        fig.add_trace(go.Scatter(x=df_candles["time_label"], y=df_candles["ema_12"], name="EMA 12", line=dict(color="#A855F7", width=1.2, dash="dot")), row=1, col=1)
+        lines.append({"name": "EMA 12", "color": "#A855F7", "values": df_candles["ema_12"]})
     if "ema_26" in df_candles:
-        fig.add_trace(go.Scatter(x=df_candles["time_label"], y=df_candles["ema_26"], name="EMA 26", line=dict(color="#EC4899", width=1.2, dash="dot")), row=1, col=1)
-
+        lines.append({"name": "EMA 26", "color": "#EC4899", "values": df_candles["ema_26"]})
 if show_vwap and "vwap" in df_candles:
-    fig.add_trace(go.Scatter(x=df_candles["time_label"], y=df_candles["vwap"], name="VWAP", line=dict(color="#EAB308", width=1.8, dash="dash")), row=1, col=1)
+    lines.append({"name": "VWAP", "color": "#EAB308", "values": df_candles["vwap"]})
 
-# Execution Markers Alignment (P0)
+markers = []
+
+def _finite_series(column: str) -> list:
+    values = []
+    for value in df_candles[column]:
+        values.append(None if pd.isna(value) else round(float(value), 4))
+    return values
+
+# Execution markers use the candle window, with Daily end at the close of the last session.
 if show_trades:
-    min_t = df_candles["bar_time"].min()
-    max_t = df_candles["bar_time"].max()
-    df_trades = MarketDataService.get_trade_markers(
+    min_t, max_t = MarketDataService.candle_marker_bounds(df_candles, selected_timeframe)
+    trade_summary = MarketDataService.summarize_trade_markers(
         dataset_id=selected_dataset,
         ticker=selected_ticker,
         session_id=selected_session if selected_session != "ALL" else None,
         start_time=min_t,
         end_time=max_t,
+        alpha_id=selected_alpha_id,
     )
-    if not df_trades.empty:
+    df_trades = trade_summary.frame
+    if trade_summary.status == "error":
+        st.error(trade_summary.message)
+    elif trade_summary.status == "empty":
+        st.caption(trade_summary.message)
+    elif trade_summary.status == "outside":
+        st.caption(trade_summary.message)
+    elif not df_trades.empty:
         # Snap each trade to corresponding candle time_label and validate execution context
-        mapped_trades = []
         for _, tr in df_trades.iterrows():
             t_exec = tr["executed_at"]
             match = df_candles[df_candles["bar_time"] <= t_exec]
             candle = match.iloc[-1] if not match.empty else df_candles.iloc[0]
-            t_label = candle["time_label"]
+            pos = len(match) - 1 if not match.empty else 0
+            fp = float(tr["fill_price"])
+            qty = float(tr["fill_quantity"])
+            direction = str(tr["direction"]).upper()
             c_high = float(candle["high"])
             c_low = float(candle["low"])
-            fp = float(tr["fill_price"])
-            slip = float(tr["slippage_bps"])
-            qty = float(tr["fill_quantity"])
-            pnl = float(tr["realized_pnl"])
-            direction = str(tr["direction"]).upper()
-            sess = str(tr["session_id"])
-            dt_str = t_exec.strftime("%Y/%m/%d %H:%M:%S UTC")
-
-            is_gap = fp > c_high or fp < c_low
-            gap_note = f"<br>⚠️ Slippage Gap: fill ${fp:.2f} vs candle [{c_low:.2f}, {c_high:.2f}]" if is_gap else ""
-            pnl_note = f"<br>Realized PnL: ${pnl:+.2f}" if pnl != 0.0 else ""
-
-            ht = (
-                f"<b>{direction} TRADE FILL</b><br>"
-                f"Shares: {qty:.1f} @ ${fp:.2f}<br>"
-                f"Executed At: {dt_str}<br>"
-                f"Session: {sess} | Slippage: {slip:.1f} bps"
-                f"{gap_note}{pnl_note}"
-            )
-
-            mapped_trades.append({
-                "time_label": t_label,
-                "fill_price": fp,
-                "direction": direction,
-                "hovertext": ht,
+            gap = " outside the candle" if fp > c_high or fp < c_low else ""
+            markers.append({
+                "index": pos,
+                "price": round(fp, 4),
+                "side": "up" if direction == "BUY" else "down",
+                "color": "#10B981" if direction == "BUY" else "#EF4444",
+                "label": f"{direction} {qty:.1f} @ ${fp:.2f}{gap}",
             })
 
-        m_df = pd.DataFrame(mapped_trades)
-        buys = m_df[m_df["direction"] == "BUY"]
-        sells = m_df[m_df["direction"] == "SELL"]
+        st.caption(trade_summary.message)
 
-        if not buys.empty:
-            fig.add_trace(
-                go.Scatter(
-                    x=buys["time_label"],
-                    y=buys["fill_price"],
-                    mode="markers",
-                    name=f"Trade Buy ({len(buys)})",
-                    marker=dict(symbol="triangle-up", size=13, color="#10B981", line=dict(width=1.5, color="#FFFFFF")),
-                    hovertext=buys["hovertext"].tolist(),
-                    hoverinfo="text",
-                ),
-                row=1, col=1,
+book = None
+if confirmed_run and selected_alpha_id:
+    try:
+        with st.spinner("Scoring the alpha on these candles..."):
+            book = MarketDataService.evaluate_candle_book(
+                df_candles,
+                alpha_id=selected_alpha_id,
+                dataset_id=selected_dataset,
+                ticker=selected_ticker,
+                timeframe=selected_timeframe,
             )
-        if not sells.empty:
-            fig.add_trace(
-                go.Scatter(
-                    x=sells["time_label"],
-                    y=sells["fill_price"],
-                    mode="markers",
-                    name=f"Trade Sell ({len(sells)})",
-                    marker=dict(symbol="triangle-down", size=13, color="#EF4444", line=dict(width=1.5, color="#FFFFFF")),
-                    hovertext=sells["hovertext"].tolist(),
-                    hoverinfo="text",
-                ),
-                row=1, col=1,
-            )
-        st.caption(f"🎯 Displaying **{len(df_trades)}** verified execution trades from PostgreSQL (`paper_trades`) matching dataset `{selected_dataset}` and ticker `{selected_ticker}`.")
+    except Exception as exc:
+        st.error(f"Alpha evaluation failed for `{selected_alpha_id}`: {exc}")
     else:
-        st.caption(f"ℹ️ No matching execution trades found for `{selected_ticker}` in dataset `{selected_dataset}` within the rendered window.")
+        for mark in book["markers"]:
+            action = mark["action"]
+            markers.append({
+                "index": mark["index"],
+                "price": mark["price"],
+                "side": mark["side"],
+                "color": "#34D399" if action == "BUY" else "#F87171",
+                "label": f"Signal {action}",
+            })
+        if book["trade_count"] == 0:
+            st.caption(
+                f"`{selected_alpha_id}` on `{selected_ticker}` ({selected_timeframe}) did not open a position. "
+                f"Max |z| was {book['max_abs_z']:.2f}; entry threshold is {book['entry_z']:.2f}."
+            )
+        else:
+            st.caption(
+                f"`{selected_alpha_id}` on `{selected_ticker}` ({selected_timeframe}): "
+                f"{book['trade_count']} round trip(s). A score earns the next bar."
+            )
 
-current_row = 2
-
-# 2. Volume Subplot
-if show_volume:
-    vol_colors = ["#10B981" if c >= o else "#EF4444" for c, o in zip(df_candles["close"], df_candles["open"])]
-    fig.add_trace(
-        go.Bar(
-            x=df_candles["time_label"],
-            y=df_candles["volume"],
-            name="Volume",
-            marker_color=vol_colors,
-            opacity=0.7,
-        ),
-        row=current_row, col=1,
-    )
-    fig.update_yaxes(title_text="Vol", row=current_row, col=1, showgrid=True, gridcolor="#334155")
-    current_row += 1
-
-# 3. Oscillators (RSI or MACD)
+oscillator = None
 if show_rsi and "rsi_14" in df_candles:
-    fig.add_trace(
-        go.Scatter(x=df_candles["time_label"], y=df_candles["rsi_14"], name="RSI 14", line=dict(color="#A78BFA", width=1.5)),
-        row=current_row, col=1,
-    )
-    fig.add_hline(y=70, line_dash="dot", line_color="#EF4444", opacity=0.6, row=current_row, col=1)
-    fig.add_hline(y=30, line_dash="dot", line_color="#10B981", opacity=0.6, row=current_row, col=1)
-    fig.update_yaxes(title_text="RSI", range=[0, 100], row=current_row, col=1, showgrid=True, gridcolor="#334155")
-
+    oscillator = {"name": "RSI", "series": [{"name": "RSI 14", "color": "#A78BFA", "values": _finite_series("rsi_14")}]}
 elif show_macd and "macd_line" in df_candles:
-    fig.add_trace(go.Scatter(x=df_candles["time_label"], y=df_candles["macd_line"], name="MACD", line=dict(color="#38BDF8", width=1.5)), row=current_row, col=1)
-    fig.add_trace(go.Scatter(x=df_candles["time_label"], y=df_candles["macd_signal"], name="Signal", line=dict(color="#F43F5E", width=1.2)), row=current_row, col=1)
-    hist_colors = ["#10B981" if h >= 0 else "#EF4444" for h in df_candles["macd_histogram"]]
-    fig.add_trace(go.Bar(x=df_candles["time_label"], y=df_candles["macd_histogram"], name="Hist", marker_color=hist_colors), row=current_row, col=1)
-    fig.update_yaxes(title_text="MACD", row=current_row, col=1, showgrid=True, gridcolor="#334155")
+    oscillator = {
+        "name": "MACD",
+        "series": [
+            {"name": "MACD", "color": "#38BDF8", "values": _finite_series("macd_line")},
+            {"name": "Signal", "color": "#F43F5E", "values": _finite_series("macd_signal")},
+        ],
+    }
 
-# Tick labels formatting: evenly spaced ticks without overlapping
-n_candles = len(df_candles)
-tick_step = max(1, n_candles // 8)
-tick_indices = list(range(0, n_candles, tick_step))
-if tick_indices[-1] != n_candles - 1:
-    tick_indices.append(n_candles - 1)
-tick_vals = [df_candles["time_label"].iloc[i] for i in tick_indices]
-
-# Layout styling
-fig.update_layout(
-    height=750,
-    xaxis_rangeslider_visible=False,
-    template="plotly_dark",
-    margin=dict(l=50, r=40, t=30, b=40),
-    legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
+payload = build_chart_payload(
+    df_candles,
+    ticker=selected_ticker,
+    timeframe=selected_timeframe,
+    lines=lines,
+    markers=markers,
+    show_volume=show_volume,
+    oscillator=oscillator,
 )
+render_market_chart(payload)
 
-fig.update_xaxes(
-    type="category",
-    tickvals=tick_vals,
-    ticktext=tick_vals,
-    tickangle=-25,
-    showgrid=True,
-    gridcolor="#334155",
-)
-fig.update_yaxes(
-    showgrid=True,
-    gridcolor="#334155",
-)
-
-st.plotly_chart(fig, use_container_width=True)
+if book is not None:
+    st.subheader("Book")
+    st.dataframe(
+        pd.DataFrame([{
+            "Alpha": selected_alpha_id,
+            "Ticker": selected_ticker,
+            "Timeframe": selected_timeframe,
+            "Booksize": f"${book['booksize']:,.0f}",
+            "Sharpe": format_sharpe(
+                book["sharpe"],
+                book.get("sharpe_reason"),
+                trade_count=book["trade_count"],
+            ),
+            "Max drawdown": f"{book['max_drawdown']:.2f}%",
+            "PnL": f"${book['pnl']:,.2f}",
+            "Trades": book["trade_count"],
+            "Win rate": f"{book['win_rate']:.1f}%",
+        }]),
+        hide_index=True,
+        use_container_width=True,
+    )
+    st.caption(
+        "One ticker takes the whole booksize. The score on a bar earns the next bar, "
+        "after 6 bps of slippage and commission. This run is not written to paper_trades."
+    )

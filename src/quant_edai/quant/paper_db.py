@@ -28,19 +28,26 @@ DEFAULT_SQLITE_PATH = os.environ.get("SQLITE_PAPER_DB", "paper_trading.db")
 class PaperDatabase:
     """Manages paper trading persistence across PostgreSQL and SQLite fallback."""
 
-    def __init__(self, db_url: Optional[str] = None, sqlite_path: Optional[str] = None):
+    def __init__(
+        self,
+        db_url: Optional[str] = None,
+        sqlite_path: Optional[str] = None,
+        require_postgres: bool = False,
+    ):
         self.db_url = db_url or DEFAULT_PG_URL
         self.sqlite_path = sqlite_path or DEFAULT_SQLITE_PATH
+        self.require_postgres = require_postgres
         self.is_postgres = False
         self._pg_conn = None
         self._sqlite_conn = None
+        # An explicit sqlite file is a test or local database. It must not open production Postgres.
+        self._sqlite_only = sqlite_path is not None or os.environ.get("USE_SQLITE_ONLY") == "1"
 
         self._connect()
 
     def _connect(self) -> None:
         """Attempt PostgreSQL connection first, fallback to SQLite."""
-        # Check if Postgres should be attempted
-        if os.environ.get("USE_SQLITE_ONLY") != "1":
+        if not self._sqlite_only:
             try:
                 import psycopg2
                 conn = psycopg2.connect(self.db_url, connect_timeout=1)
@@ -51,7 +58,12 @@ class PaperDatabase:
                 self._migrate_existing_provenance()
                 return
             except Exception as e:
+                if self.require_postgres:
+                    raise ConnectionError(f"PostgreSQL is required for official replay: {e}") from e
                 logger.debug(f"PostgreSQL connection unavailable ({e}); using SQLite backend.")
+
+        if self.require_postgres:
+            raise ConnectionError("PostgreSQL is required for official replay.")
 
         # Fallback to SQLite
         self.is_postgres = False
@@ -66,6 +78,7 @@ class PaperDatabase:
         cur = conn.cursor()
         try:
             self._ensure_provenance_columns(cur)
+            self._ensure_replay_history(cur)
             conn.commit()
         except Exception as e:
             conn.rollback()
@@ -75,6 +88,10 @@ class PaperDatabase:
 
     def init_db(self, reset: bool = False) -> None:
         """Initialize or reset tables."""
+        if reset and self.is_postgres and os.environ.get("ALLOW_PG_PAPER_RESET") != "1":
+            raise RuntimeError(
+                "Refusing to reset PostgreSQL paper tables. Tests must pass sqlite_path so they stay off the production database."
+            )
         if self.is_postgres:
             self._init_postgres(reset=reset)
         else:
@@ -369,6 +386,8 @@ class PaperDatabase:
             ("alpha_ensemble_config", "approval_status", "TEXT"),
             ("alpha_ensemble_config", "approved_by", "TEXT"),
             ("alpha_ensemble_config", "approved_at", "TIMESTAMP WITH TIME ZONE" if self.is_postgres else "TEXT"),
+            ("paper_trades", "alpha_id", "TEXT"),
+            ("paper_positions", "entry_time", "TEXT"),
         ]
         for tbl, col, ctype in extra_schema:
             try:
@@ -380,6 +399,206 @@ class PaperDatabase:
                         cur.execute(f"ALTER TABLE {tbl} ADD COLUMN {col} {ctype}")
             except Exception:
                 pass
+
+    def _ensure_replay_history(self, cur) -> None:
+        """Additive tables for score history, position marks, and closed-trade lifecycle."""
+        if self.is_postgres:
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS paper_alpha_scores (
+                    session_id TEXT NOT NULL,
+                    ticker_symbol TEXT NOT NULL,
+                    event_time TEXT NOT NULL,
+                    alpha_id TEXT NOT NULL,
+                    version TEXT NOT NULL,
+                    z_score DOUBLE PRECISION,
+                    action TEXT NOT NULL,
+                    PRIMARY KEY (session_id, ticker_symbol, event_time, alpha_id, version)
+                )
+                """
+            )
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS paper_position_lifecycle (
+                    session_id TEXT NOT NULL,
+                    ticker_symbol TEXT NOT NULL,
+                    entry_time TEXT NOT NULL,
+                    side TEXT NOT NULL,
+                    quantity DOUBLE PRECISION NOT NULL,
+                    entry_price DOUBLE PRECISION NOT NULL,
+                    last_mark_time TEXT,
+                    last_mark_price DOUBLE PRECISION,
+                    unrealized_pnl DOUBLE PRECISION NOT NULL DEFAULT 0,
+                    last_open_unrealized DOUBLE PRECISION NOT NULL DEFAULT 0,
+                    exit_time TEXT,
+                    exit_price DOUBLE PRECISION,
+                    exit_reason TEXT,
+                    realized_pnl DOUBLE PRECISION,
+                    status TEXT NOT NULL,
+                    PRIMARY KEY (session_id, ticker_symbol, entry_time)
+                )
+                """
+            )
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS paper_position_marks (
+                    session_id TEXT NOT NULL,
+                    ticker_symbol TEXT NOT NULL,
+                    entry_time TEXT NOT NULL,
+                    event_time TEXT NOT NULL,
+                    mark_price DOUBLE PRECISION NOT NULL,
+                    unrealized_pnl DOUBLE PRECISION NOT NULL,
+                    quantity DOUBLE PRECISION NOT NULL,
+                    side TEXT NOT NULL,
+                    PRIMARY KEY (session_id, ticker_symbol, entry_time, event_time)
+                )
+                """
+            )
+        else:
+            cur.executescript(
+                """
+                CREATE TABLE IF NOT EXISTS paper_alpha_scores (
+                    session_id TEXT NOT NULL,
+                    ticker_symbol TEXT NOT NULL,
+                    event_time TEXT NOT NULL,
+                    alpha_id TEXT NOT NULL,
+                    version TEXT NOT NULL,
+                    z_score REAL,
+                    action TEXT NOT NULL,
+                    PRIMARY KEY (session_id, ticker_symbol, event_time, alpha_id, version)
+                );
+                CREATE TABLE IF NOT EXISTS paper_position_lifecycle (
+                    session_id TEXT NOT NULL,
+                    ticker_symbol TEXT NOT NULL,
+                    entry_time TEXT NOT NULL,
+                    side TEXT NOT NULL,
+                    quantity REAL NOT NULL,
+                    entry_price REAL NOT NULL,
+                    last_mark_time TEXT,
+                    last_mark_price REAL,
+                    unrealized_pnl REAL NOT NULL DEFAULT 0,
+                    last_open_unrealized REAL NOT NULL DEFAULT 0,
+                    exit_time TEXT,
+                    exit_price REAL,
+                    exit_reason TEXT,
+                    realized_pnl REAL,
+                    status TEXT NOT NULL,
+                    PRIMARY KEY (session_id, ticker_symbol, entry_time)
+                );
+                CREATE TABLE IF NOT EXISTS paper_position_marks (
+                    session_id TEXT NOT NULL,
+                    ticker_symbol TEXT NOT NULL,
+                    entry_time TEXT NOT NULL,
+                    event_time TEXT NOT NULL,
+                    mark_price REAL NOT NULL,
+                    unrealized_pnl REAL NOT NULL,
+                    quantity REAL NOT NULL,
+                    side TEXT NOT NULL,
+                    PRIMARY KEY (session_id, ticker_symbol, entry_time, event_time)
+                );
+                """
+            )
+
+    def record_alpha_scores(self, session_id: str, ticker: str, event_time: str, scores: List[Dict[str, Any]]) -> None:
+        """Store evaluated alpha scores. A later bar does not erase them."""
+        rows = []
+        for score in scores:
+            alpha_id = score.get("alpha_id")
+            if not alpha_id:
+                continue
+            z_score = score.get("z_score")
+            rows.append((
+                session_id, ticker, str(event_time), str(alpha_id), str(score.get("version") or ""),
+                None if z_score is None else float(z_score), str(score.get("action") or ""),
+            ))
+        if not rows:
+            return
+        sql = """
+            INSERT INTO paper_alpha_scores (
+                session_id, ticker_symbol, event_time, alpha_id, version, z_score, action
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        """
+        if self.is_postgres:
+            sql = sql.replace("?", "%s") + " ON CONFLICT DO NOTHING"
+            cur = self._pg_conn.cursor()
+            try:
+                cur.executemany(sql, rows)
+                self._pg_conn.commit()
+            finally:
+                cur.close()
+        else:
+            cur = self._sqlite_conn.cursor()
+            cur.executemany(sql + " ON CONFLICT DO NOTHING", rows)
+            self._sqlite_conn.commit()
+
+    def open_position_lifecycle(self, pos: Dict[str, Any]) -> None:
+        sql = """
+            INSERT INTO paper_position_lifecycle (
+                session_id, ticker_symbol, entry_time, side, quantity, entry_price,
+                last_mark_time, last_mark_price, unrealized_pnl, last_open_unrealized, status
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'OPEN')
+        """
+        params = (
+            pos["session_id"], pos["ticker_symbol"], str(pos["entry_time"]), pos["side"],
+            float(pos["quantity"]), float(pos["average_entry_price"]),
+            str(pos["entry_time"]), float(pos["current_mark_price"]),
+            float(pos["unrealized_pnl"]), float(pos["unrealized_pnl"]),
+        )
+        self._write_history(sql, params, conflict="DO NOTHING")
+        self.record_position_mark(pos, pos["entry_time"])
+
+    def record_position_mark(self, pos: Dict[str, Any], event_time: str) -> None:
+        mark_sql = """
+            INSERT INTO paper_position_marks (
+                session_id, ticker_symbol, entry_time, event_time, mark_price, unrealized_pnl, quantity, side
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """
+        mark_params = (
+            pos["session_id"], pos["ticker_symbol"], str(pos["entry_time"]), str(event_time),
+            float(pos["current_mark_price"]), float(pos["unrealized_pnl"]),
+            float(pos["quantity"]), pos["side"],
+        )
+        self._write_history(mark_sql, mark_params, conflict="DO NOTHING")
+        update_sql = """
+            UPDATE paper_position_lifecycle
+            SET last_mark_time = ?, last_mark_price = ?, unrealized_pnl = ?, last_open_unrealized = ?
+            WHERE session_id = ? AND ticker_symbol = ? AND entry_time = ? AND status = 'OPEN'
+        """
+        update_params = (
+            str(event_time), float(pos["current_mark_price"]), float(pos["unrealized_pnl"]),
+            float(pos["unrealized_pnl"]), pos["session_id"], pos["ticker_symbol"], str(pos["entry_time"]),
+        )
+        self._write_history(update_sql, update_params, conflict=None)
+
+    def close_position_lifecycle(self, pos: Dict[str, Any], exit_time: str, exit_price: float, reason: str, realized_pnl: float) -> None:
+        sql = """
+            UPDATE paper_position_lifecycle
+            SET exit_time = ?, exit_price = ?, exit_reason = ?, realized_pnl = ?,
+                unrealized_pnl = 0, status = 'CLOSED'
+            WHERE session_id = ? AND ticker_symbol = ? AND entry_time = ? AND status = 'OPEN'
+        """
+        params = (
+            str(exit_time), float(exit_price), reason, float(realized_pnl),
+            pos["session_id"], pos["ticker_symbol"], str(pos["entry_time"]),
+        )
+        self._write_history(sql, params, conflict=None)
+
+    def _write_history(self, sql: str, params: tuple, conflict: Optional[str]) -> None:
+        statement = sql
+        if conflict:
+            statement = sql + f" ON CONFLICT {conflict}"
+        if self.is_postgres:
+            statement = statement.replace("?", "%s")
+            cur = self._pg_conn.cursor()
+            try:
+                cur.execute(statement, params)
+                self._pg_conn.commit()
+            finally:
+                cur.close()
+        else:
+            cur = self._sqlite_conn.cursor()
+            cur.execute(statement, params)
+            self._sqlite_conn.commit()
 
     def record_order(self, order: Dict[str, Any]) -> bool:
         """Insert order with idempotency check. Returns True if inserted, False if duplicate."""
@@ -434,15 +653,17 @@ class PaperDatabase:
             INSERT INTO paper_trades (
                 trade_id, order_id, session_id, ticker_symbol, direction,
                 fill_price, fill_quantity, slippage_bps, commission, realized_pnl, executed_at,
-                model_version, dataset_id, feature_source
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                model_version, dataset_id, feature_source, alpha_id
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """
+        alpha_id = trade.get("alpha_id")
         params = (
             trade["trade_id"], trade.get("order_id"), trade["session_id"], trade["ticker_symbol"],
             trade["direction"], float(trade["fill_price"]), float(trade["fill_quantity"]),
             float(trade.get("slippage_bps", 5.0)), float(trade.get("commission", 0.0)),
             float(trade.get("realized_pnl", 0.0)), str(trade["executed_at"]),
             *[str(trade[f]) for f in PROVENANCE_FIELDS],
+            None if alpha_id is None or str(alpha_id).strip() == "" else str(alpha_id),
         )
         if self.is_postgres:
             cur = self._pg_conn.cursor()
@@ -466,8 +687,8 @@ class PaperDatabase:
                 INSERT INTO paper_positions (
                     session_id, ticker_symbol, side, quantity, average_entry_price,
                     current_mark_price, unrealized_pnl, unrealized_pnl_pct, stop_loss_price,
-                    take_profit_price, updated_at
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    take_profit_price, updated_at, entry_time
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (session_id, ticker_symbol) DO UPDATE SET
                     side = EXCLUDED.side,
                     quantity = EXCLUDED.quantity,
@@ -477,7 +698,8 @@ class PaperDatabase:
                     unrealized_pnl_pct = EXCLUDED.unrealized_pnl_pct,
                     stop_loss_price = EXCLUDED.stop_loss_price,
                     take_profit_price = EXCLUDED.take_profit_price,
-                    updated_at = EXCLUDED.updated_at
+                    updated_at = EXCLUDED.updated_at,
+                    entry_time = EXCLUDED.entry_time
             """
             cur = self._pg_conn.cursor()
             try:
@@ -486,7 +708,8 @@ class PaperDatabase:
                     float(pos["quantity"]), float(pos["average_entry_price"]),
                     float(pos["current_mark_price"]), float(pos["unrealized_pnl"]),
                     float(pos["unrealized_pnl_pct"]), pos.get("stop_loss_price"),
-                    pos.get("take_profit_price"), str(pos["updated_at"])
+                    pos.get("take_profit_price"), str(pos["updated_at"]),
+                    str(pos.get("entry_time") or pos["updated_at"]),
                 ))
                 self._pg_conn.commit()
             finally:
@@ -496,8 +719,8 @@ class PaperDatabase:
                 INSERT INTO paper_positions (
                     session_id, ticker_symbol, side, quantity, average_entry_price,
                     current_mark_price, unrealized_pnl, unrealized_pnl_pct, stop_loss_price,
-                    take_profit_price, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    take_profit_price, updated_at, entry_time
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT (session_id, ticker_symbol) DO UPDATE SET
                     side = excluded.side,
                     quantity = excluded.quantity,
@@ -507,7 +730,8 @@ class PaperDatabase:
                     unrealized_pnl_pct = excluded.unrealized_pnl_pct,
                     stop_loss_price = excluded.stop_loss_price,
                     take_profit_price = excluded.take_profit_price,
-                    updated_at = excluded.updated_at
+                    updated_at = excluded.updated_at,
+                    entry_time = excluded.entry_time
             """
             cur = self._sqlite_conn.cursor()
             cur.execute(sql, (
@@ -515,7 +739,8 @@ class PaperDatabase:
                 float(pos["quantity"]), float(pos["average_entry_price"]),
                 float(pos["current_mark_price"]), float(pos["unrealized_pnl"]),
                 float(pos["unrealized_pnl_pct"]), pos.get("stop_loss_price"),
-                pos.get("take_profit_price"), str(pos["updated_at"])
+                pos.get("take_profit_price"), str(pos["updated_at"]),
+                str(pos.get("entry_time") or pos["updated_at"]),
             ))
             self._sqlite_conn.commit()
 
@@ -566,6 +791,35 @@ class PaperDatabase:
             cur = self._sqlite_conn.cursor()
             cur.execute(sql, params)
             self._sqlite_conn.commit()
+
+    def close(self) -> None:
+        if self._pg_conn is not None:
+            self._pg_conn.close()
+            self._pg_conn = None
+        if self._sqlite_conn is not None:
+            self._sqlite_conn.close()
+            self._sqlite_conn = None
+
+    def session_has_activity(self, session_id: str) -> bool:
+        """True when this session already has trades or portfolio snapshots."""
+        sql = """
+            SELECT
+                (SELECT COUNT(*) FROM paper_trades WHERE session_id = ?)
+              + (SELECT COUNT(*) FROM paper_portfolio_snapshots WHERE session_id = ?)
+        """
+        params = (session_id, session_id)
+        if self.is_postgres:
+            cur = self._pg_conn.cursor()
+            try:
+                cur.execute(sql.replace("?", "%s"), params)
+                count = int(cur.fetchone()[0])
+            finally:
+                cur.close()
+        else:
+            cur = self._sqlite_conn.cursor()
+            cur.execute(sql, params)
+            count = int(cur.fetchone()[0])
+        return count > 0
 
     def get_latest_session_id(self) -> Optional[str]:
         """Fetch the most recently active session ID."""
@@ -1046,6 +1300,11 @@ class PaperDatabase:
 
     def upsert_ensemble_config(self, config: Dict[str, Any]) -> None:
         """Persist Pick-5 ensemble config for a horizon (INTRADAY|DAILY) with immutable approval metadata."""
+        writer = str(config.get("updated_by") or config.get("approved_by") or "").strip().lower()
+        if self.is_postgres and writer in {"test", "pytest"}:
+            raise RuntimeError(
+                "A test writer cannot update the production ensemble. Use an explicit sqlite database."
+            )
         selected = config.get("selected_alpha_ids", [])
         if isinstance(selected, list):
             selected_json = json.dumps(selected)

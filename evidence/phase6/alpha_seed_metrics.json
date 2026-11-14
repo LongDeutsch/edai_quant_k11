@@ -1,5 +1,9 @@
 {
   "status": "SUCCESS",
+  "execution_mode": "LOCAL_GOLD",
+  "model_version": "alpha_catalog-v1.0.0",
+  "dataset_id": "ds_canonical_4y_eval_s05",
+  "feature_source": "/tmp/lakehouse_source/runs/ds_canonical_4y_eval_s05/gold_features/feat_ticker_technical_indicators.parquet",
   "registry": {
     "registry_rows": 20,
     "strategies": 10,
@@ -7,23 +11,32 @@
     "version": "v1.0.0"
   },
   "daily_signals": {
-    "feature_source": "synthetic_panel",
-    "asof_date": "2026-11-10",
-    "effective_date": "2026-11-11",
-    "signals_prepared": 44,
-    "signals_inserted": 44,
+    "feature_source": "/tmp/lakehouse_source/runs/ds_canonical_4y_eval_s05/gold_features/feat_ticker_technical_indicators.parquet",
+    "synthetic_features": false,
+    "model_version": "alpha_catalog-v1.0.0",
+    "dataset_id": "ds_canonical_4y_eval_s05",
+    "asof_date": "2026-10-30",
+    "effective_date": "2026-11-02",
+    "signals_prepared": 73,
+    "signals_inserted": 73,
     "tickers": [
       "AAPL",
-      "MSFT",
-      "NVDA",
+      "AMD",
       "AMZN",
       "GOOGL",
-      "META",
-      "TSLA",
+      "JNJ",
       "JPM",
+      "META",
+      "MSFT",
+      "NVDA",
+      "ORCL",
       "PG",
-      "SPY"
+      "SPY",
+      "TSLA",
+      "V",
+      "WMT",
+      "XOM"
     ]
   },
-  "db_backend": "sqlite"
+  "db_backend": "postgres"
 }

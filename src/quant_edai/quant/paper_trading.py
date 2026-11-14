@@ -87,6 +87,10 @@ class Position:
 class PaperTradingEngine:
     """Institutional Event-Driven Intraday Scalping Engine."""
 
+    # Stops are checked on a later completed bar. A signal exit can still close
+    # on the bar that produced the signal. This name records that order.
+    EXECUTION_POLICY = "next_bar_risk_v1"
+
     def __init__(
         self,
         session_id: Optional[str] = None,
@@ -120,6 +124,14 @@ class PaperTradingEngine:
         )
         self._bar_provenance: Dict[str, Optional[str]] = {}
         self._signal_provenance: Dict[str, Dict[str, Optional[str]]] = {}
+        self._last_alpha_id: Dict[str, Optional[str]] = {}
+        self._last_signal_notes: Dict[str, str] = {}
+        self._last_signal_detail: Dict[str, Any] = {}
+        # Dashboard replay sets these so serving uses the chosen alphas and as-of features.
+        self.signal_alpha_ids: Optional[List[str]] = None
+        self.signal_alpha_versions: Optional[Dict[str, str]] = None
+        self.signal_strict: bool = False
+        self.bar_features: Optional[Dict[str, Any]] = None
 
         self.starting_cash = starting_cash
         self.cash = starting_cash
@@ -211,6 +223,17 @@ class PaperTradingEngine:
         ranked = sorted(self.cross_section_scores.items(), key=lambda kv: kv[1], reverse=True)
         return ranked[: max(1, n)]
 
+    @staticmethod
+    def _alpha_label(sig: Any) -> Optional[str]:
+        """Registry ids that produced this signal, without versions."""
+        names = getattr(sig, "alphas_combined", None) or []
+        ids: List[str] = []
+        for name in names:
+            aid = str(name).split(":")[0].strip()
+            if aid and aid not in ids and aid != "alpha_default_composite":
+                ids.append(aid)
+        return ",".join(ids) if ids else None
+
     def _remember_signal_provenance(self, ticker: str, sig: Any) -> None:
         prov = {f: getattr(sig, f, None) for f in PROVENANCE_FIELDS}
         if any(is_real_provenance_value(v) for v in prov.values()):
@@ -259,6 +282,7 @@ class PaperTradingEngine:
             if pos.side == "LONG":
                 pos.unrealized_pnl = (close - pos.average_entry_price) * pos.quantity
                 pos.unrealized_pnl_pct = (close - pos.average_entry_price) / pos.average_entry_price
+                self._remember_mark(pos, ts)
                 # Check Stop Loss / Take Profit
                 if close <= pos.stop_loss_price:
                     self._close_position(ticker, close, ts, reason="STOP_LOSS")
@@ -271,6 +295,7 @@ class PaperTradingEngine:
             else:  # SHORT
                 pos.unrealized_pnl = (pos.average_entry_price - close) * pos.quantity
                 pos.unrealized_pnl_pct = (pos.average_entry_price - close) / pos.average_entry_price
+                self._remember_mark(pos, ts)
                 if close >= pos.stop_loss_price:
                     self._close_position(ticker, close, ts, reason="STOP_LOSS")
                     events_fired.append(f"SL_SHORT_{ticker}")
@@ -313,10 +338,14 @@ class PaperTradingEngine:
 
         # 4. Generate Signal and Potential Entry
         signal_val = 0.0
+        signal_action = ""
+        signal_notes = ""
+        alpha_scores: List[Dict[str, Any]] = []
+        rejected_signal = False
         pm_blocked = self.pm_controls.is_entry_blocked()
         if pm_blocked:
             events_fired.append(f"PM_BLOCK_ACTIVE_{ticker}")
-        elif not self.daily_halted and not is_eod:
+        elif not is_eod:
             if self.profile == "daily":
                 # Daily signal policy (Rubric M1-38/M1-39):
                 # 1. Check market open window (09:30 - 09:35 ET)
@@ -331,6 +360,7 @@ class PaperTradingEngine:
                 daily_sig = self.signal_server.get_daily_signal(ticker=ticker, effective_date=effective_date)
                 signal_val = daily_sig.z_score
                 self._remember_signal_provenance(ticker, daily_sig)
+                self._last_alpha_id[ticker] = self._alpha_label(daily_sig)
                 self._update_cross_section_score(ticker, signal_val)
 
                 # Signal exit for open daily positions (weak/FLAT or flip)
@@ -346,7 +376,8 @@ class PaperTradingEngine:
                         position_closed_this_bar = True
 
                 if (
-                    is_market_open
+                    not self.daily_halted
+                    and is_market_open
                     and not position_closed_this_bar
                     and ticker not in self.positions
                     and len(self.positions) < self.max_positions
@@ -376,11 +407,26 @@ class PaperTradingEngine:
                         "volume": self.volume_buffers,
                         "close": self.close_buffers,
                     },
+                    alpha_ids=self.signal_alpha_ids,
+                    features=self.bar_features,
+                    allow_default_composite=not self.signal_strict,
+                    strict=self.signal_strict,
+                    alpha_versions=self.signal_alpha_versions,
                 )
-                if self.alpha_source == "store":
+                self._last_alpha_id[ticker] = self._alpha_label(sig)
+                self._last_signal_notes[ticker] = str(getattr(sig, "notes", "") or "")
+                self._last_signal_detail[ticker] = sig
+                signal_action = str(sig.action or "")
+                signal_notes = self._last_signal_notes[ticker]
+                alpha_scores = list(getattr(sig, "alpha_scores", None) or [])
+                if alpha_scores:
+                    self.db.record_alpha_scores(self.session_id, ticker, ts, alpha_scores)
+                rejected_signal = signal_action == "REJECTED" or signal_notes.startswith("REJECTED")
+                if self.alpha_source == "store" and not rejected_signal:
                     signal_val = sig.z_score
                 self._remember_signal_provenance(ticker, sig)
-                self._update_cross_section_score(ticker, float(signal_val))
+                if not rejected_signal:
+                    self._update_cross_section_score(ticker, float(signal_val))
 
                 # Exit when store signal weakens / flips (before considering new entries)
                 if (
@@ -403,7 +449,8 @@ class PaperTradingEngine:
 
                 # Check capacity and entry conditions
                 if (
-                    not position_closed_this_bar
+                    not self.daily_halted
+                    and not position_closed_this_bar
                     and ticker not in self.positions
                     and len(self.positions) < self.max_positions
                     and self.cash >= self.trade_notional
@@ -452,28 +499,46 @@ class PaperTradingEngine:
         elapsed_ms = (time.perf_counter() - start_time) * 1000.0
         self.latencies_ms.append(elapsed_ms)
 
-        # Snapshot state
+        # Snapshot the book after this bar's fills. The circuit breaker above
+        # still uses the pre-entry equity sample, so this does not change orders.
+        metrics = self.book_metrics()
         snapshot = {
             "session_id": self.session_id,
-            "cash_balance": self.cash,
-            "invested_equity": invested_equity,
-            "total_portfolio_value": total_equity,
-            "realized_pnl_cumulative": self.realized_pnl_cumulative,
-            "unrealized_pnl_current": total_unrealized,
+            "cash_balance": metrics["cash"],
+            "invested_equity": metrics["invested"],
+            "total_portfolio_value": metrics["equity"],
+            "realized_pnl_cumulative": metrics["realized_pnl"],
+            "unrealized_pnl_current": metrics["unrealized_pnl"],
             "rolling_sharpe_ratio": 0.0,
-            "max_drawdown_pct": drawdown_pct,
-            "active_positions_count": len(self.positions),
+            "max_drawdown_pct": metrics["drawdown"],
+            "active_positions_count": metrics["open_positions"],
             "latency_ms": elapsed_ms,
             "recorded_at": ts,
         }
         self.db.record_snapshot(snapshot)
+        if is_eod:
+            signal_state = "SESSION_CLOSED"
+        elif rejected_signal:
+            signal_state = "REJECTED"
+        elif pm_blocked or (self.alpha_source == "store" and not alpha_scores):
+            signal_state = "NO_SIGNAL"
+        elif abs(float(signal_val)) < self.z_entry_threshold:
+            signal_state = "HOLD"
+        elif float(signal_val) >= self.z_entry_threshold:
+            signal_state = "BUY"
+        else:
+            signal_state = "SELL"
 
         return {
             "ticker": ticker,
             "timestamp": ts,
             "events": events_fired,
-            "signal": signal_val,
-            "equity": total_equity,
+            "signal": None if rejected_signal else signal_val,
+            "signal_action": signal_action,
+            "signal_notes": signal_notes,
+            "signal_state": signal_state,
+            "alpha_scores": alpha_scores,
+            "equity": metrics["equity"],
             "cash": self.cash,
             "positions_count": len(self.positions),
             "latency_ms": elapsed_ms,
@@ -573,11 +638,17 @@ class PaperTradingEngine:
             "commission": commission,
             "realized_pnl": 0.0,
             "executed_at": ts,
+            "alpha_id": self._last_alpha_id.get(ticker),
             **self._provenance_for(ticker),
         }
         self.db.record_trade(trade_record)
 
         self.cash -= total_cost
+        if side == "LONG":
+            unrealized = (price - fill_price) * quantity
+        else:
+            unrealized = (fill_price - price) * quantity
+        unrealized_pct = unrealized / self.trade_notional if self.trade_notional else 0.0
         pos = Position(
             ticker_symbol=ticker,
             session_id=self.session_id,
@@ -585,8 +656,8 @@ class PaperTradingEngine:
             quantity=quantity,
             average_entry_price=fill_price,
             current_mark_price=price,
-            unrealized_pnl=0.0,
-            unrealized_pnl_pct=0.0,
+            unrealized_pnl=unrealized,
+            unrealized_pnl_pct=unrealized_pct,
             stop_loss_price=sl_price,
             take_profit_price=tp_price,
             entry_time=ts,
@@ -594,6 +665,7 @@ class PaperTradingEngine:
         )
         self.positions[ticker] = pos
         self.db.upsert_position(asdict(pos))
+        self.db.open_position_lifecycle(asdict(pos))
 
     def _close_position(self, ticker: str, price: float, ts: str, reason: str) -> None:
         """Close an existing position with slippage, commission and PnL accounting."""
@@ -647,11 +719,52 @@ class PaperTradingEngine:
             "commission": commission,
             "realized_pnl": net_pnl,
             "executed_at": ts,
+            "alpha_id": self._last_alpha_id.get(ticker),
             **self._provenance_for(ticker),
         }
         self.db.record_trade(trade_record)
 
         self.cash += returned_capital
         self.realized_pnl_cumulative += net_pnl
+        self.db.close_position_lifecycle(asdict(pos), ts, fill_price, reason, net_pnl)
         del self.positions[ticker]
         self.db.remove_position(ticker, session_id=self.session_id)
+
+    def book_metrics(self) -> Dict[str, float]:
+        """Mark-to-market book. Unrealized is zero when no position is open."""
+        unrealized = sum(p.unrealized_pnl for p in self.positions.values())
+        invested = sum(p.current_mark_price * p.quantity for p in self.positions.values())
+        equity = self.cash + invested
+        drawdown = (equity - self.peak_equity) / self.peak_equity if self.peak_equity > 0 else 0.0
+        if not self.positions:
+            unrealized = 0.0
+        return {
+            "cash": float(self.cash),
+            "invested": float(invested),
+            "equity": float(equity),
+            "realized_pnl": float(self.realized_pnl_cumulative),
+            "unrealized_pnl": float(unrealized),
+            "drawdown": float(drawdown),
+            "open_positions": float(len(self.positions)),
+        }
+
+    def flatten_open_positions(self, ts: str, reason: str) -> List[str]:
+        """Close every open position at its current mark through the existing fill path."""
+        closed: List[str] = []
+        for ticker in list(self.positions):
+            mark = float(self.positions[ticker].current_mark_price)
+            self._close_position(ticker, mark, ts, reason)
+            closed.append(ticker)
+        return closed
+
+    def apply_end_policy(self, policy: str, ts: str) -> List[str]:
+        """MARK_TO_MARKET leaves the book open. FORCE_CLOSE uses the normal close path."""
+        if policy == "MARK_TO_MARKET":
+            return []
+        if policy == "FORCE_CLOSE":
+            return self.flatten_open_positions(ts, "END_OF_REPLAY")
+        raise ValueError(f"Unknown end policy: {policy}")
+
+    def _remember_mark(self, pos: Position, event_time: str) -> None:
+        self.db.upsert_position(asdict(pos))
+        self.db.record_position_mark(asdict(pos), event_time)

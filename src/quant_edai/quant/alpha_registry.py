@@ -76,14 +76,28 @@ class AlphaRegistry:
         metrics = metrics or {}
         reasons = []
         ic = float(metrics.get("ic_mean", metrics.get("ic", 0.0)))
-        sharpe = float(metrics.get("sharpe", 0.0))
+        raw_sharpe = metrics.get("sharpe", 0.0)
+        sharpe: Optional[float]
+        if raw_sharpe is None:
+            sharpe = None
+        else:
+            try:
+                sharpe = float(raw_sharpe)
+            except (TypeError, ValueError):
+                sharpe = None
+            else:
+                if sharpe != sharpe or sharpe in (float("inf"), float("-inf")):
+                    sharpe = None
         mdd = float(metrics.get("max_drawdown", metrics.get("mdd", -1.0)))
 
         passed = True
         if ic < self.MIN_IC_MEAN:
             passed = False
             reasons.append(f"IC Mean {ic:+.4f} < {self.MIN_IC_MEAN:+.4f} threshold")
-        if sharpe < self.MIN_SHARPE:
+        if sharpe is None:
+            passed = False
+            reasons.append("Sharpe undefined")
+        elif sharpe < self.MIN_SHARPE:
             passed = False
             reasons.append(f"Sharpe {sharpe:.2f} < {self.MIN_SHARPE:.2f} threshold")
         if mdd < self.MAX_DRAWDOWN:
@@ -93,7 +107,9 @@ class AlphaRegistry:
         if passed:
             reasons.append("All OOS Quality Gates Passed (IC, Sharpe, Drawdown)")
 
-        composite_score = (ic * 10.0) + (sharpe * 0.5)
+        composite_score = ic * 10.0
+        if sharpe is not None:
+            composite_score += sharpe * 0.5
         return QualityGateResult(passed=passed, score=round(composite_score, 3), reasons=reasons)
 
     def register_candidate(

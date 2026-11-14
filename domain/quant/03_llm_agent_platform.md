@@ -100,6 +100,47 @@ The tools are packaged as standalone Docker containers and deployed to Kubernete
 
 ## 5. Multi-Agent Fleet Hierarchy & Interaction Flow
 
+```mermaid
+sequenceDiagram
+    autonumber
+    actor PM as Portfolio Manager / Quant
+    participant Gateway as AgentGateway (JWT & Router)
+    participant Coord as Coordinator Agent (Orchestrator)
+    participant Tech as Technical Quant Agent
+    participant News as Sentiment & News Agent
+    participant MCP as FastAPI MCP Tools (K8s)
+    participant LLM as vLLM / LiteLLM
+
+    PM->>Gateway: POST /v1/agents/chat ("NVDA Investment Brief")
+    Gateway->>Coord: Dispatch Task Plan
+    Coord->>LLM: Decompose Query into Sub-Tasks
+    LLM-->>Coord: Execution Plan (Tech + News)
+
+    par Parallel Evidence Gathering
+        Coord->>Tech: A2A Request: Technical & ML Direction
+        Tech->>MCP: fetch_ticker_quant_features(NVDA)
+        MCP-->>Tech: {rsi_14d: 68.2, vwap_spread: +0.8%, iv_skew: 1.12}
+        Tech->>MCP: predict_ticker_direction(NVDA)
+        MCP-->>Tech: {probability_up: 0.684, model_version: "v1.2-champion"}
+        Tech->>LLM: Formulate Technical Stance
+        LLM-->>Tech: Technical summary & risk triggers
+        Tech-->>Coord: Technical Stance: BULLISH (Conf: 68.4%)
+    and
+        Coord->>News: A2A Request: News Sentiment & Headwinds
+        News->>MCP: search_market_news_rag(NVDA, query="GPU demand")
+        MCP-->>News: Top-3 relevant filings & news chunks
+        News->>LLM: Synthesize Corporate News Tone
+        LLM-->>News: Positive sentiment score + Macro risk warning
+        News-->>Coord: Sentiment Stance: NEUTRAL-POSITIVE (+0.42)
+    end
+
+    Coord->>LLM: Synthesize Memoranda (Weighting Tech + Sentiment + Risk)
+    LLM-->>Coord: Institutional Investment Memorandum
+    Coord-->>Gateway: Return Structured Response & Citations
+    Gateway-->>PM: Streamlit / WebUI Display
+```
+
+### Agent Roles & Responsibilities
 1. **Coordinator Agent**:
    - Acts as the orchestrator. It receives user prompts (e.g. *"Provide an investment brief for NVDA following today's market close"*).
    - Generates an execution plan, delegating analytical tasks to Sub-Agent 1 and Sub-Agent 2 in parallel.

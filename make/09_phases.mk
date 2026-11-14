@@ -112,7 +112,7 @@ phase7: ## Execute Phase 7: Agentic AI, RAG Pipeline, MCP Tools & Multi-Agent Fl
 
 phase8 demo:
 	@echo "Notice: Target '$@' is scheduled for subsequent implementation phases."
-	@echo "Currently completed and verified milestones: Phase 1, Phase 2, Phase 3 & Phase 4."
+	@echo "Currently completed and verified milestones: Phase 1, Phase 2, Phase 3, Phase 4, Phase 5 & Phase 6."
 	@echo "Refer to docs/plan/IMPLEMENTATION_STATUS.md for detailed status and evidence."
 	@exit 1
 

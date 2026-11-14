@@ -11,6 +11,9 @@ from quant_edai.quant.metrics import (
     calculate_rolling_sharpe,
     calculate_sharpe,
     calculate_sortino,
+    format_sharpe,
+    periods_per_year,
+    SharpeResult,
 )
 
 __all__ = [
@@ -24,4 +27,7 @@ __all__ = [
     "calculate_cumulative_returns",
     "calculate_rolling_sharpe",
     "calculate_ic_series",
+    "format_sharpe",
+    "periods_per_year",
+    "SharpeResult",
 ]

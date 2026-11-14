@@ -33,7 +33,12 @@ from quant_edai.quant.alpha_catalog import (
     DEFAULT_SL_PCT,
     score_row_features,
 )
-from quant_edai.quant.metrics import calculate_max_drawdown, calculate_sharpe
+from quant_edai.quant.metrics import (
+    SHARPE_INSUFFICIENT,
+    calculate_max_drawdown,
+    calculate_sharpe,
+    finite_float,
+)
 from quant_edai.quant.paper_db import PaperDatabase
 
 logger = logging.getLogger(__name__)
@@ -193,8 +198,13 @@ def _simulate_alpha(
 
     dates = sorted(panel["date"].unique())
     if len(dates) < 5:
-        empty = {k: 0.0 for k in ("sharpe", "max_drawdown", "win_rate", "pnl", "n_trades")}
-        empty.update({"booksize": booksize, "horizon": horizon})
+        empty = {k: 0.0 for k in ("max_drawdown", "win_rate", "pnl", "n_trades")}
+        empty.update({
+            "sharpe": None,
+            "sharpe_reason": SHARPE_INSUFFICIENT,
+            "booksize": booksize,
+            "horizon": horizon,
+        })
         return empty
 
     scores: Dict[Tuple[str, str], float] = {}
@@ -282,7 +292,8 @@ def _simulate_alpha(
     pnl = float(equity_curve[-1] - booksize)
 
     return {
-        "sharpe": round(float(sharpe), 4),
+        "sharpe": sharpe.rounded(4),
+        "sharpe_reason": sharpe.reason,
         "max_drawdown": round(float(mdd), 4),
         "win_rate": round(float(win_rate), 4),
         "pnl": round(pnl, 2),
@@ -390,9 +401,12 @@ def run_alpha_metrics(
             )
             metrics_oos["strategy"] = strategy
             metrics_oos["split_id"] = "OOS"
-            is_sh = float(metrics.get("sharpe", 0.0))
-            oos_sh = float(metrics_oos.get("sharpe", 0.0))
-            metrics_oos["degradation_pct"] = round(((is_sh - oos_sh) / max(0.1, is_sh)) * 100.0, 2)
+            is_sh = finite_float(metrics.get("sharpe", 0.0))
+            oos_sh = finite_float(metrics_oos.get("sharpe", 0.0))
+            if is_sh is None or oos_sh is None:
+                metrics_oos["degradation_pct"] = None
+            else:
+                metrics_oos["degradation_pct"] = round(((is_sh - oos_sh) / max(0.1, is_sh)) * 100.0, 2)
             metrics_oos["computed_at"] = datetime.now(timezone.utc).isoformat()
 
         record = dict(alpha)

@@ -419,12 +419,19 @@ class QuantAlphaBacktester:
 
         rolling_sharpe_data = []
         for i, dt in enumerate(valid_dates):
-            if i >= 63:
-                rolling_sharpe_data.append({
-                    "date": dt,
-                    "rolling_sharpe": round(float(rolling_sharpe_strat.iloc[i]), 3),
-                    "spy_rolling_sharpe": round(float(rolling_sharpe_bench.iloc[i]), 3),
-                })
+            if i < 63:
+                continue
+            strat_roll = rolling_sharpe_strat.iloc[i]
+            bench_roll = rolling_sharpe_bench.iloc[i]
+            if pd.isna(strat_roll) or pd.isna(bench_roll):
+                continue
+            if not np.isfinite(strat_roll) or not np.isfinite(bench_roll):
+                continue
+            rolling_sharpe_data.append({
+                "date": dt,
+                "rolling_sharpe": round(float(strat_roll), 3),
+                "spy_rolling_sharpe": round(float(bench_roll), 3),
+            })
 
         ic_series_data = [
             {"date": r["date"], "ic": round(float(r["ic"]), 4), "rank_ic": round(float(r["rank_ic"]), 4)}
@@ -456,14 +463,16 @@ class QuantAlphaBacktester:
                 "cum_return": round(cum_strat, 4),
                 "annualized_return": round(ann_ret_strat, 4),
                 "annualized_volatility": round(vol_strat, 4),
-                "sharpe": round(sharpe_strat, 2),
+                "sharpe": sharpe_strat.rounded(2),
+                "sharpe_reason": sharpe_strat.reason,
                 "sortino": round(sortino_strat, 2),
                 "calmar": round(calmar_strat, 2),
                 "max_drawdown": round(mdd_strat, 4),
                 "spy_cum_return": round(cum_bench, 4),
                 "spy_annualized_return": round(ann_ret_bench, 4),
                 "spy_annualized_volatility": round(vol_bench, 4),
-                "spy_sharpe": round(sharpe_bench, 2),
+                "spy_sharpe": sharpe_bench.rounded(2),
+                "spy_sharpe_reason": sharpe_bench.reason,
                 "spy_max_drawdown": round(mdd_bench, 4),
                 "excess_alpha_vs_spy": round(cum_strat - cum_bench, 4),
             },
@@ -710,7 +719,7 @@ class QuantAlphaBacktester:
                     "friction_bps": TRANSACTION_COST_BPS,
                     "trading_days": summary["date_range"]["trading_days"],
                 })
-                mlflow.log_metrics({
+                logged_metrics = {
                     "ic_mean": summary["metrics"]["ic_mean"],
                     "rank_ic_mean": summary["metrics"]["rank_ic_mean"],
                     "ic_ir": summary["metrics"]["ic_ir"],
@@ -720,6 +729,11 @@ class QuantAlphaBacktester:
                     "strategy_max_drawdown": summary["metrics"]["max_drawdown"],
                     "spy_sharpe": summary["metrics"]["spy_sharpe"],
                     "excess_alpha": summary["metrics"]["excess_alpha_vs_spy"],
+                }
+                mlflow.log_metrics({
+                    key: value
+                    for key, value in logged_metrics.items()
+                    if value is not None and np.isfinite(value)
                 })
                 # Log artifacts
                 for artifact_key, artifact_path in summary["artifacts"].items():

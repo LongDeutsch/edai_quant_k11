@@ -11,7 +11,7 @@ Features:
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 import json
 import logging
@@ -28,6 +28,7 @@ from quant_edai.quant.alpha_catalog import (
     DEFAULT_EXIT_Z,
     FeatureContext,
     score_strategy,
+    score_strategy_strict,
 )
 from quant_edai.quant.alpha_registry import AlphaHorizon, AlphaRegistry, AlphaStatus
 from quant_edai.quant.paper_db import PaperDatabase
@@ -66,6 +67,7 @@ class TradeSignal:
     model_version: Optional[str] = None
     dataset_id: Optional[str] = None
     feature_source: Optional[str] = None
+    alpha_scores: List[Dict[str, Any]] = field(default_factory=list)
 
 
 def _collect_provenance(rows: Any) -> Dict[str, Optional[str]]:
@@ -249,6 +251,32 @@ class AlphaSignalServer:
     # -------------------------------------------------------------------------
     # 1. INTRADAY MULTI-ALPHA SERVING (SUB-10MS)
     # -------------------------------------------------------------------------
+    def _alphas_by_ids(
+        self,
+        alpha_ids: List[str],
+        versions: Optional[Dict[str, str]] = None,
+    ) -> Tuple[List[Dict[str, Any]], List[str]]:
+        """Resolve explicit registry rows. A requested version must match exactly."""
+        rows = self.db.list_alphas()
+        chosen: Dict[str, Dict[str, Any]] = {}
+        for row in rows:
+            aid = str(row.get("alpha_id") or "")
+            if not aid or aid in chosen:
+                continue
+            wanted = None if not versions else versions.get(aid)
+            if wanted is not None and str(row.get("version")) != str(wanted):
+                continue
+            chosen[aid] = row
+        found: List[Dict[str, Any]] = []
+        missing: List[str] = []
+        for aid in alpha_ids:
+            row = chosen.get(str(aid))
+            if row is None:
+                missing.append(str(aid))
+            else:
+                found.append(row)
+        return found, missing
+
     def get_intraday_signal(
         self,
         ticker: str,
@@ -257,6 +285,11 @@ class AlphaSignalServer:
         p_ml: Optional[float] = None,
         mode: str = "paper",
         rolling_buffers: Optional[Dict[str, Any]] = None,
+        alpha_ids: Optional[List[str]] = None,
+        features: Optional[Dict[str, Any]] = None,
+        allow_default_composite: bool = True,
+        strict: bool = False,
+        alpha_versions: Optional[Dict[str, str]] = None,
     ) -> TradeSignal:
         """Generate combined intraday signal using K active alphas.
 
@@ -281,13 +314,38 @@ class AlphaSignalServer:
                 notes="BLOCKED_BY_PM_GOVERNANCE",
             )
 
-        # 1. Fetch active intraday alphas (ensemble-filtered to Pick-5 when saved)
-        active_alphas = self.get_active_alphas_for_serving(horizon="INTRADAY", mode=mode)
+        # 1. Explicit alpha ids (dashboard replay) never fall back to a synthetic composite.
+        if alpha_ids is not None:
+            active_alphas, missing_alphas = self._alphas_by_ids(list(alpha_ids), versions=alpha_versions)
+            if missing_alphas or not active_alphas:
+                missing_txt = ",".join(missing_alphas) if missing_alphas else "(none requested)"
+                return TradeSignal(
+                    ticker_symbol=ticker,
+                    action="REJECTED",
+                    z_score=0.0,
+                    confidence=0.0,
+                    horizon="INTRADAY",
+                    target_weight=0.0,
+                    alphas_combined=[],
+                    asof_timestamp=now_ts,
+                    notes=f"REJECTED_ALPHA_NOT_IN_REGISTRY:{missing_txt}",
+                    alpha_scores=[
+                        {
+                            "alpha_id": aid,
+                            "version": (alpha_versions or {}).get(aid),
+                            "z_score": None,
+                            "action": "REJECTED_ALPHA_NOT_IN_REGISTRY",
+                        }
+                        for aid in (missing_alphas or list(alpha_ids))
+                    ],
+                )
+        else:
+            active_alphas = self.get_active_alphas_for_serving(horizon="INTRADAY", mode=mode)
+            missing_alphas = []
 
         # In live mode: STRICTLY require PROMOTED_ACTIVE alpha. No promoted alpha = FLAT signal.
         if not active_alphas:
-            if mode == "live" or is_integration_mode():
-                # integration|full: no synthetic default composite gate
+            if mode == "live" or is_integration_mode() or not allow_default_composite:
                 return TradeSignal(
                     ticker_symbol=ticker,
                     action="FLAT",
@@ -309,6 +367,7 @@ class AlphaSignalServer:
         individual_z_scores: List[float] = []
         individual_confidences: List[float] = []
         alpha_names: List[str] = []
+        alpha_score_rows: List[Dict[str, Any]] = []
         entry_thresholds: List[float] = []
         exit_thresholds: List[float] = []
 
@@ -334,9 +393,24 @@ class AlphaSignalServer:
                 p_ml=p_ml,
                 config=cfg,
                 rolling_buffers=rolling_buffers,
+                features=features,
+                strict=strict,
             )
             individual_z_scores.append(z_score)
             individual_confidences.append(conf)
+            entry_z_i = entry_thresholds[-1]
+            if z_score >= entry_z_i:
+                alpha_action = "BUY"
+            elif z_score <= -entry_z_i:
+                alpha_action = "SELL"
+            else:
+                alpha_action = "FLAT"
+            alpha_score_rows.append({
+                "alpha_id": alpha_id,
+                "version": version,
+                "z_score": round(float(z_score), 4),
+                "action": alpha_action,
+            })
 
         # 3. Rule 5: Multi-alpha Equal Average Combination
         k = len(individual_z_scores)
@@ -369,7 +443,11 @@ class AlphaSignalServer:
             target_weight=round(weight, 4),
             alphas_combined=alpha_names,
             asof_timestamp=now_ts,
-            notes=f"EqualAvg(K={k}) | entry_z={entry_z:.2f} exit_z={exit_z:.2f} | Lookback={self.lookback_days}d",
+            notes=(
+                f"EqualAvg(K={k}) | entry_z={entry_z:.2f} exit_z={exit_z:.2f} | Lookback={self.lookback_days}d"
+                + (f" | missing={','.join(missing_alphas)}" if missing_alphas else "")
+            ),
+            alpha_scores=alpha_score_rows,
             **_collect_provenance(active_alphas),
         )
 
@@ -390,10 +468,11 @@ class AlphaSignalServer:
         p_ml: Optional[float],
         config: Dict[str, Any],
         rolling_buffers: Optional[Dict[str, Any]],
+        features: Optional[Dict[str, Any]] = None,
+        strict: bool = False,
     ) -> Tuple[float, float]:
         """Compute score for a single alpha via catalog strategy dispatch."""
-        features = None
-        if self.feast_manager is not None:
+        if features is None and self.feast_manager is not None:
             try:
                 features = self.feast_manager.get_online_feature_record(ticker)
             except Exception:
@@ -420,6 +499,8 @@ class AlphaSignalServer:
             realized_vol_ann=float((features or {}).get("rolling_volatility_30d", 0.18) or 0.18),
         )
         strategy = str(config.get("strategy") or "composite_eq")
+        if strict:
+            return score_strategy_strict(strategy, ctx, config)
         return score_strategy(strategy, ctx, config)
 
     # -------------------------------------------------------------------------

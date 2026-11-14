@@ -119,32 +119,61 @@ flowchart TD
 
 ---
 
-## 7. Quant Alpha Backtesting & Signal Evaluation Module
+## 7. Quant Alpha Factor Research & Signal Serving Pipeline
 
-A specialized, reproducible evaluation module using Python and Pandas/NumPy:
-- **Signal Generation**: Maps model probability scores into long/short quintile rankings.
+A specialized, reproducible evaluation module and real-time signal serving microservice:
+- **10-Alpha Catalog**: Includes Mean Reversion (`alpha_rsi_mr_intraday`, `alpha_bollinger_reversal`, `alpha_vwap_mean_revert`), Trend & Momentum (`alpha_mom_z_intraday`, `alpha_macd_z_intraday`, `alpha_breakout_donchian`), Volatility (`alpha_vol_breakout_atr`), Composite Ensemble (`alpha_composite_eq_intraday`), Dynamic Regime-Adaptive (`alpha_regime_adapt_intraday`), and ML Directional (`alpha_lightgbm_direction`).
+- **Signal Normalization**: Warm-up rolling z-score normalization ($z = \frac{x - \mu}{\sigma}$) mapped to discrete trading actions (`BUY` if $z > 1.5$, `SELL` if $z < -1.5$, `FLAT` otherwise).
+- **Ensemble Modes**: Supports Single Alpha isolation mode and Approved Frozen Ensemble aggregation (`APPROVED_FROZEN` status in `alpha_registry`).
 - **Factor Evaluation Metrics**:
   - **Information Coefficient (IC)**: Pearson correlation between predicted alpha and actual forward returns.
   - **Rank IC**: Spearman rank correlation assessing monotonic ranking power.
-  - **Hit Rate**: Percentage of days with positive predicted directional accuracy.
-- **Portfolio & Strategy Backtesting**:
-  - **Cumulative Return**: Simulated returns of top-decile long portfolio.
-  - **Annualized Sharpe Ratio**: Risk-adjusted excess return over risk-free rate.
-  - **Maximum Drawdown (MDD)**: Peak-to-trough decline measurement.
-  - **Benchmark Comparison**: Evaluated against SPY (S&P 500 ETF) Buy & Hold.
-- **Artifacts**: Backtest performance curves and tear sheets logged directly to MLflow.
+  - **Hit Rate**: Percentage of trading intervals with positive directional return.
+  - **Risk-Adjusted Metrics**: Annualized Sharpe Ratio, Sortino Ratio, Maximum Drawdown (MDD).
+
+```mermaid
+flowchart TD
+    subgraph FeatureInputs["Feature Inputs (Zero Look-Ahead)"]
+        F1["Feast Online Store (Redis)"]
+        F2["ClickHouse quant_dw.market_intraday_bars"]
+        F3["Iceberg Gold feat_technical_indicators"]
+    end
+
+    subgraph AlphaScoringPipeline["Alpha Scoring & Signal Generation Pipeline"]
+        Reg["Alpha Registry (Provenance & Status Check)"]
+        Cat["10-Alpha Catalog (alpha_catalog.py)"]
+        Norm["Rolling Z-Score Normalizer & Warm-up (N=30)"]
+        Agg["Weight Aggregator: Single Alpha vs. Ensemble"]
+        Thresh["Action Classifier (|z| > 1.5 -> BUY / SELL / FLAT)"]
+    end
+
+    subgraph DownstreamExec["Execution & Evaluation Handoff"]
+        PaperEngine["PaperTradingEngine (on_bar Execution)"]
+        Backtester["Walk-Forward Backtester (metrics.py)"]
+        MLflowTrack["MLflow Tracking & Registry"]
+    end
+
+    FeatureInputs --> Cat
+    Reg --> Cat
+    Cat --> Norm
+    Norm --> Agg
+    Agg --> Thresh
+    Thresh --> PaperEngine
+    Thresh --> Backtester
+    Backtester --> MLflowTrack
+```
 
 ---
 
-## 8. Implemented & Planned Codebase Architecture Mapping
+## 8. Implemented & Verified Codebase Architecture Mapping
 
 | Component | Source File / Module | Implementation Status | Description & Verification |
 |---|---|---|---|
-| **Feature Calculator** | [feature_calculator.py](file:///Users/nguyenbuihoanglong/Desktop/FSDS/edai_11/quant_edai/src/quant_edai/processing/features/feature_calculator.py) | `LIVE VERIFIED` (Gate 5) | Generates SMA, RSI, MACD, volatility from Iceberg Gold `market_daily_ohlcv` with zero lookahead bias. |
-| **Feature Store (Feast & Redis)** | [feast_manager.py](file:///Users/nguyenbuihoanglong/Desktop/FSDS/edai_11/quant_edai/src/quant_edai/ml/feast/feast_manager.py) | `UNIT TESTED` | Offline store on Iceberg Gold `feat_technical_indicators`, online store materialization to Redis (`redis:6379`). |
-| **Model Trainer & Registry** | [trainer.py](file:///Users/nguyenbuihoanglong/Desktop/FSDS/edai_11/quant_edai/src/quant_edai/ml/trainer.py) | `UNIT TESTED` | Trains LogisticRegression & LightGBM with walk-forward temporal split; logs to MLflow (`sqlite:///mlflow.db`). |
-| **Alpha Registry & Catalog** | [alpha_registry.py](file:///Users/nguyenbuihoanglong/Desktop/FSDS/edai_11/quant_edai/src/quant_edai/quant/alpha_registry.py), [alpha_catalog.py](file:///Users/nguyenbuihoanglong/Desktop/FSDS/edai_11/quant_edai/src/quant_edai/quant/alpha_catalog.py) | `UNIT TESTED` | Registers alpha models with metadata provenance (`model_version`, `dataset_id`, `feature_source`). |
-| **Alpha Serving & Signal Server** | [alpha_serving.py](file:///Users/nguyenbuihoanglong/Desktop/FSDS/edai_11/quant_edai/src/quant_edai/quant/alpha_serving.py) | `UNIT TESTED` | Microservice serving directional probabilities and ranking signals from ML models and Feast features. |
-| **KServe v2 Protocol Serving** | `src/quant_edai/serving/kserve_v2_runner.py` / `mock_kserve_v2.py` | `PLANNED (Gate 6)` | Standalone FastAPI KServe v2 runner implementing `POST /v2/models/{name}/infer`, loading champion models from MLflow. |
-| **Paper Trading Engine** | [paper_trading.py](file:///Users/nguyenbuihoanglong/Desktop/FSDS/edai_11/quant_edai/src/quant_edai/quant/paper_trading.py), [paper_db.py](file:///Users/nguyenbuihoanglong/Desktop/FSDS/edai_11/quant_edai/src/quant_edai/quant/paper_db.py) | `UNIT TESTED` | Long/Flat order execution at next-bar Open with ACID deduplication and idempotency in PostgreSQL. |
-| **Live Closed-Loop E2E** | `tests/live/test_live_05_ml_serving_and_paper_trading.py` | `PLANNED (Gate 6)` | Live integration test verifying Tick/Bar $\to$ ClickHouse $\to$ Feast Redis $\to$ KServe v2 $\to$ Paper Trading. |
+| **Feature Calculator** | [feature_calculator.py](file:///Users/nguyenbuihoanglong/Desktop/FSDS/edai_11/quant_edai/src/quant_edai/processing/features/feature_calculator.py) | `VERIFIED` | Generates SMA, RSI, MACD, volatility from Iceberg Gold `market_daily_ohlcv` with zero lookahead bias. |
+| **Feature Store (Feast & Redis)** | [feast_manager.py](file:///Users/nguyenbuihoanglong/Desktop/FSDS/edai_11/quant_edai/src/quant_edai/ml/feast/feast_manager.py) | `VERIFIED` | Offline store on Iceberg Gold `feat_technical_indicators`, online store materialization to Redis (`redis:6379`). |
+| **Model Trainer & Registry** | [trainer.py](file:///Users/nguyenbuihoanglong/Desktop/FSDS/edai_11/quant_edai/src/quant_edai/ml/trainer.py) | `VERIFIED` | Trains LogisticRegression & LightGBM with walk-forward temporal split; logs to MLflow (`sqlite:///mlflow.db`). |
+| **Alpha Registry & 10-Alpha Catalog** | [alpha_registry.py](file:///Users/nguyenbuihoanglong/Desktop/FSDS/edai_11/quant_edai/src/quant_edai/quant/alpha_registry.py), [alpha_catalog.py](file:///Users/nguyenbuihoanglong/Desktop/FSDS/edai_11/quant_edai/src/quant_edai/quant/alpha_catalog.py) | `VERIFIED` | Registers and evaluates 10 alpha strategies with metadata provenance (`model_version`, `dataset_id`, `status`). |
+| **Alpha Serving & Signal Server** | [alpha_serving.py](file:///Users/nguyenbuihoanglong/Desktop/FSDS/edai_11/quant_edai/src/quant_edai/quant/alpha_serving.py) | `VERIFIED` | Microservice serving directional probabilities and ranking signals from ML models and Feast features. |
+| **KServe v2 Protocol Serving** | `src/quant_edai/serving/kserve_v2_runner.py` / `mock_kserve_v2.py` | `VERIFIED` | Standalone FastAPI KServe v2 runner implementing `POST /v2/models/{name}/infer`, loading champion models from MLflow. |
+| **Paper Trading Engine** | [paper_trading.py](file:///Users/nguyenbuihoanglong/Desktop/FSDS/edai_11/quant_edai/src/quant_edai/quant/paper_trading.py), [paper_db.py](file:///Users/nguyenbuihoanglong/Desktop/FSDS/edai_11/quant_edai/src/quant_edai/quant/paper_db.py) | `VERIFIED` | Long/Flat order execution at bar close with 5 bps slippage, 1 bps fee, SL/TP/Circuit Breaker, ACID deduplication in PostgreSQL. |
+| **Walk-Forward Backtesting** | [backtester.py](file:///Users/nguyenbuihoanglong/Desktop/FSDS/edai_11/quant_edai/src/quant_edai/quant/backtester.py), [metrics.py](file:///Users/nguyenbuihoanglong/Desktop/FSDS/edai_11/quant_edai/src/quant_edai/quant/metrics.py) | `VERIFIED` | Calculates IC, Rank IC, Sharpe, Drawdown over canonical 4-year walk-forward dataset partitions. |

@@ -113,22 +113,23 @@ These are real-time events produced continuously and consumed by a stream proces
 
 ```mermaid
 flowchart TD
-    subgraph Ingestion["Ingestion Layer"]
-        Gen["Data Generator (--scale 0.1 | 1.0)"] -->|"Bulk Parquet"| ExtMinIO["Simulated External MinIO"]
-        Gen -->|"Kafka Stream"| Kafka["Apache Kafka Topics"]
+    subgraph Ingestion["1. Ingestion Layer"]
+        Gen["Data Generator (--scale 0.1 | 1.0)"] -->|"Bulk Raw Parquet"| ExtMinIO["Simulated External MinIO"]
+        Gen -->|"Kafka Stream"| Kafka["Apache Kafka Topics (market.ticks)"]
     end
 
-    subgraph Lakehouse["Storage Layer: Medallion Architecture (MinIO S3)"]
-        ExtMinIO -->|"DP1 Ingest"| Bronze["Bronze Zone: raw_ohlcv, raw_news (MinIO)"]
-        Bronze -->|"DP2 Spark Batch"| Silver["Silver Zone: stg_ohlcv, stg_news (Apache Iceberg)"]
-        Silver -->|"DP2 Spark Transform"| Gold["Gold Zone: dim_companies, fact_ohlcv, fact_news (Iceberg)"]
+    subgraph Lakehouse["2. Storage Layer: Medallion Architecture (MinIO S3)"]
+        ExtMinIO -->|"DP1 Ingest"| Bronze["Bronze Zone: raw_market_ticks, raw_news (MinIO)"]
+        Bronze -->|"DP2 Spark Batch (Dedup & Salting)"| Silver["Silver Zone: stg_market_ticks, stg_news (Apache Iceberg)"]
+        Silver -->|"DP2 Spark Resampler & SCD2"| Gold["Gold Zone: gold_market_bars_1m, gold_market_bars_daily, dim_companies (Iceberg)"]
         Gold -->|"DP3 Spark Features"| Feat["Feature Tables: feat_ticker_technical_indicators (Iceberg)"]
     end
 
-    subgraph ServingStorage["Serving Layer Stores"]
-        Gold -->|"Batch Sync"| ClickHouse["ClickHouse OLAP (Historical & Intraday Serving)"]
+    subgraph ServingStorage["3. Analytical Serving & Feature Store"]
+        Gold -->|"DP4 Batch Sync"| ClickHouse["ClickHouse OLAP: quant_dw (market_intraday_bars, market_daily_ohlcv)"]
+        Feat -->|"DP4 Batch Sync"| ClickHouse
         Kafka -->|"Flink Streaming Aggs"| ClickHouse
-        Kafka -->|"Flink Streaming Aggs"| Redis["Redis (Online Feature Store - Feast)"]
+        Feat -->|"Daily Materialize"| Redis["Redis Cluster (Feast Online Store: Sub-10ms Feature Cache)"]
     end
 ```
 

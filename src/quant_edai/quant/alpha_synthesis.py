@@ -201,7 +201,7 @@ def generate_attribution_report(
     2. Equal-Weight vs Risk-Parity Allocation Sizing
     3. Both vs S&P 500 (SPY) Benchmark
     """
-    def _metrics(eq: pd.Series) -> Dict[str, float]:
+    def _metrics(eq: pd.Series) -> Dict[str, Optional[float]]:
         rets = eq.pct_change().dropna()
         mdd, _ = calculate_max_drawdown(eq)
         cum_ret = float(eq.iloc[-1] / eq.iloc[0] - 1.0) if len(eq) > 0 else 0.0
@@ -210,11 +210,24 @@ def generate_attribution_report(
         calmar = calculate_calmar(cum_ret, mdd, years=len(rets) / 252.0 if len(rets) > 0 else 1.0)
         return {
             "cum_return": cum_ret,
-            "sharpe": sharpe,
+            "sharpe": sharpe.value,
             "sortino": sortino,
             "max_drawdown": mdd,
             "calmar": calmar,
         }
+
+    def _num(value: Optional[float], digits: int = 2, signed: bool = False) -> str:
+        if value is None or not np.isfinite(value):
+            return "N/A"
+        sign = "+" if signed else ""
+        return f"{value:{sign}.{digits}f}"
+
+    def _delta(left: Optional[float], right: Optional[float], *, percent: bool = False) -> str:
+        if left is None or right is None or not np.isfinite(left) or not np.isfinite(right):
+            return "N/A"
+        gap = (left - right) * (100.0 if percent else 1.0)
+        suffix = "%" if percent else ""
+        return f"{gap:+.2f}{suffix}"
 
     m_bench = _metrics(benchmark_equity)
     m_fixed = _metrics(fixed_equity)
@@ -238,10 +251,10 @@ By dynamically adjusting factor weights based on real-time market volatility:
 
 | Strategy Configuration | Cumulative Return | Annualized Sharpe | Sortino Ratio | Max Drawdown | Calmar Ratio |
 |---|---|---|---|---|---|
-| **S&P 500 Benchmark (SPY)** | {m_bench['cum_return']*100:+.2f}% | {m_bench['sharpe']:.2f} | {m_bench['sortino']:.2f} | {m_bench['max_drawdown']*100:.2f}% | {m_bench['calmar']:.2f} |
-| **Fixed Weight Baseline (33/33/34)** | {m_fixed['cum_return']*100:+.2f}% | {m_fixed['sharpe']:.2f} | {m_fixed['sortino']:.2f} | {m_fixed['max_drawdown']*100:.2f}% | {m_fixed['calmar']:.2f} |
-| **Regime-Adaptive Dynamic Weighting** | **{m_regime['cum_return']*100:+.2f}%** | **{m_regime['sharpe']:.2f}** | **{m_regime['sortino']:.2f}** | **{m_regime['max_drawdown']*100:.2f}%** | **{m_regime['calmar']:.2f}** |
-| *Variance / Improvement* | *{((m_regime['cum_return'] - m_fixed['cum_return'])*100):+.2f}%* | *{(m_regime['sharpe'] - m_fixed['sharpe']):+.2f}* | *{(m_regime['sortino'] - m_fixed['sortino']):+.2f}* | *{((m_regime['max_drawdown'] - m_fixed['max_drawdown'])*100):+.2f}%* | *{(m_regime['calmar'] - m_fixed['calmar']):+.2f}* |
+| **S&P 500 Benchmark (SPY)** | {m_bench['cum_return']*100:+.2f}% | {_num(m_bench['sharpe'])} | {m_bench['sortino']:.2f} | {m_bench['max_drawdown']*100:.2f}% | {m_bench['calmar']:.2f} |
+| **Fixed Weight Baseline (33/33/34)** | {m_fixed['cum_return']*100:+.2f}% | {_num(m_fixed['sharpe'])} | {m_fixed['sortino']:.2f} | {m_fixed['max_drawdown']*100:.2f}% | {m_fixed['calmar']:.2f} |
+| **Regime-Adaptive Dynamic Weighting** | **{m_regime['cum_return']*100:+.2f}%** | **{_num(m_regime['sharpe'])}** | **{m_regime['sortino']:.2f}** | **{m_regime['max_drawdown']*100:.2f}%** | **{m_regime['calmar']:.2f}** |
+| *Variance / Improvement* | *{((m_regime['cum_return'] - m_fixed['cum_return'])*100):+.2f}%* | *{_delta(m_regime['sharpe'], m_fixed['sharpe'])}* | *{(m_regime['sortino'] - m_fixed['sortino']):+.2f}* | *{((m_regime['max_drawdown'] - m_fixed['max_drawdown'])*100):+.2f}%* | *{(m_regime['calmar'] - m_fixed['calmar']):+.2f}* |
 
 ---
 
@@ -251,9 +264,9 @@ Equal-weighted portfolios allocate $1/N$ capital regardless of asset volatility,
 
 | Position Sizing Model | Cumulative Return | Annualized Sharpe | Sortino Ratio | Max Drawdown | Calmar Ratio |
 |---|---|---|---|---|---|
-| **Equal-Weight Allocation ($1/N$)** | {m_equal['cum_return']*100:+.2f}% | {m_equal['sharpe']:.2f} | {m_equal['sortino']:.2f} | {m_equal['max_drawdown']*100:.2f}% | {m_equal['calmar']:.2f} |
-| **Risk Parity Allocation ($1/\\sigma_i$)** | **{m_rp['cum_return']*100:+.2f}%** | **{m_rp['sharpe']:.2f}** | **{m_rp['sortino']:.2f}** | **{m_rp['max_drawdown']*100:.2f}%** | **{m_rp['calmar']:.2f}** |
-| *Variance / Improvement* | *{((m_rp['cum_return'] - m_equal['cum_return'])*100):+.2f}%* | *{(m_rp['sharpe'] - m_equal['sharpe']):+.2f}* | *{(m_rp['sortino'] - m_equal['sortino']):+.2f}* | *{((m_rp['max_drawdown'] - m_equal['max_drawdown'])*100):+.2f}%* | *{(m_rp['calmar'] - m_equal['calmar']):+.2f}* |
+| **Equal-Weight Allocation ($1/N$)** | {m_equal['cum_return']*100:+.2f}% | {_num(m_equal['sharpe'])} | {m_equal['sortino']:.2f} | {m_equal['max_drawdown']*100:.2f}% | {m_equal['calmar']:.2f} |
+| **Risk Parity Allocation ($1/\\sigma_i$)** | **{m_rp['cum_return']*100:+.2f}%** | **{_num(m_rp['sharpe'])}** | **{m_rp['sortino']:.2f}** | **{m_rp['max_drawdown']*100:.2f}%** | **{m_rp['calmar']:.2f}** |
+| *Variance / Improvement* | *{((m_rp['cum_return'] - m_equal['cum_return'])*100):+.2f}%* | *{_delta(m_rp['sharpe'], m_equal['sharpe'])}* | *{(m_rp['sortino'] - m_equal['sortino']):+.2f}* | *{((m_rp['max_drawdown'] - m_equal['max_drawdown'])*100):+.2f}%* | *{(m_rp['calmar'] - m_equal['calmar']):+.2f}* |
 
 ---
 

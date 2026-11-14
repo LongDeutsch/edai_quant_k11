@@ -2,10 +2,32 @@
 
 from __future__ import annotations
 
-from typing import Tuple, Union
+from dataclasses import dataclass
+from typing import Any, Dict, Optional, Tuple, Union
 import numpy as np
 import pandas as pd
 from scipy import stats
+
+SHARPE_INSUFFICIENT = "insufficient_observations"
+SHARPE_ZERO_VOLATILITY = "zero_volatility"
+
+DISPLAY_NO_TRADES = "N/A — No trades"
+DISPLAY_ZERO_VOLATILITY = "N/A — Zero volatility"
+DISPLAY_INSUFFICIENT = "N/A — Insufficient observations"
+
+# Regular US cash session is 6.5 hours.
+_SESSION_MINUTES = 390
+_BAR_MINUTES = {
+    "1m": 1,
+    "1min": 1,
+    "5m": 5,
+    "5min": 5,
+    "10m": 10,
+    "10min": 10,
+    "15m": 15,
+    "15min": 15,
+}
+_DAILY_TIMEFRAMES = {"d", "1d", "daily", "day", "eod"}
 
 
 def calculate_ic(
@@ -80,44 +102,197 @@ def calculate_rank_ic(
     return float(0.0 if np.isnan(rho) else rho)
 
 
+def periods_per_year(timeframe: str) -> int:
+    """Bar count used to annualize one return series.
+
+    Daily bars use 252 sessions. Intraday bars use a 6.5 hour session
+    (390 minutes) times 252 sessions, so 5-minute bars are 78×252 and
+    15-minute bars are 26×252.
+    """
+    tf = (timeframe or "").strip().lower()
+    if tf in _DAILY_TIMEFRAMES:
+        return 252
+    minutes = _BAR_MINUTES.get(tf)
+    if minutes is None:
+        return 252
+    return (_SESSION_MINUTES // minutes) * 252
+
+
+def periodic_risk_free(rf: float, periods: int) -> float:
+    """Convert an annual risk-free rate into the matching per-bar rate.
+
+    The conversion is ``rf / periods``. Annualization multiplies by
+    ``sqrt(periods)``, so the two factors stay paired.
+    """
+    if periods <= 0:
+        raise ValueError("periods_per_year must be positive")
+    return float(rf) / float(periods)
+
+
+@dataclass(frozen=True)
+class SharpeResult:
+    """Annualized Sharpe, or an explicit reason the ratio is undefined."""
+
+    value: Optional[float]
+    reason: Optional[str] = None
+
+    @property
+    def defined(self) -> bool:
+        return self.reason is None and self.value is not None and bool(np.isfinite(self.value))
+
+    def rounded(self, ndigits: int = 2) -> Optional[float]:
+        """Round a defined Sharpe. Undefined stays None and is never replaced with 0."""
+        if not self.defined:
+            return None
+        return round(float(self.value), ndigits)
+
+
+def format_sharpe(
+    value: Optional[float],
+    reason: Optional[str] = None,
+    *,
+    trade_count: Optional[int] = None,
+    digits: int = 2,
+) -> str:
+    """Display a Sharpe ratio. A flat book and a zero-variance book stay distinct."""
+    if trade_count == 0:
+        return DISPLAY_NO_TRADES
+    if reason == SHARPE_ZERO_VOLATILITY:
+        return DISPLAY_ZERO_VOLATILITY
+    if reason == SHARPE_INSUFFICIENT or value is None or not np.isfinite(value):
+        return DISPLAY_INSUFFICIENT
+    return f"{float(value):.{int(digits)}f}"
+
+
+def finite_float(value: Any) -> Optional[float]:
+    """Finite float, or None when the metric is missing or undefined."""
+    if isinstance(value, SharpeResult):
+        return float(value.value) if value.defined else None
+    if value is None:
+        return None
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        return None
+    if not np.isfinite(number):
+        return None
+    return number
+
+
+def persisted_sharpe_needs_recompute(sharpe: Any, total_trades: Any, total_return: Any) -> bool:
+    """True when a stored Sharpe is the zero-variance numerical failure.
+
+    Valid negative ratios and already-null values are left alone.
+    """
+    if sharpe is None:
+        return False
+    try:
+        number = float(sharpe)
+    except (TypeError, ValueError):
+        return True
+    if not np.isfinite(number) or abs(number) >= 1e6:
+        return True
+    trades = 0 if total_trades is None else int(total_trades)
+    try:
+        ret = 0.0 if total_return is None else float(total_return)
+    except (TypeError, ValueError):
+        ret = 0.0
+    return trades == 0 and number == 0.0 and ret == 0.0
+
+
+def stamp_recomputed_sharpe(
+    metrics: Optional[Dict[str, Any]],
+    result: "SharpeResult",
+    *,
+    prior: Any,
+    recomputed_at: str,
+) -> Dict[str, Any]:
+    """Write the corrected Sharpe onto a stored metrics document.
+
+    Run identity, dates, and every other key already on the document stay in place.
+    """
+    stamped = dict(metrics or {})
+    stamped["sharpe_prior"] = finite_float(prior)
+    stamped["sharpe_ratio"] = result.rounded(4)
+    stamped["sharpe_reason"] = result.reason
+    stamped["sharpe_recomputed_at"] = recomputed_at
+    return stamped
+
+
+def _finite_returns(returns: Union[pd.Series, np.ndarray]) -> np.ndarray:
+    values = pd.Series(returns, dtype="float64").to_numpy(dtype=np.float64)
+    return values[np.isfinite(values)]
+
+
+def _excess_std(excess: np.ndarray) -> Tuple[float, Optional[str]]:
+    """Sample standard deviation of excess returns.
+
+    A constant series has variance zero. A long constant series can make a
+    floating-point ``std`` return a tiny positive number; the range test treats
+    that dust as zero variance. Values that truly differ, even by a very small
+    amount, keep their standard deviation.
+    """
+    x = np.asarray(excess, dtype=np.float64)
+    n = int(x.size)
+    if n < 2:
+        return float("nan"), SHARPE_INSUFFICIENT
+    lo = float(np.min(x))
+    hi = float(np.max(x))
+    spread = hi - lo
+    magnitude = max(abs(lo), abs(hi))
+    ulp_span = float(np.finfo(np.float64).eps) * magnitude * n
+    if magnitude == 0.0 or spread <= ulp_span:
+        return 0.0, SHARPE_ZERO_VOLATILITY
+    mean = float(np.mean(x))
+    var = float(np.sum((x - mean) ** 2) / (n - 1))
+    if not np.isfinite(var) or var <= 0.0:
+        return 0.0, SHARPE_ZERO_VOLATILITY
+    std = float(np.sqrt(var))
+    if not np.isfinite(std) or std <= ulp_span:
+        return 0.0, SHARPE_ZERO_VOLATILITY
+    return std, None
+
+
 def calculate_sharpe(
     returns: Union[pd.Series, np.ndarray],
     rf: float = 0.04,
     periods_per_year: int = 252,
-) -> float:
-    """Calculate Annualized Sharpe Ratio with explicit scaling.
+) -> SharpeResult:
+    """Annualized Sharpe ratio of periodic returns.
 
     Parameters
     ----------
     returns : pd.Series or np.ndarray
-        Periodic returns (e.g. daily EOD returns, or 1-minute intraday returns).
+        Periodic portfolio returns. Cash interest is not added here.
     rf : float
-        Annual risk-free rate (default 0.04 = 4.0%).
+        Annual risk-free rate (default 0.04). Subtracted as ``rf / periods_per_year``.
     periods_per_year : int
-        Number of periods per year for annualization:
-        - Daily EOD backtesting (Phase 5): periods_per_year = 252 (scale = sqrt(252) ≈ 15.87)
-        - 1-minute intraday scalping (Phase 6): periods_per_year = 252 * 390 = 98,280 (scale ≈ 313.50)
-        *Important*: Phase 6 intraday MUST NOT blindly reuse sqrt(252) on 1m bar returns.
+        Daily bars use 252. A 5-minute bar uses 78×252 and a 15-minute bar uses 26×252.
+        One-minute bars use 390×252. Do not annualize an intraday series with 252.
 
     Returns
     -------
-    float
-        Annualized Sharpe ratio.
+    SharpeResult
+        ``value`` is the annualized ratio, including valid negative ratios.
+        ``reason`` is ``insufficient_observations`` or ``zero_volatility`` when the
+        ratio is undefined. Undefined is never returned as 0, and a large finite
+        ratio is not clipped.
     """
-    s = pd.Series(returns).dropna()
-    if len(s) < 2:
-        return 0.0
+    values = _finite_returns(returns)
+    if values.size < 2:
+        return SharpeResult(None, SHARPE_INSUFFICIENT)
+    if periods_per_year <= 0:
+        raise ValueError("periods_per_year must be positive")
 
-    periodic_rf = rf / periods_per_year
-    excess_returns = s - periodic_rf
+    excess = values - periodic_risk_free(rf, periods_per_year)
+    std, reason = _excess_std(excess)
+    if reason is not None:
+        return SharpeResult(None, reason)
 
-    std = excess_returns.std(ddof=1)
-    if std == 0.0 or np.isnan(std):
-        return 0.0
-
-    mean_excess = excess_returns.mean()
-    sharpe = (mean_excess / std) * np.sqrt(periods_per_year)
-    return float(0.0 if np.isnan(sharpe) else sharpe)
+    sharpe = (float(np.mean(excess)) / std) * float(np.sqrt(periods_per_year))
+    if not np.isfinite(sharpe):
+        return SharpeResult(None, SHARPE_ZERO_VOLATILITY)
+    return SharpeResult(float(sharpe), None)
 
 
 def calculate_sortino(
@@ -294,20 +469,27 @@ def calculate_rolling_sharpe(
     Returns
     -------
     pd.Series
-        Rolling Sharpe series.
+        Rolling Sharpe series. Windows with fewer than two observations or with
+        numerically zero variance are NaN, not 0.
     """
-    s = pd.Series(returns).dropna()
-    if len(s) < window:
-        return pd.Series(dtype=float, index=s.index)
+    s = pd.Series(returns, dtype="float64").dropna()
+    if periods_per_year <= 0:
+        raise ValueError("periods_per_year must be positive")
+    if len(s) < 2:
+        return pd.Series(np.nan, index=s.index, dtype=float)
 
-    periodic_rf = rf / periods_per_year
-    excess = s - periodic_rf
-
-    rolling_mean = excess.rolling(window=window, min_periods=window // 2).mean()
-    rolling_std = excess.rolling(window=window, min_periods=window // 2).std(ddof=1)
-
-    rolling_sharpe = (rolling_mean / rolling_std) * np.sqrt(periods_per_year)
-    return rolling_sharpe.fillna(0.0)
+    excess = s.to_numpy(dtype=np.float64) - periodic_risk_free(rf, periods_per_year)
+    out = np.full(len(excess), np.nan)
+    min_obs = max(2, int(window) // 2)
+    scale = float(np.sqrt(periods_per_year))
+    for i in range(min_obs - 1, len(excess)):
+        start = 0 if window <= 0 else max(0, i + 1 - int(window))
+        chunk = excess[start:i + 1]
+        std, reason = _excess_std(chunk)
+        if reason is not None:
+            continue
+        out[i] = (float(np.mean(chunk)) / std) * scale
+    return pd.Series(out, index=s.index)
 
 
 def calculate_ic_series(

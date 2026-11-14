@@ -1,29 +1,27 @@
-"""Page 3: Real-Time Trading Simulation & Execution Terminal (M1-38).
+"""Page 3: Real-Time Trading Simulation.
 
-Features:
-- Streaming Market Replay Controller (Start / Pause / Resume / Stop) running in safe background worker.
-- Active Top-5 Alphas ensemble signal matrix with ML directional probability (KServe / Feast).
-- Institutional intraday scalping risk controls: Stop Loss (-12 bps), Take Profit (+20 bps), Max 5 positions, Circuit Breaker (-2.0%).
-- Real-time PnL & Portfolio valuation, live open positions, recent trade execution fills in PostgreSQL.
-- ACID idempotency preventing duplicate orders upon session replay or service restarts.
+The worker owns execution. This page only configures a session and reads the
+metrics that worker publishes after each completed bar.
 """
 
 from __future__ import annotations
 
+from datetime import timedelta
 import logging
-import time
+
 import pandas as pd
-import plotly.graph_objects as go
 import streamlit as st
 
-logger = logging.getLogger("DashboardTrading")
-
+from quant_edai.quant.alpha_split_evaluation import load_approved_replay_ensemble
 from quant_edai.serving.dashboard.dashboard_service import (
-    AlphaResearchService,
     MarketDataService,
     ReplayController,
+    build_replay_equity_figure,
     get_postgres_connection,
+    single_alpha_block_reason,
 )
+
+logger = logging.getLogger("DashboardTrading")
 
 st.set_page_config(
     page_title="Real-Time Trading | Quant Terminal",
@@ -32,202 +30,363 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-st.title("⚡ Real-Time Trading Simulation & Risk Terminal")
-st.caption("Event-driven paper execution engine, live streaming alpha signals, and institutional risk management backed by PostgreSQL ACID storage.")
+st.title("Real-Time Trading Simulation")
+st.caption("Paper replay through the existing engine. Speed and this page's refresh do not change fills.")
 
-# -----------------------------------------------------------------------------
-# 1. Replay Control Strip (Top Toolbar)
-# -----------------------------------------------------------------------------
-st.subheader("🕹️ Market Replay Controller")
 
+def _alpha_options() -> list[dict]:
+    conn = get_postgres_connection()
+    try:
+        frame = pd.read_sql(
+            """
+            SELECT alpha_id, version, alpha_type, config_json
+            FROM alpha_registry
+            WHERE alpha_type = 'INTRADAY'
+            ORDER BY alpha_id, version
+            """,
+            conn,
+        )
+    finally:
+        conn.close()
+    options = []
+    for _, row in frame.iterrows():
+        payload = row.to_dict()
+        if single_alpha_block_reason(payload.get("alpha_id"), payload.get("version"), payload):
+            continue
+        options.append({
+            "alpha_id": str(payload["alpha_id"]),
+            "version": str(payload["version"]),
+            "label": f"{payload['alpha_id']} @ {payload['version']}",
+        })
+    return options
+
+
+st.subheader("Simulation configuration")
 state = ReplayController.get_state()
-
-c_sess, c_ds, c_spd, c_act = st.columns([2, 3, 1.5, 3.5])
-
-with c_sess:
-    sess_id = st.text_input("Session ID", value=state["session_id"] or "sess_canonical_trading_01")
-with c_ds:
-    adv_mode = st.checkbox("⚙️ Advanced Mode", value=False, help="Show raw ClickHouse test/idempotency datasets.")
+config_left, config_right = st.columns(2)
+with config_left:
+    adv_mode = st.checkbox("Advanced dataset list", value=False, key="replay_advanced_datasets")
     ds_options = MarketDataService.get_catalog_options(advanced_mode=adv_mode)
     trading_default_idx = 2 if len(ds_options) >= 3 else 0
-    selected_preset = st.selectbox("Market Dataset Context", ds_options, index=trading_default_idx)
+    selected_preset = st.selectbox(
+        "Market dataset",
+        ds_options,
+        index=trading_default_idx,
+        key="replay_dataset_preset",
+    )
     selected_ds = MarketDataService.resolve_dataset_id(selected_preset)
-    st.caption(f"Resolved Dataset: `{selected_ds}` (TRADING Split)")
-with c_spd:
-    speed = st.selectbox("Replay Speed", [1, 5, 10, 25, 50], index=2)
-with c_act:
-    st.write("Controls")
-    btn_c1, btn_c2, btn_c3 = st.columns(3)
-    with btn_c1:
-        if not state["is_running"]:
-            if st.button("▶ Start", type="primary", use_container_width=True):
-                saved_alphas = AlphaResearchService.get_latest_top5_ensemble(horizon="INTRADAY") or ["alpha_sma_cross_intraday", "alpha_ml_prob_intraday", "alpha_mom_z_intraday", "alpha_vol_break_intraday", "alpha_macd_z_intraday"]
-                ReplayController.start_replay(
-                    session_id=sess_id,
-                    dataset_id=selected_ds,
-                    speed=speed,
-                    selected_alphas=saved_alphas,
-                )
-                st.rerun()
+    st.caption(f"Resolved dataset `{selected_ds}`, split TRADING.")
+    alpha_mode = st.radio("Alpha mode", ["Approved ensemble", "Single alpha"], key="replay_alpha_mode")
+    alpha_error = ""
+    if alpha_mode == "Single alpha":
+        try:
+            choices = _alpha_options()
+        except Exception as exc:
+            choices = []
+            alpha_error = str(exc)
+        if alpha_error:
+            st.error(f"Registry query failed: {alpha_error}")
+        elif not choices:
+            st.warning("No INTRADAY alpha with a strict strategy is registered.")
         else:
-            if st.button("⏹ Stop", type="secondary", use_container_width=True):
-                ReplayController.stop_replay()
-                st.rerun()
-    with btn_c2:
-        if state["is_running"] and not state["is_paused"]:
-            if st.button("⏸ Pause", use_container_width=True):
+            st.session_state["replay_alpha_choices"] = choices
+            st.selectbox(
+                "Alpha id and version",
+                [item["label"] for item in choices],
+                key="replay_single_alpha_label",
+            )
+    else:
+        try:
+            ensemble_preview = load_approved_replay_ensemble(dataset_id=selected_ds)
+        except Exception as exc:
+            ensemble_preview = {"ok": False, "reason": str(exc), "alphas": []}
+        if ensemble_preview.get("reason") and not ensemble_preview.get("ok"):
+            st.error(ensemble_preview["reason"])
+        elif ensemble_preview.get("alphas"):
+            st.dataframe(
+                pd.DataFrame(ensemble_preview["alphas"])[["alpha_id", "version", "weight"]],
+                use_container_width=True,
+                hide_index=True,
+            )
+with config_right:
+    try:
+        trading_tickers = MarketDataService.fetch_trading_tickers(selected_ds)
+    except Exception as exc:
+        trading_tickers = []
+        st.error(f"TRADING ticker query failed: {exc}")
+    if not trading_tickers:
+        st.warning("No TRADING tickers were returned. Replay will not start with a guessed ticker.")
+    selected_tickers = st.multiselect(
+        "Tickers",
+        trading_tickers,
+        key="replay_tickers",
+        placeholder="Select TRADING tickers",
+    )
+    timeframe = st.selectbox("Timeframe", ["1m", "5m", "10m", "15m"], key="replay_timeframe")
+    end_policy = st.selectbox(
+        "End of replay",
+        ["MARK_TO_MARKET", "FORCE_CLOSE"],
+        key="replay_end_policy",
+        help="MARK_TO_MARKET leaves positions open. FORCE_CLOSE flattens them at the last mark.",
+    )
+    speed = st.selectbox("Replay speed", [1, 5, 10, 25, 50], index=2, key="replay_speed")
+    session_id = st.text_input("Session ID", key="replay_session_id", placeholder="sess_new_01")
+    st.caption("A session that already has trades cannot be started again. Use a new session id.")
+
+
+@st.fragment(run_every=timedelta(seconds=1))
+def _live_replay_panel() -> None:
+    """Refresh KPIs, charts, and controls without rerunning the configuration form."""
+    live = ReplayController.get_state()
+    if live.get("is_running"):
+        ReplayController.set_speed(int(st.session_state.get("replay_speed") or 10))
+
+    st.subheader("Replay controls")
+    if live.get("is_running") and not live.get("is_paused"):
+        status = "RUNNING"
+    elif live.get("is_paused"):
+        status = "PAUSED"
+    elif live.get("last_error"):
+        status = "FAILED"
+    elif live.get("completed"):
+        status = "COMPLETED"
+    else:
+        status = "IDLE"
+    progress = (live["processed_bars"] / max(1, live["total_bars"])) if live.get("total_bars") else 0.0
+    st.progress(
+        min(1.0, progress),
+        text=(
+            f"{status} | {live.get('processed_bars', 0)}/{live.get('total_bars', 0)} bars"
+            f" | {live.get('current_time') or 'no bar yet'}"
+            f" | {live.get('timeframe') or st.session_state.get('replay_timeframe')} "
+            f"{live.get('alpha_mode') or 'ensemble'}"
+        ),
+    )
+    if live.get("last_error"):
+        st.error(live["last_error"])
+
+    start_col, pause_col, step_col, stop_col = st.columns(4)
+    with start_col:
+        if st.button("Start", type="primary", use_container_width=True, key="replay_start", disabled=bool(live.get("is_running"))):
+            mode_name = "single" if st.session_state.get("replay_alpha_mode") == "Single alpha" else "ensemble"
+            label = st.session_state.get("replay_single_alpha_label")
+            choice = next(
+                (
+                    item for item in (st.session_state.get("replay_alpha_choices") or [])
+                    if item.get("label") == label
+                ),
+                {},
+            )
+            ReplayController.start_replay(
+                session_id=(st.session_state.get("replay_session_id") or "").strip(),
+                dataset_id=MarketDataService.resolve_dataset_id(st.session_state.get("replay_dataset_preset")),
+                speed=int(st.session_state.get("replay_speed") or 10),
+                tickers=list(st.session_state.get("replay_tickers") or []),
+                timeframe=st.session_state.get("replay_timeframe") or "1m",
+                alpha_mode=mode_name,
+                single_alpha_id=(choice or {}).get("alpha_id"),
+                single_alpha_version=(choice or {}).get("version"),
+                end_policy=st.session_state.get("replay_end_policy") or "MARK_TO_MARKET",
+            )
+            st.rerun(scope="fragment")
+    with pause_col:
+        if live.get("is_running") and not live.get("is_paused"):
+            if st.button("Pause", use_container_width=True, key="replay_pause"):
                 ReplayController.pause_replay()
-                st.rerun()
-        elif state["is_running"] and state["is_paused"]:
-            if st.button("⏯ Resume", use_container_width=True):
+                st.rerun(scope="fragment")
+        elif live.get("is_running") and live.get("is_paused"):
+            if st.button("Resume", use_container_width=True, key="replay_resume"):
                 ReplayController.resume_replay()
-                st.rerun()
-    with btn_c3:
-        if st.button("🔄 Refresh", use_container_width=True):
-            st.rerun()
+                st.rerun(scope="fragment")
+        else:
+            st.button("Pause", use_container_width=True, key="replay_pause_idle", disabled=True)
+    with step_col:
+        if st.button("Step", use_container_width=True, key="replay_step", disabled=not (live.get("is_running") and live.get("is_paused"))):
+            ReplayController.step_replay()
+            st.rerun(scope="fragment")
+    with stop_col:
+        if st.button("Stop", use_container_width=True, key="replay_stop", disabled=not live.get("is_running")):
+            ReplayController.stop_replay()
+            st.rerun(scope="fragment")
 
-st.info("⚡ **Direct Bar Replay (TRADING Split: 2026-05 to 2026-10)**: Streaming simulation feeds unseen held-out trading bars directly to the Paper Trading Engine. In-Sample and Out-of-Sample data are protected from look-ahead leakage.")
+    st.subheader("Live portfolio")
+    metrics = live.get("live_metrics") or {}
+    if not metrics:
+        st.caption("Source: no completed bar yet. The chart stays visible before the ledger has a snapshot.")
+        cash = equity = realized = unrealized = 0.0
+        drawdown = 0.0
+        open_positions = 0
+        as_of = "no completed bar yet"
+        source = "not yet"
+        metric_session = live.get("session_id") or st.session_state.get("replay_session_id") or ""
+    else:
+        cash = float(metrics.get("cash") or 0.0)
+        equity = float(metrics.get("equity") or 0.0)
+        realized = float(metrics.get("realized_pnl") or 0.0)
+        unrealized = float(metrics.get("unrealized_pnl") or 0.0)
+        drawdown = float(metrics.get("drawdown") or 0.0) * 100.0
+        open_positions = int(metrics.get("open_positions") or 0)
+        as_of = str(metrics.get("last_bar") or "")
+        source = str(metrics.get("source") or "engine_memory")
+        metric_session = str(metrics.get("session_id") or "")
+        st.caption(f"As of `{as_of}` · source `{source}` · session `{metric_session}`")
+    k1, k2, k3, k4, k5, k6 = st.columns(6)
+    k1.metric("Cash", f"${cash:,.2f}")
+    k2.metric("Equity", f"${equity:,.2f}")
+    k3.metric("Realized PnL", f"${realized:+,.2f}")
+    k4.metric("Unrealized PnL", f"${unrealized:+,.2f}")
+    k5.metric("Drawdown", f"{drawdown:.2f}%")
+    k6.metric("Open positions", open_positions)
+    s1, s2, s3, s4, s5 = st.columns(5)
+    s1.metric("Signals evaluated", int(live.get("signals_scored") or 0))
+    s2.metric("Orders submitted", int(live.get("orders") or 0))
+    s3.metric("Fills", int(live.get("fills") or 0))
+    s4.metric("Rejections", int(live.get("rejections") or 0))
+    s5.metric("Last processed bar", as_of if metrics else "—")
 
-# Replay Progress Status Strip
-status_color = "🟢 RUNNING" if state["is_running"] and not state["is_paused"] else ("🟡 PAUSED" if state["is_paused"] else "⚪ IDLE")
-prog = (state["processed_bars"] / max(1, state["total_bars"])) if state["total_bars"] > 0 else 0.0
+    st.subheader("Real-time charts")
+    st.plotly_chart(
+        build_replay_equity_figure(live.get("equity_history") or []),
+        use_container_width=True,
+        key="replay_equity_chart",
+    )
 
-st.progress(min(1.0, prog), text=f"Status: {status_color} | Progress: {state['processed_bars']}/{state['total_bars']} bars | Time: {state['current_time'] or 'N/A'}")
+    st.subheader("Signals, positions, and fills")
+    members = (live.get("ensemble") or {}).get("alphas") or []
+    if members:
+        st.caption("Approved weights are stored with the session. The signal combination remains an equal average.")
+        st.dataframe(pd.DataFrame(members), use_container_width=True, hide_index=True)
+    signal_rows = []
+    for ticker in live.get("tickers") or []:
+        data = (live.get("latest_signals") or {}).get(ticker) or {}
+        signal_rows.append({
+            "Ticker": ticker,
+            "Action": data.get("action") or "WAITING",
+            "Status": data.get("status") or "No bar received yet",
+            "Z": data.get("z_combined"),
+            "Position": data.get("position") or "",
+            "Unrealized PnL": data.get("unrealized_pnl"),
+            "Last event": data.get("last_bar_time") or "",
+            "Score scope": data.get("score_scope") or "",
+        })
+    if signal_rows:
+        st.dataframe(pd.DataFrame(signal_rows), use_container_width=True, hide_index=True)
+    else:
+        st.caption("Select at least one TRADING ticker. Signals appear after the first processed bar.")
+    score_rows = []
+    for ticker, data in (live.get("latest_signals") or {}).items():
+        for score in data.get("alpha_scores") or []:
+            score_rows.append({
+                "Ticker": ticker,
+                "Alpha": score.get("alpha_id"),
+                "Version": score.get("version"),
+                "Z-Score": score.get("z_score"),
+                "Action": score.get("action"),
+                "As of": data.get("evaluated_at") or data.get("last_bar_time"),
+                "Scope": data.get("score_scope") or "last evaluated",
+            })
+    if score_rows:
+        st.caption("Last evaluated scores stay on screen when a later bar has no new signal.")
+        st.dataframe(pd.DataFrame(score_rows), use_container_width=True, hide_index=True)
+    else:
+        st.caption("Individual alpha scores appear after the first evaluated bar.")
 
-st.markdown("---")
+    book = live.get("open_book") or []
+    if book:
+        st.dataframe(pd.DataFrame(book), use_container_width=True, hide_index=True)
+    elif live.get("fills"):
+        st.info("No open positions. The book is flat. Closed fills remain below.")
+    else:
+        st.info("No trades executed in this session yet.")
+    fills = live.get("recent_fills") or []
+    if fills:
+        st.dataframe(pd.DataFrame(fills), use_container_width=True, hide_index=True)
+    else:
+        st.caption("Fills appear here after the engine submits an order.")
 
-# -----------------------------------------------------------------------------
-# 2. Portfolio KPIs & Risk Guard Strip
-# -----------------------------------------------------------------------------
-def get_portfolio_kpis(session_id: str):
-    """Retrieve live equity, cash, realized PnL and drawdown from PostgreSQL paper_portfolio_snapshots."""
+
+_live_replay_panel()
+
+st.subheader("Ledger audit")
+st.caption("This block reads PostgreSQL only when you ask it to. It is not the live KPI source.")
+audit_session = (st.session_state.get("replay_session_id") or "").strip()
+if st.button("Load ledger", key="replay_load_ledger", disabled=not audit_session):
     try:
         conn = get_postgres_connection()
-        cur = conn.cursor()
-        cur.execute("""
-            SELECT cash_balance, invested_equity, total_portfolio_value, realized_pnl_cumulative, unrealized_pnl_current, max_drawdown_pct
+        snapshot = pd.read_sql(
+            """
+            SELECT snapshot_id, recorded_at, cash_balance, total_portfolio_value,
+                   realized_pnl_cumulative, unrealized_pnl_current, active_positions_count
             FROM paper_portfolio_snapshots
             WHERE session_id = %s
-            ORDER BY recorded_at DESC LIMIT 1;
-        """, (session_id,))
-        row = cur.fetchone()
+            ORDER BY snapshot_id DESC
+            LIMIT 1
+            """,
+            conn,
+            params=[audit_session],
+        )
+        trades = pd.read_sql(
+            """
+            SELECT trade_id, ticker_symbol, direction, fill_price, realized_pnl, executed_at
+            FROM paper_trades
+            WHERE session_id = %s
+            ORDER BY executed_at DESC
+            LIMIT 20
+            """,
+            conn,
+            params=[audit_session],
+        )
+        lifecycle = pd.read_sql(
+            """
+            SELECT ticker_symbol, side, quantity, entry_time, entry_price, last_mark_time,
+                   last_mark_price, last_open_unrealized, unrealized_pnl, exit_time,
+                   exit_reason, realized_pnl, status
+            FROM paper_position_lifecycle
+            WHERE session_id = %s
+            ORDER BY entry_time DESC
+            LIMIT 50
+            """,
+            conn,
+            params=[audit_session],
+        )
         conn.close()
-        if row:
-            return {
-                "cash": float(row[0]),
-                "invested": float(row[1]),
-                "equity": float(row[2]),
-                "realized_pnl": float(row[3]),
-                "unrealized_pnl": float(row[4]),
-                "drawdown": float(row[5]),
-                "status": "LIVE",
-            }
-        else:
-            # Clean initial session before first snapshot (no trades executed yet)
-            return {
-                "cash": 100000.0,
-                "invested": 0.0,
-                "equity": 100000.0,
-                "realized_pnl": 0.0,
-                "unrealized_pnl": 0.0,
-                "drawdown": 0.0,
-                "status": "INITIAL",
-            }
-    except Exception as e:
-        logger.error(f"PostgreSQL error querying portfolio KPIs for session '{session_id}': {e}")
-        st.error(f"❌ PostgreSQL Portfolio Snapshots Query Error: {e}")
-        return {
-            "cash": 0.0,
-            "invested": 0.0,
-            "equity": 0.0,
-            "realized_pnl": 0.0,
-            "unrealized_pnl": 0.0,
-            "drawdown": 0.0,
-            "status": "ERROR",
-            "error_msg": str(e),
+        st.session_state["replay_audit"] = {
+            "session_id": audit_session,
+            "snapshot": snapshot,
+            "trades": trades,
+            "lifecycle": lifecycle,
         }
+    except Exception as exc:
+        st.session_state["replay_audit"] = {"session_id": audit_session, "error": str(exc)}
 
-kpis = get_portfolio_kpis(sess_id)
-
-k1, k2, k3, k4, k5 = st.columns(5)
-total_pnl = kpis["realized_pnl"] + kpis["unrealized_pnl"]
-pnl_pct = (total_pnl / 100000.0) * 100.0
-k1.metric("Total Equity", f"${kpis['equity']:,.2f}", delta=f"{pnl_pct:+.2f}%")
-k2.metric("Cash Balance", f"${kpis['cash']:,.2f}")
-k3.metric("Realized PnL", f"${kpis['realized_pnl']:+,.2f}")
-k4.metric("Unrealized PnL", f"${kpis['unrealized_pnl']:+,.2f}")
-
-circuit_breaker = kpis["drawdown"] <= -2.0
-cb_label = "🚨 TRIPPED (-2.0%)" if circuit_breaker else "✅ HEALTHY"
-k5.metric("Current Drawdown", f"{kpis['drawdown']:.2f}%", delta=cb_label, delta_color="inverse" if circuit_breaker else "normal")
-
-# -----------------------------------------------------------------------------
-# 3. Active Top-5 Ensemble Signals & Model Telemetry
-# -----------------------------------------------------------------------------
-st.subheader("🎯 Active Top-5 Ensemble & ML Directional Signals")
-st.caption("Bar-closed execution signals: Signals are evaluated strictly after bar closure to eliminate look-ahead leakage.")
-
-saved_alphas = AlphaResearchService.get_latest_top5_ensemble() or ["composite_eq", "momentum_1m", "vwap_dev", "rsi_reversal", "breakout_vol"]
-latest_sigs = state.get("latest_signals", {})
-
-sig_rows = []
-for tkr in ["AAPL", "NVDA", "MSFT", "AMZN", "GOOGL"]:
-    data = latest_sigs.get(tkr, {
-        "price": 150.0,
-        "p_ml": 0.50,
-        "z_combined": 0.0,
-        "action": "HOLD",
-        "status": "WAITING: No bar received yet",
-        "position": "FLAT",
-        "unrealized_pnl": 0.0,
-        "last_bar_time": "N/A",
-    })
-    sig_rows.append({
-        "Ticker": tkr,
-        "Mark Price": f"${data['price']:.2f}",
-        "ML Direction P(Up)": f"{data['p_ml']:.4f}",
-        "Combined Z-Score": f"{data['z_combined']:+.2f}",
-        "Signal Action": data["action"],
-        "Execution / Rejection Status": data.get("status", "EVALUATING"),
-        "Position": data.get("position", "FLAT"),
-        "Unrealized PnL": f"${data.get('unrealized_pnl', 0.0):+,.2f}",
-        "Last Event Time": data.get("last_bar_time", "N/A"),
-    })
-
-st.dataframe(pd.DataFrame(sig_rows), use_container_width=True, hide_index=True)
-
-# -----------------------------------------------------------------------------
-# 4. Open Positions & Executed Orders (PostgreSQL ACID Ledger)
-# -----------------------------------------------------------------------------
-p_col, t_col = st.columns([1, 1])
-
-with p_col:
-    st.subheader("📌 Open Positions Matrix")
-    try:
-        conn = get_postgres_connection()
-        pos_df = pd.read_sql("SELECT ticker_symbol, side, quantity, average_entry_price, current_mark_price, unrealized_pnl, stop_loss_price, take_profit_price FROM paper_positions WHERE session_id = %s", conn, params=[sess_id])
-        conn.close()
-        if not pos_df.empty:
-            st.dataframe(pos_df, use_container_width=True, hide_index=True)
-        else:
-            st.info("No open positions. Waiting for entry signals...")
-    except Exception as e:
-        st.warning(f"Positions query: {e}")
-
-with t_col:
-    st.subheader("📜 Recent Fills (paper_trades)")
-    try:
-        conn = get_postgres_connection()
-        trades_df = pd.read_sql("SELECT trade_id, ticker_symbol, direction, fill_price, fill_quantity, slippage_bps, realized_pnl, executed_at FROM paper_trades WHERE session_id = %s ORDER BY executed_at DESC LIMIT 8", conn, params=[sess_id])
-        conn.close()
-        if not trades_df.empty:
-            st.dataframe(trades_df, use_container_width=True, hide_index=True)
-        else:
-            st.info("No trades executed in this session yet.")
-    except Exception as e:
-        st.warning(f"Trades query: {e}")
-
-# Auto-refresh loop while running
-if state["is_running"] and not state["is_paused"]:
-    time.sleep(1.0)
-    st.rerun()
+audit = st.session_state.get("replay_audit") or {}
+if audit.get("session_id") != audit_session:
+    st.caption("Load the ledger to reconcile the final in-memory metrics with persisted rows.")
+elif audit.get("error"):
+    st.warning(audit["error"])
+else:
+    snapshot = audit.get("snapshot")
+    if snapshot is None or snapshot.empty:
+        st.caption("The ledger has no portfolio snapshot for this session yet.")
+    else:
+        row = snapshot.iloc[0]
+        st.caption(
+            f"Latest snapshot {row['snapshot_id']} at {row['recorded_at']}: "
+            f"equity ${float(row['total_portfolio_value']):,.2f}, "
+            f"realized ${float(row['realized_pnl_cumulative']):+,.2f}, "
+            f"unrealized ${float(row['unrealized_pnl_current']):+,.2f}."
+        )
+        live_metrics = ReplayController.get_state().get("live_metrics") or {}
+        if live_metrics.get("session_id") == audit_session:
+            equity_gap = abs(float(live_metrics.get("equity") or 0.0) - float(row["total_portfolio_value"]))
+            st.caption(f"In-memory equity differs from this snapshot by ${equity_gap:,.2f}.")
+    trades = audit.get("trades")
+    if trades is not None and not trades.empty:
+        st.dataframe(trades, use_container_width=True, hide_index=True)
+    else:
+        st.caption("No persisted fills for this session.")
+    lifecycle = audit.get("lifecycle")
+    if lifecycle is not None and not lifecycle.empty:
+        st.dataframe(lifecycle, use_container_width=True, hide_index=True)
+    else:
+        st.caption("No position lifecycle rows for this session.")

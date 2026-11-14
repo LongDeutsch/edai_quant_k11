@@ -18,7 +18,27 @@ import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
 
+from quant_edai.quant.metrics import format_sharpe
 from quant_edai.serving.dashboard.dashboard_service import AlphaResearchService, MarketDataService
+
+
+def _eval_sharpe(status, value, reason, trades) -> str:
+    if status != "COMPLETED":
+        return "N/A"
+    trade_count = None if pd.isna(trades) else int(trades)
+    return format_sharpe(None if pd.isna(value) else float(value), reason, trade_count=trade_count)
+
+
+def _eval_percent(status, value) -> str:
+    if status != "COMPLETED" or pd.isna(value):
+        return "N/A"
+    return f"{float(value) * 100.0:.1f}%"
+
+
+def _eval_rate(status, value) -> str:
+    if status != "COMPLETED" or pd.isna(value):
+        return "N/A"
+    return f"{float(value) * 100.0:.1f}%"
 
 st.set_page_config(
     page_title="Alpha Research | Quant Terminal",
@@ -109,7 +129,11 @@ with tab2:
 
             # Metrics Scorecard Strip
             s1, s2, s3, s4, s5, s6 = st.columns(6)
-            s1.metric("Sharpe Ratio", f"{m['sharpe_ratio']:.2f}", delta="Rf = 4.0%")
+            s1.metric(
+                "Sharpe Ratio",
+                format_sharpe(m.get("sharpe_ratio"), m.get("sharpe_reason"), trade_count=m.get("trade_count")),
+                delta="Rf = 4.0%",
+            )
             s2.metric("Total Return", f"{m['total_return_pct']:+.2f}%")
             s3.metric("Max Drawdown", f"{m['max_drawdown_pct']:.2f}%")
             s4.metric("Win Rate", f"{m['win_rate_pct']:.1f}%")
@@ -147,57 +171,201 @@ with tab2:
 # =============================================================================
 with tab3:
     st.subheader("🛡️ Independent Out-of-Sample (OOS) Validation & Quality Gate")
-    st.markdown("Strictly evaluated on held-out **OOS Split** (`2025-05-01` to `2026-04-30`). Admin reviews degradation across held-out market conditions before approving and freezing Top-5 ensembles.")
+    st.markdown(
+        "Each alpha is backtested on its own candles. "
+        "In-Sample is `2022-11-01` to `2025-04-30`. "
+        "Out-of-Sample is `2025-05-01` to `2026-04-30`. "
+        "The trading split is not used here."
+    )
 
-    oos_df = AlphaResearchService.get_alpha_validation_comparison()
+    oos_df = AlphaResearchService.get_alpha_validation_comparison(dataset_id=selected_dataset)
     if not oos_df.empty:
+        completed = oos_df[(oos_df["is_status"] == "COMPLETED") & (oos_df["oos_status"] == "COMPLETED")]
+        comparable = oos_df["degradation_pct"].dropna()
         col_ov1, col_ov2, col_ov3 = st.columns(3)
-        col_ov1.metric("Validated Alphas Count", len(oos_df))
-        approved_count = len(oos_df[oos_df["status"] == "APPROVED_FROZEN"])
+        col_ov1.metric("Completed IS and OOS", int(len(completed)))
+        approved_count = int((oos_df["lifecycle_status"] == "APPROVED_FROZEN").sum())
         col_ov2.metric("Approved Frozen Alphas", approved_count)
-        avg_deg = oos_df["degradation_pct"].mean()
-        col_ov3.metric("Average Factor Degradation", f"{avg_deg:.1f}%")
+        if comparable.empty:
+            col_ov3.metric("Average Factor Degradation", "N/A")
+        else:
+            col_ov3.metric("Average Factor Degradation", f"{float(comparable.mean()):.1f}%")
+        st.caption(
+            f"Average degradation uses {len(comparable)} of {len(oos_df)} registered alphas. "
+            "A row is included only when both Sharpes are defined and the In-Sample Sharpe is above 0.10. "
+            "Missing Out-of-Sample metrics stay N/A."
+        )
 
+        display = oos_df.copy()
+        display["IS Sharpe"] = [
+            _eval_sharpe(status, value, reason, trades)
+            for status, value, reason, trades in zip(
+                display["is_status"], display["is_sharpe"], display["is_sharpe_reason"], display["is_trades"]
+            )
+        ]
+        display["OOS Sharpe"] = [
+            _eval_sharpe(status, value, reason, trades)
+            for status, value, reason, trades in zip(
+                display["oos_status"], display["oos_sharpe"], display["oos_sharpe_reason"], display["oos_trades"]
+            )
+        ]
+        display["IS MDD"] = [_eval_percent(status, value) for status, value in zip(display["is_status"], display["is_mdd"])]
+        display["OOS MDD"] = [_eval_percent(status, value) for status, value in zip(display["oos_status"], display["oos_mdd"])]
+        display["Degradation"] = display["degradation_pct"].map(lambda value: "N/A" if pd.isna(value) else f"{float(value):.1f}%")
+        display["Sharpe change"] = display["sharpe_change"].map(lambda value: "N/A" if pd.isna(value) else f"{float(value):+.2f}")
+        display["OOS win rate"] = [
+            _eval_rate(status, value) for status, value in zip(display["oos_status"], display["oos_win_rate"])
+        ]
+        display["IS trades"] = display["is_trades"].map(lambda value: "N/A" if pd.isna(value) else int(value))
+        display["OOS trades"] = display["oos_trades"].map(lambda value: "N/A" if pd.isna(value) else int(value))
         st.dataframe(
-            oos_df[["alpha_id", "horizon", "status", "is_sharpe", "oos_sharpe", "is_mdd", "oos_mdd", "degradation_pct", "oos_win_rate"]],
+            display[[
+                "alpha_id", "version", "horizon", "lifecycle_status", "timeframe",
+                "is_status", "oos_status", "IS Sharpe", "OOS Sharpe", "Sharpe change", "Degradation",
+                "IS MDD", "OOS MDD", "IS trades", "OOS trades", "OOS win rate",
+                "is_run_id", "oos_run_id", "note",
+            ]].rename(columns={
+                "lifecycle_status": "lifecycle",
+                "is_status": "IS eval",
+                "oos_status": "OOS eval",
+                "is_run_id": "IS run",
+                "oos_run_id": "OOS run",
+            }),
             use_container_width=True,
             hide_index=True,
         )
 
         st.markdown("---")
         st.subheader("🔒 Admin Top-5 Approval & Freeze")
-        st.markdown("PM / Admin approves the Top-5 Ensemble based on OOS validation. This sets `status = APPROVED_FROZEN` in PostgreSQL and updates `alpha_ensemble_config` with cryptographic provenance.")
-
-        horizon_approve = st.radio("Target Serving Horizon", ["INTRADAY", "DAILY"], horizontal=True)
-        sub_oos = oos_df[oos_df["horizon"] == horizon_approve]
-        top_candidates = sub_oos.sort_values(by="oos_sharpe", ascending=False)["alpha_id"].tolist()
-        default_top5 = top_candidates[:5] if len(top_candidates) >= 5 else top_candidates
-
-        admin_top5 = st.multiselect(
-            f"Select 5 Validated {horizon_approve} Alphas for Approval",
-            options=top_candidates,
-            default=default_top5,
-            max_selections=5,
-            key=f"admin_approve_{horizon_approve}"
+        from quant_edai.quant.alpha_split_evaluation import (
+            POLICY_DOCUMENT,
+            POLICY_NAME,
+            is_admin_approver,
+            rank_ensemble_candidates,
+            weight_block_reason,
         )
 
+        st.caption(f"Policy `{POLICY_NAME}`: {POLICY_DOCUMENT}")
+        horizon_approve = st.radio("Target Serving Horizon", ["INTRADAY", "DAILY"], horizontal=True)
+        ranked = rank_ensemble_candidates(oos_df, horizon_approve)
+        eligible = ranked[ranked["eligible"] == True].sort_values("rank")
+        blocked = ranked[ranked["eligible"] != True]
+        st.caption(
+            f"{len(eligible)} {horizon_approve} versions on `{selected_dataset}` have completed IS and OOS runs with a defined Sharpe."
+        )
+        if horizon_approve == "INTRADAY":
+            st.caption("Daily alphas are excluded from this list and are not used to fill a short Intraday set.")
+
+        candidate_view = ranked.copy()
+        for column, status_column in (("IS Sharpe", "is_status"), ("OOS Sharpe", "oos_status")):
+            source = "is_sharpe" if column.startswith("IS") else "oos_sharpe"
+            reason = "is_sharpe_reason" if column.startswith("IS") else "oos_sharpe_reason"
+            trades = "is_trades" if column.startswith("IS") else "oos_trades"
+            candidate_view[column] = [
+                _eval_sharpe(status, value, why, count)
+                for status, value, why, count in zip(
+                    candidate_view[status_column], candidate_view[source], candidate_view[reason], candidate_view[trades]
+                )
+            ]
+        candidate_view["IS MDD"] = [
+            _eval_percent(status, value) for status, value in zip(candidate_view["is_status"], candidate_view["is_mdd"])
+        ]
+        candidate_view["OOS MDD"] = [
+            _eval_percent(status, value) for status, value in zip(candidate_view["oos_status"], candidate_view["oos_mdd"])
+        ]
+        candidate_view["IS trades"] = candidate_view["is_trades"].map(lambda value: "N/A" if pd.isna(value) else str(int(value)))
+        candidate_view["OOS trades"] = candidate_view["oos_trades"].map(lambda value: "N/A" if pd.isna(value) else str(int(value)))
+        candidate_view["Rank"] = candidate_view["rank"].map(lambda value: "" if pd.isna(value) else int(value))
+        st.dataframe(
+            candidate_view[[
+                "Rank", "alpha_id", "version", "eligible", "exclusion_reason",
+                "is_status", "oos_status", "IS Sharpe", "OOS Sharpe", "IS MDD", "OOS MDD",
+                "IS trades", "OOS trades", "is_run_id", "oos_run_id",
+            ]].rename(columns={
+                "alpha_id": "Alpha",
+                "version": "Version",
+                "eligible": "Eligible",
+                "exclusion_reason": "Why excluded",
+                "is_status": "IS eval",
+                "oos_status": "OOS eval",
+                "is_run_id": "IS run",
+                "oos_run_id": "OOS run",
+            }),
+            use_container_width=True,
+            hide_index=True,
+        )
+
+        if len(eligible) < 5:
+            st.error(
+                f"Approval blocked: {len(eligible)} eligible {horizon_approve} versions. Exactly five are required."
+            )
+            for row in blocked.itertuples(index=False):
+                st.write(f"`{row.alpha_id}@{row.version}`: {row.exclusion_reason}")
+
+        option_labels = [f"{row.alpha_id}@{row.version}" for row in eligible.itertuples(index=False)]
+        suggested = option_labels[:5]
+        if suggested:
+            st.caption("Suggested by the policy: " + ", ".join(suggested))
+        admin_top5 = st.multiselect(
+            f"Select 5 validated {horizon_approve} alpha versions",
+            options=option_labels,
+            default=suggested if len(eligible) >= 5 else [],
+            max_selections=5,
+            key=f"admin_approve_{horizon_approve}",
+        )
+        chosen_weights: list[float] = []
+        if len(admin_top5) == 5:
+            weight_columns = st.columns(5)
+            for index, label in enumerate(admin_top5):
+                chosen_weights.append(float(weight_columns[index].number_input(
+                    f"Weight {label}",
+                    min_value=0.0,
+                    max_value=1.0,
+                    value=0.20,
+                    step=0.05,
+                    format="%.2f",
+                    key=f"weight_{horizon_approve}_{label}",
+                )))
+            entered_weight_reason = weight_block_reason(chosen_weights)
+            if entered_weight_reason:
+                st.error(entered_weight_reason)
+        else:
+            entered_weight_reason = "Select exactly five versions."
         admin_user = st.text_input("Approving Admin User ID", value="ADMIN_PM")
 
-        if st.button(f"🔒 Approve & Freeze Top-5 {horizon_approve} Ensemble", type="primary", disabled=len(admin_top5) != 5):
+        selection_ready = (
+            len(eligible) >= 5
+            and len(admin_top5) == 5
+            and entered_weight_reason is None
+            and is_admin_approver(admin_user)
+        )
+        if st.button(
+            f"🔒 Approve & Freeze Top-5 {horizon_approve} Ensemble",
+            type="primary",
+            disabled=not selection_ready,
+        ):
+            chosen_ids = [item.split("@", 1)[0] for item in admin_top5]
+            chosen_versions = [item.split("@", 1)[1] for item in admin_top5]
             success = AlphaResearchService.save_top5_ensemble(
-                alpha_ids=admin_top5,
+                alpha_ids=chosen_ids,
                 horizon=horizon_approve,
                 dataset_id=selected_dataset,
                 approved_by=admin_user,
                 freeze=True,
+                versions=chosen_versions,
+                weights=chosen_weights,
             )
             if success:
-                st.success(f"✅ Successfully approved and frozen Top-5 {horizon_approve} Ensemble ({', '.join(admin_top5)})! Status: `APPROVED_FROZEN`. Live trading will use this verified ensemble.")
+                st.success(f"Approved and froze the {horizon_approve} Top-5.")
                 st.rerun()
             else:
-                st.error("Failed to approve ensemble. Check database connection.")
+                from quant_edai.quant.alpha_split_evaluation import approval_block_reason
+
+                st.error(approval_block_reason(
+                    chosen_ids, horizon_approve, admin_user, selected_dataset, chosen_versions,
+                ) or "The ensemble was not saved.")
     else:
-        st.info("No validation comparison available. Please refresh alpha metrics with splits.")
+        st.info("No registered alphas were found.")
 
 
 # =============================================================================
@@ -226,15 +394,30 @@ with tab4:
 
     st.markdown("---")
     st.subheader("📋 Active Production Ensemble Handoff")
-    active_intraday_ens = AlphaResearchService.get_latest_top5_ensemble(horizon="INTRADAY")
+    from quant_edai.quant.alpha_split_evaluation import latest_frozen_ensemble
+
+    active_intraday_ens = latest_frozen_ensemble(horizon="INTRADAY", dataset_id=selected_dataset)
     active_daily_ens = AlphaResearchService.get_latest_top5_ensemble(horizon="DAILY")
     col_e1, col_e2 = st.columns(2)
     with col_e1:
         st.markdown("**Active Intraday Ensemble (Page 3 Streaming)**")
         if active_intraday_ens:
-            st.success(f"Status: `APPROVED_FROZEN`\n\nAlphas: {', '.join(active_intraday_ens)}")
+            members = [
+                f"{alpha_id}@{version} ({weight:.2f})"
+                for alpha_id, version, weight in zip(
+                    active_intraday_ens["selected_alpha_ids"],
+                    active_intraday_ens["alpha_versions"],
+                    active_intraday_ens["weights"],
+                )
+            ]
+            st.success(
+                f"Status: `APPROVED_FROZEN` version {active_intraday_ens['ensemble_version']}\n\n"
+                f"Policy: `{active_intraday_ens['policy_name']}`\n\n"
+                f"Approved by {active_intraday_ens['approved_by']} at {active_intraday_ens['approved_at']}\n\n"
+                + "\n".join(members)
+            )
         else:
-            st.warning("No intraday ensemble configured.")
+            st.warning("No immutable Intraday approval for this dataset.")
     with col_e2:
         st.markdown("**Active Daily Ensemble (Daily Factor Allocation)**")
         if active_daily_ens:

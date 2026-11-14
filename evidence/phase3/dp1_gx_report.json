@@ -5,12 +5,12 @@
     "table": "lakehouse.bronze.raw_market_ohlcv",
     "description": "Validation suite for raw market ingestion from external MinIO source"
   },
-  "evaluated_rows": 3488,
+  "evaluated_rows": 16704,
   "total_expectations": 9,
   "successful_expectations": 9,
   "success_percent": 100.0,
   "status": "PASSED",
-  "evaluated_at": "2026-11-12T07:13:12.391680+00:00",
+  "evaluated_at": "2026-11-14T03:37:33.301701+00:00",
   "results": [
     {
       "expectation_type": "expect_column_to_exist",
@@ -54,8 +54,8 @@
       "success": true,
       "result": {
         "unexpected_count": 0,
-        "min_observed": 67.94,
-        "max_observed": 540.07
+        "min_observed": 33.37,
+        "max_observed": 543.45
       }
     },
     {
@@ -68,8 +68,8 @@
       "success": true,
       "result": {
         "unexpected_count": 0,
-        "min_observed": 67.94,
-        "max_observed": 540.07
+        "min_observed": 33.46,
+        "max_observed": 543.51
       }
     },
     {
@@ -82,8 +82,8 @@
       "success": true,
       "result": {
         "unexpected_count": 0,
-        "min_observed": 67.94,
-        "max_observed": 540.07
+        "min_observed": 33.35,
+        "max_observed": 543.45
       }
     },
     {
@@ -96,8 +96,8 @@
       "success": true,
       "result": {
         "unexpected_count": 0,
-        "min_observed": 67.94,
-        "max_observed": 540.07
+        "min_observed": 33.4,
+        "max_observed": 543.47
       }
     },
     {
@@ -110,7 +110,7 @@
       "result": {
         "unexpected_count": 0,
         "min_observed": 10.0,
-        "max_observed": 8184.0
+        "max_observed": 15909.0
       }
     },
     {

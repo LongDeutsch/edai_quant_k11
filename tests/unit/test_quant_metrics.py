@@ -5,6 +5,10 @@ import pandas as pd
 import pytest
 
 from quant_edai.quant.metrics import (
+    DISPLAY_NO_TRADES,
+    DISPLAY_ZERO_VOLATILITY,
+    SHARPE_INSUFFICIENT,
+    SHARPE_ZERO_VOLATILITY,
     calculate_calmar,
     calculate_cumulative_returns,
     calculate_hit_rate,
@@ -15,6 +19,11 @@ from quant_edai.quant.metrics import (
     calculate_rolling_sharpe,
     calculate_sharpe,
     calculate_sortino,
+    format_sharpe,
+    periods_per_year,
+    periodic_risk_free,
+    persisted_sharpe_needs_recompute,
+    stamp_recomputed_sharpe,
 )
 
 
@@ -49,20 +58,23 @@ def test_calculate_sharpe_daily_vs_intraday():
     returns = np.random.normal(loc=0.001, scale=0.01, size=252)
 
     sharpe_daily = calculate_sharpe(returns, rf=0.04, periods_per_year=252)
-    assert isinstance(sharpe_daily, float)
-    assert sharpe_daily > 0.0
+    assert sharpe_daily.defined
+    assert sharpe_daily.value > 0.0
 
     # Verify scaling factor periods_per_year with rf=0.0:
     sharpe_daily_zero_rf = calculate_sharpe(returns, rf=0.0, periods_per_year=252)
     sharpe_1m_zero_rf = calculate_sharpe(returns, rf=0.0, periods_per_year=98280)
     # Scale difference is sqrt(98280) / sqrt(252) = sqrt(390) ≈ 19.748
     expected_ratio = np.sqrt(98280 / 252)
-    assert pytest.approx(sharpe_1m_zero_rf / sharpe_daily_zero_rf, 0.001) == expected_ratio
+    assert pytest.approx(sharpe_1m_zero_rf.value / sharpe_daily_zero_rf.value, 0.001) == expected_ratio
 
-    # Edge cases
-    assert calculate_sharpe([]) == 0.0
-    assert calculate_sharpe([0.01]) == 0.0
-    assert calculate_sharpe([0.01, 0.01]) == 0.0  # zero variance
+    # Too few observations are undefined, not a silent 0.
+    assert calculate_sharpe([]).value is None
+    assert calculate_sharpe([]).reason == SHARPE_INSUFFICIENT
+    assert calculate_sharpe([0.01]).reason == SHARPE_INSUFFICIENT
+    flat = calculate_sharpe([0.01, 0.01])
+    assert flat.value is None
+    assert flat.reason == SHARPE_ZERO_VOLATILITY
 
 
 def test_calculate_sortino_and_calmar():
@@ -117,7 +129,9 @@ def test_calculate_rolling_sharpe_and_ic_series():
     returns = pd.Series(np.random.normal(0.001, 0.01, 100), index=dates)
     rolling = calculate_rolling_sharpe(returns, window=20, rf=0.0)
     assert len(rolling) == 100
-    assert not rolling.iloc[-1] == 0.0
+    assert np.isfinite(rolling.iloc[-1])
+    flat_roll = calculate_rolling_sharpe(np.zeros(80), window=20, rf=0.04, periods_per_year=78 * 252)
+    assert flat_roll.isna().all()
 
     # IC series across dates and tickers
     df = pd.DataFrame({
@@ -130,3 +144,86 @@ def test_calculate_rolling_sharpe_and_ic_series():
     assert len(ic_df) == 2
     assert pytest.approx(ic_df.iloc[0]["ic"], 0.001) == 1.0
     assert pytest.approx(ic_df.iloc[1]["ic"], 0.001) == 1.0
+
+
+def test_sharpe_frequency_and_risk_free_conversion():
+    assert periods_per_year("Daily") == 252
+    assert periods_per_year("5m") == 78 * 252
+    assert periods_per_year("15m") == 26 * 252
+    assert periods_per_year("1m") == 390 * 252
+    assert periodic_risk_free(0.04, 252) == pytest.approx(0.04 / 252)
+    assert periodic_risk_free(0.04, 78 * 252) == pytest.approx(0.04 / (78 * 252))
+    assert periodic_risk_free(0.04, 26 * 252) == pytest.approx(0.04 / (26 * 252))
+
+    returns = np.array([0.02, -0.01, 0.015, 0.005, -0.008, 0.012])
+    for periods in (252, 78 * 252, 26 * 252):
+        result = calculate_sharpe(returns, rf=0.04, periods_per_year=periods)
+        excess = returns - (0.04 / periods)
+        expected = (excess.mean() / excess.std(ddof=1)) * np.sqrt(periods)
+        assert result.reason is None
+        assert result.value == pytest.approx(expected, rel=1e-12)
+
+
+def test_sharpe_zero_trades_constant_negative_and_small_volatility():
+    # The 5-minute flat book that used to print Sharpe ≈ -6.7e16.
+    flat = calculate_sharpe(np.zeros(50_000), rf=0.04, periods_per_year=78 * 252)
+    assert flat.value is None
+    assert flat.reason == SHARPE_ZERO_VOLATILITY
+    assert format_sharpe(flat.value, flat.reason, trade_count=0) == DISPLAY_NO_TRADES
+
+    constant = calculate_sharpe(np.full(10_000, 0.01), rf=0.04, periods_per_year=252)
+    assert constant.value is None
+    assert constant.reason == SHARPE_ZERO_VOLATILITY
+    assert format_sharpe(constant.value, constant.reason, trade_count=4) == DISPLAY_ZERO_VOLATILITY
+
+    negative = np.tile(np.array([-0.02, 0.004, -0.015, 0.001, -0.01]), 40)
+    negative_sharpe = calculate_sharpe(negative, rf=0.04, periods_per_year=252)
+    assert negative_sharpe.reason is None
+    assert negative_sharpe.value < 0.0
+    assert format_sharpe(negative_sharpe.value, None, trade_count=12).startswith("-")
+
+    # Tiny but real volatility stays a finite Sharpe and is not clipped.
+    small = np.tile(np.array([1e-6 + 1e-8, 1e-6 - 1e-8]), 200)
+    small_sharpe = calculate_sharpe(small, rf=0.0, periods_per_year=252)
+    assert small_sharpe.reason is None
+    assert small_sharpe.value > 100.0
+    assert small_sharpe.value < 1e6
+    assert small_sharpe.rounded(2) == pytest.approx(round(small_sharpe.value, 2))
+
+
+def test_persisted_sharpe_recompute_keeps_valid_negatives_and_provenance():
+    assert persisted_sharpe_needs_recompute(-20.7348, 514, -1.9279) is False
+    assert persisted_sharpe_needs_recompute(0.4384, 40, 1.2) is False
+    assert persisted_sharpe_needs_recompute(0.0, 10, 0.5) is False
+    assert persisted_sharpe_needs_recompute(None, 0, 0.0) is False
+    assert persisted_sharpe_needs_recompute(0.0, 0, 0.0) is True
+    assert persisted_sharpe_needs_recompute(-6.7e16, 0, 0.0) is True
+
+    prior_doc = {
+        "run_id": "bt_alpha_compos_0393b15f",
+        "alpha_id": "alpha_composite_eq_daily",
+        "dataset_id": "gold_lakehouse",
+        "start_date": "2022-11-01",
+        "end_date": "2025-10-31",
+        "trade_count": 0,
+        "sharpe_ratio": 0.0,
+        "total_return_pct": 0.0,
+    }
+    result = calculate_sharpe(np.zeros(252), rf=0.04, periods_per_year=252)
+    stamped = stamp_recomputed_sharpe(
+        prior_doc,
+        result,
+        prior=0.0,
+        recomputed_at="2026-11-13T06:00:00+00:00",
+    )
+    assert stamped["run_id"] == prior_doc["run_id"]
+    assert stamped["alpha_id"] == prior_doc["alpha_id"]
+    assert stamped["dataset_id"] == prior_doc["dataset_id"]
+    assert stamped["start_date"] == prior_doc["start_date"]
+    assert stamped["end_date"] == prior_doc["end_date"]
+    assert stamped["trade_count"] == 0
+    assert stamped["total_return_pct"] == 0.0
+    assert stamped["sharpe_prior"] == 0.0
+    assert stamped["sharpe_ratio"] is None
+    assert stamped["sharpe_reason"] == SHARPE_ZERO_VOLATILITY
+    assert stamped["sharpe_recomputed_at"] == "2026-11-13T06:00:00+00:00"
